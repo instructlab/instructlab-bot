@@ -5,3 +5,7 @@ npm-debug.log
 .env
 coverage
 lib
+taxonomy
+config.yaml
+models
+generated
