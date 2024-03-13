@@ -10,6 +10,9 @@ npm install
 
 # Run the bot
 npm start
+
+# Run the bot with nodemon - hot reload on file changes
+npm run dev
 ```
 
 ## Docker
