@@ -30,4 +30,4 @@ For more, check out the [Contributing Guide](CONTRIBUTING.md).
 
 ## License
 
-[ISC](LICENSE) © 2024 Dave Tucker
+[Apache 2.0](LICENSE)
