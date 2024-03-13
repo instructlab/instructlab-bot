@@ -1,15 +1,15 @@
 {
   "action": "opened",
-  "issue": {
+  "pull_request": {
     "number": 1,
     "user": {
-      "login": "hiimbex"
+      "login": "instruct-lab-bot"
     }
   },
   "repository": {
-    "name": "testing-things",
+    "name": "taxonomy",
     "owner": {
-      "login": "hiimbex"
+      "login": "instruct-lab-bot"
     }
   },
   "installation": {
