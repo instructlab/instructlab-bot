@@ -1,7 +1,7 @@
 # instruct-lab-bot
 
-> [!NOTE] Work-in-progress
-> Proof-of-concept development in progress.
+> [!NOTE]
+> **Work-in-progress**: Proof-of-concept development in progress.
 
 A GitHub bot to increase contributor test and review velocity for
 [instruct-lab/taxonomy](https://github.com/instruct-lab/taxonomy).
