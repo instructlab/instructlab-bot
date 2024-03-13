@@ -3,18 +3,14 @@ import { Probot } from "probot";
 export default (app: Probot) => {
   app.on("pull_request.opened", async (context) => {
     const issueComment = context.issue({
-      body: `
-        Beep, boop 🤖  Hi, I'm instruct-lab-bot and I'm going to help you
-        with your pull request. Thanks for you contribution! 🎉
-
-        In order to proceed please reply with the following comment:
-
-        @instruct-lab-bot generate
-
-        This will trigger the generation of some test data for your
-        contribution. Once the data is generated, I will let you know
-        and you can proceed with the review.
-    `,
+      body:
+        `Beep, boop 🤖  Hi, I'm instruct-lab-bot and I'm going to help you` +
+        `with your pull request. Thanks for you contribution! 🎉\n` +
+        `In order to proceed please reply with the following comment:\n` +
+        `\`@instruct-lab-bot generate\`\n` +
+        `This will trigger the generation of some test data for your` +
+        `contribution. Once the data is generated, I will let you know` +
+        `and you can proceed with the review.`,
     });
     await context.octokit.issues.createComment(issueComment);
   });

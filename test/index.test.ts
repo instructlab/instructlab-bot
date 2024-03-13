@@ -3,7 +3,7 @@
 
 import nock from "nock";
 // Requiring our app implementation
-import myProbotApp from "../src/index.js";
+import myProbotApp from "../src/index";
 import { Probot, ProbotOctokit } from "probot";
 // Requiring our fixtures
 //import payload from "./fixtures/issues.opened.json" with { "type": "json"};
@@ -12,17 +12,26 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { describe, beforeEach, afterEach, test, expect } from "vitest";
 
-const issueCreatedBody = { body: "Thanks for opening this issue!" };
+const issueCreatedBody = {
+  body:
+    `Beep, boop 🤖  Hi, I'm instruct-lab-bot and I'm going to help you` +
+    `with your pull request. Thanks for you contribution! 🎉\n` +
+    `In order to proceed please reply with the following comment:\n` +
+    `\`@instruct-lab-bot generate\`\n` +
+    `This will trigger the generation of some test data for your` +
+    `contribution. Once the data is generated, I will let you know` +
+    `and you can proceed with the review.`,
+};
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const privateKey = fs.readFileSync(
   path.join(__dirname, "fixtures/mock-cert.pem"),
-  "utf-8",
+  "utf-8"
 );
 
 const payload = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "fixtures/issues.opened.json"), "utf-8"),
+  fs.readFileSync(path.join(__dirname, "fixtures/pr.opened.json"), "utf-8")
 );
 
 describe("My Probot app", () => {
@@ -43,7 +52,7 @@ describe("My Probot app", () => {
     probot.load(myProbotApp);
   });
 
-  test("creates a comment when an issue is opened", async () => {
+  test("creates a comment when an PR is opened", async () => {
     const mock = nock("https://api.github.com")
       // Test that we correctly return a test token
       .post("/app/installations/2/access_tokens")
@@ -51,18 +60,22 @@ describe("My Probot app", () => {
         token: "test",
         permissions: {
           issues: "write",
+          pull_request: "write",
         },
       })
 
       // Test that a comment is posted
-      .post("/repos/hiimbex/testing-things/issues/1/comments", (body: any) => {
-        expect(body).toMatchObject(issueCreatedBody);
-        return true;
-      })
+      .post(
+        "/repos/instruct-lab-bot/taxonomy/issues/1/comments",
+        (body: any) => {
+          expect(body).toMatchObject(issueCreatedBody);
+          return true;
+        }
+      )
       .reply(200);
 
     // Receive a webhook event
-    await probot.receive({ name: "issues", payload });
+    await probot.receive({ name: "pull_request", payload });
 
     expect(mock.pendingMocks()).toStrictEqual([]);
   });
