@@ -6,6 +6,9 @@
 A GitHub bot to increase contributor test and review velocity for
 [instruct-lab/taxonomy](https://github.com/instruct-lab/taxonomy).
 
+For PoC purposes, we are only running against a fork:
+[redhat-et/taxonomy](https://github.com/redhat-et/taxonomy).
+
 ## Overview
 
 Personas:
