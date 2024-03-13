@@ -40,12 +40,23 @@ This is a rough overview of the workflow we're implementing in this PoC.
 
 ## Resources
 
+### PoC Infrastructure
+
 For PoC purposes, we're running this on a single EC2 instance. We're using the following resources:
 
 - Flavor: p3.2xlarge (has 1 GPU)
 - OS: Fedora 39
 
 We are using Ansible to automate the setup and teardown of the environment.
+
+### Future Infrastructure
+
+If we decide to move forward with this workflow after the PoC, we envision:
+
+- An OpenShift cluster with nodes that have GPUs
+- Make use of workflows in OpenShift AI (kubeflow) for doing training
+- Run our teacher model, as well as models built for PRs via kserve
+  - Make use of serverless / knative capabilities here to allow for scaling down to zero for PR models not in use.
 
 ## Components
 
