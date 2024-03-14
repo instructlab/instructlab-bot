@@ -11,6 +11,7 @@
     name: instruct-lab-bot
     image: ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-bot:main
     state: started
+    pull: always
     links:
       - "instructlab:instructlab"
     ports:
@@ -20,7 +21,6 @@
       - APP_ID: "{{ app_id }}"
       - PRIVATE_KEY: "{{ private_key }}"
       - WEBHOOK_SECRET: "{{ webhook_secret }}"
-      - WORK_DIR: "/src/instructlab"
-      - VENV_DIR: "venv"
+      - WORK_DIR: "/data"
     volumes:
-      - "/home/{{ ansible_user }}/instructlab:/src/instructlab"
+      - "/home/{{ ansible_user }}/instructlab:/data"

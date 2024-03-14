@@ -34,6 +34,9 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          build-args: |
+            GITHUB_USER=instruct-lab-bot
+            GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
           file: Dockerfile
           push: true
           tags: ${{ steps.bot_meta.outputs.tags }}
@@ -50,6 +53,9 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          build-args: |
+            GITHUB_USER=instruct-lab-bot
+            GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
           file: Dockerfile.serve
           push: true
           tags: ${{ steps.labserve_meta.outputs.tags }}

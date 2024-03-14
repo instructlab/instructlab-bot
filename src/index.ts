@@ -5,9 +5,6 @@ import { Probot } from "probot";
 
 dotenv.config();
 
-const WORK_DIR = process.env.WORK_DIR;
-const VENV_DIR = process.env.VENV_DIR;
-
 function run(cmd: string) {
   return new Promise((resolve, reject) => {
     exec(cmd, (error, stdout, stderr) => {
@@ -51,9 +48,7 @@ export default (app: Probot) => {
 
       try {
         const prNumber = context.payload.issue.number;
-        await run(
-          `./scripts/generate.sh --work-dir ${WORK_DIR} --venv-dir ${VENV_DIR} ${prNumber}`,
-        );
+        await run(`./scripts/generate.sh ${prNumber}`);
         const issueComment = context.issue({
           body:
             `Beep, boop 🤖  The test data has been generated!\n` +

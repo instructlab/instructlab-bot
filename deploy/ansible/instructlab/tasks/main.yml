@@ -19,34 +19,10 @@
       https://instruct-lab-bot:{{ github_token }}@github.com
     mode: "0600"
 
-- name: Check if the cli directory exists
-  ansible.builtin.stat:
-    path: "{{ cli_directory }}"
-  register: cli_dir
-
-- name: Delete the cli directory if it exists
-  ansible.builtin.file:
-    path: "{{ cli_directory }}"
-    state: absent
-  when: cli_dir.stat.exists
-
-- name: Clone the cli repository
-  ansible.builtin.git: # noqa latest[git]
-    repo: https://github.com/redhat-et/instruct-lab-cli
-    dest: "{{ cli_directory }}"
-    clone: true
-    update: true
-
 - name: Check if the taxonomy directory exists
   ansible.builtin.stat:
     path: "{{ taxonomy_directory }}"
   register: taxonomy_dir
-
-- name: Delete the taxonomy directory if it exists
-  ansible.builtin.file:
-    path: "{{ taxonomy_directory }}"
-    state: absent
-  when: taxonomy_dir.stat.exists
 
 - name: Clone the taxonomy repository
   ansible.builtin.git: # noqa latest[git]
@@ -55,24 +31,9 @@
     clone: true
     update: true
 
-- name: Create Python virtual environment if it does not exist
-  ansible.builtin.shell: |
-    python3 -m venv {{ python_venv_path }}
-  args:
-    executable: /bin/bash
-    creates: "{{ python_venv_path }}/bin/activate"
-
-- name: Install Labrador CLI
-  ansible.builtin.pip:
-    name: .
-    virtualenv: "{{ python_venv_path }}"
-    state: present
-    chdir: "{{ cli_directory }}"
-
 - name: Install additional packages
   ansible.builtin.pip:
     name: huggingface-hub
-    virtualenv: "{{ python_venv_path }}"
     state: present
 
 - name: Create the models directory
@@ -81,9 +42,14 @@
     state: directory
     mode: "0755"
 
+- name: Check if model exists
+  ansible.builtin.stat:
+    path: "{{ models_directory }}/{{ new_model_path }}"
+  register: model
+
 - name: Download model from Hugging Face # noqa no-changed-when
+  when: model.stat.exists == false
   ansible.builtin.shell: |
-    source {{ python_venv_path }}/bin/activate
     huggingface-cli download \
       TheBloke/Mistral-7B-Instruct-v0.1-GGUF \
       mistral-7b-instruct-v0.1.Q4_K_M.gguf \
@@ -120,14 +86,15 @@
         gpu_layers: -1
         host_port: localhost:8000
         max_ctx_size: 4096
-        model_path: models/{{ new_model_path }}
+        model_path: models/mistral-7b-instruct-v0.1.Q4_K_M.gguf
 
 - name: Serve the model
   community.docker.docker_container:
     name: instruct-lab-serve
     image: ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-serve:main
+    pull: always
     state: started
     ports:
       - "8000:8000"
     volumes:
-      - "/home/{{ ansible_user }}/instructlab:/src"
+      - "/home/{{ ansible_user }}/instructlab:/data"
