@@ -48,7 +48,7 @@
   register: model
 
 - name: Download model from Hugging Face # noqa no-changed-when
-  when: model.stat.exists == false
+  when: not model.stat.exists
   ansible.builtin.shell: |
     huggingface-cli download \
       TheBloke/Mistral-7B-Instruct-v0.1-GGUF \
@@ -62,6 +62,7 @@
 - name: Initialize lab # noqa no-changed-when
   ansible.builtin.copy:
     dest: "{{ app_directory }}/config.yaml"
+    mode: preserve
     content: |
       chat:
         context: default
