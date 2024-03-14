@@ -52,11 +52,12 @@ generate() {
     fi
     cd taxonomy || exit 1
     git fetch origin
+    git checkout main
     git branch -D "pr-${PR_ID}" 2>/dev/null
     git fetch origin "pull/${PR_ID}/head:pr-${PR_ID}"
     git checkout "pr-${PR_ID}"
+    OUTPUT_DIR="generate-pr-${PR_ID}-$(git rev-parse --short HEAD)"
     cd ..
-    OUTPUT_DIR="generate-pr-${PR_ID}"
     mkdir -p "$OUTPUT_DIR"
     lab generate --output-dir "$OUTPUT_DIR" --num-instructions "${NUM_INSTRUCTIONS}"
 }
@@ -67,6 +68,10 @@ while [ $# -gt 0 ]; do
         --help)
             usage
             exit 0
+            ;;
+        --num-instructions)
+            NUM_INSTRUCTIONS="$2"
+            shift
             ;;
         --venv-dir)
             VENV_DIR="$2"
