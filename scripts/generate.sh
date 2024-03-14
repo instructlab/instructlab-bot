@@ -60,6 +60,31 @@ generate() {
     cd ..
     mkdir -p "$OUTPUT_DIR"
     lab generate --output-dir "$OUTPUT_DIR" --num-instructions "${NUM_INSTRUCTIONS}"
+    aws s3 cp --content-type text/plain --recursive "$OUTPUT_DIR" "s3://instruct-lab-bot/generate/${OUTPUT_DIR}"
+    cat << EOF > "$OUTPUT_DIR/index.html"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generated Data for ${OUTPUT_DIR}</title>
+</head>
+<body>
+    <h1>Generated Data for ${OUTPUT_DIR}</h1>
+    <ul>
+EOF
+    for file in "$OUTPUT_DIR"/*; do
+        if [ "$(basename ${file})" == "index.html" ]; then
+            continue
+        fi
+        URL=$(aws s3 presign --region us-east-2 "s3://instruct-lab-bot/generate/${file}")
+        echo "        <li><a href=\"${URL}\">$(basename ${file})</a></li>" >> "$OUTPUT_DIR/index.html"
+    done
+    cat << EOF >> "$OUTPUT_DIR/index.html"
+    </ul>
+</body>
+</html>
+EOF
+    aws s3 cp "$OUTPUT_DIR/index.html" "s3://instruct-lab-bot/generate/${OUTPUT_DIR}/index.html"
+    aws s3 presign --region us-east-2 "s3://instruct-lab-bot/generate/${OUTPUT_DIR}/index.html"
 }
 
 # Parse command line arguments
