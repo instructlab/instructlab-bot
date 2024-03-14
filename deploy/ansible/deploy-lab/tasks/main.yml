@@ -1,0 +1,85 @@
+---
+- name: Update all packages
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+  become: yes
+
+- name: Install base required packages
+  ansible.builtin.dnf:
+    name:
+      - g++
+      - python3
+      - python3-devel
+      - nodejs
+      - dnf-plugins-core
+    state: present
+  become: yes
+
+- name: Add container runtime repo
+  ansible.builtin.command: dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+  become: yes
+
+- name: Install container runtime
+  ansible.builtin.dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  become: yes
+
+- name: Setup Python virtual environment
+  ansible.builtin.shell: |
+    git clone git@github.com:instruct-lab/cli.git
+
+- name: Setup Python virtual environment
+  ansible.builtin.shell: |
+    python3 -m venv {{ python_venv_path }}
+    source {{ python_venv_path }}/bin/activate
+    cd {{ app_directory }}
+    pip install -e .
+  args:
+    executable: /bin/bash
+    creates: "{{ python_venv_path }}/bin/activate"
+
+- name: Install additional Python packages
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    pip3 install huggingface-hub
+  args:
+    executable: /bin/bash
+
+- name: Download model from Hugging Face
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    mkdir -p {{ models_directory }}
+    huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.1-GGUF mistral-7b-instruct-v0.1.Q4_K_M.gguf --local-dir {{ models_directory }} --local-dir-use-symlinks False
+  args:
+    executable: /bin/bash
+
+- name: Update the model path in config.yaml
+  ansible.builtin.replace:
+    path: "{{ app_directory }}/config.yaml"
+    regexp: 'model_path: models/merlinite-7b-Q4_K_M.gguf'
+    replace: 'model_path: {{ new_model_path }}'
+
+- name: Serve the lab
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    cd {{ app_directory }}
+    lab serve --model-path ./{{ new_model_path }}
+  args:
+    executable: /bin/bash
+    async: 10
+    poll: 0
+
+- name: Initialize the lab
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    cd {{ app_directory }}
+    lab init --non-interactive
+  args:
+    executable: /bin/bash

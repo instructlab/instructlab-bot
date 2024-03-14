@@ -1,0 +1,18 @@
+# Create the ec2 instance
+#- hosts: localhost
+#  vars_files:
+#    - vars.yml
+#  roles:
+#    - role: setup-ec2
+
+# Deploy Lab Bot
+- hosts: labNodes
+#  become: yes
+  vars:
+    git_repo: git@github.com:instruct-lab/cli.git
+    python_venv_path: "{{ ansible_env.HOME }}/venv"
+    app_directory: "{{ ansible_env.HOME }}/cli"
+    models_directory: "{{ app_directory }}/models"
+    new_model_path: "models/mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+  roles:
+    - role: deploy-lab
