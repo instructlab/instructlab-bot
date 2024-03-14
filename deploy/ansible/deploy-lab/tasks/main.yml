@@ -31,6 +31,68 @@
     state: present
   become: yes
 
+- name: Install pm2 using npm
+  ansible.builtin.npm:
+    name: pm2
+    global: yes
+  become: yes
+
+- name: Check if the instruct-lab-bot directory exists
+  stat:
+    path: {{ ghbot_directory }}/instruct-lab-bot
+  register: instruct_lab_bot_dir
+
+- name: Delete the instruct-lab-bot directory if it exists
+  file:
+    path: {{ ghbot_directory }}/instruct-lab-bot
+    state: absent
+  when: instruct_lab_bot_dir.stat.exists
+
+- name: Clone the instruct-lab-bot repository
+  git:
+    repo: https://github.com/redhat-et/instruct-lab-bot
+    dest: {{ ghbot_directory }}/instruct-lab-bot
+    clone: yes
+    update: yes
+
+- name: Install instruct lab bot dependencies
+  ansible.builtin.shell: |
+    cd {{ ghbot_directory }}
+    npm install
+  args:
+    executable: /bin/bash
+
+- name: Setup environment variables for instruct lab bot
+  ansible.builtin.shell: |
+    cd {{ ghbot_directory }}
+    echo "export GITHUB_TOKEN={{ github_token }}" > .env
+  args:
+    executable: /bin/bash
+
+- name: Setup environment variables for instruct lab bot
+  vars:
+    env_file_path: {{ ghbot_directory }}/.env
+  tasks:
+    - name: Ensure key-value pairs are in .env file
+      ansible.builtin.lineinfile:
+        path: "{{ env_file_path }}"
+        line: "{{ item.key }}={{ item.value }}"
+        insertafter: EOF
+      loop:
+        - { key: "WEBHOOK_PROXY_URL", value: ${{ secrets.WEBHOOK_PROXY_URL }} }
+        - { key: "APP_ID", value: ${{ secrets.APP_ID }} }
+        - { key: "PRIVATE_KEY", value: ${{ secrets.PRIVATE_KEY }} }
+        - { key: "WEBHOOK_SECRET", value: ${{ secrets.WEBHOOK_SECRET }} }
+        - { key: "GITHUB_CLIENT_ID", value: ${{ secrets.GITHUB_CLIENT_ID }} }
+        - { key: "GITHUB_CLIENT_SECRET", value: ${{ secrets.GITHUB_CLIENT_SECRET }} }
+
+- name: Run the instruct lab bot
+  ansible.builtin.shell: |
+    cd {{ ghbot_directory }}
+    pm2 start npm --name "ghbot" -- start
+  args:
+    executable: /bin/bash
+
 - name: Check if the cli directory exists
   stat:
     path: /home/{{ ansible_user }}/cli
