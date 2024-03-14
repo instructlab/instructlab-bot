@@ -44,7 +44,7 @@ export default (app: Probot) => {
 
       try {
         let prNumber = context.payload.issue.number;
-        await run(`./scripts/generate.sh ${prNumber}`);
+        await run(`./scripts/generate.sh --work-dir instruct-lab --venv-dir venv ${prNumber}`);
         const issueComment = context.issue({
           body:
             `Beep, boop 🤖  The test data has been generated!\n` +
