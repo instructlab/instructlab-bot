@@ -44,7 +44,7 @@
 
 - name: Check if model exists
   ansible.builtin.stat:
-    path: "{{ models_directory }}/{{ new_model_path }}"
+    path: "{{ models_directory }}/mistral-7b-instruct-v0.1.Q4_K_M.gguf"
   register: model
 
 - name: Download model from Hugging Face # noqa no-changed-when
