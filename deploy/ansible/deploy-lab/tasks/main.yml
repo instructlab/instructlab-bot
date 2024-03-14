@@ -32,9 +32,8 @@
   become: true
 
 - name: Install pm2 using npm
-  ansible.builtin.npm:
-    name: pm2
-    global: true
+  ansible.builtin.shell: |
+    npm install pm2 -g
   become: true
 
 - name: Check if the instruct-lab-bot directory exists
