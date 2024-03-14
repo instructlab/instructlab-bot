@@ -1,0 +1,31 @@
+---
+- name: Remove Packages
+  ansible.builtin.dnf:
+    name:
+      - nvidia-docker
+      - nvidia-docker2
+      - nvidia-container-runtime
+    state: absent
+    autoremove: true
+
+- name: Add Repo
+  ansible.builtin.get_url:
+    url: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+    dest: "/etc/yum.repos.d/nvidia-container-toolkit.repo"
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Install Packages
+  ansible.builtin.dnf:
+    name:
+      - nvidia-container-runtime
+    state: present
+    update_cache: true
+  notify: restart docker
+
+- name: Set docker daemon configuration
+  ansible.builtin.shell: |
+    nvidia-ctk runtime configure --runtime=docker
+  changed_when: true
+  notify: restart docker

@@ -1,0 +1,26 @@
+---
+- name: Log into GHCR
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: instruct-lab-bot
+    password: "{{ github_token }}"
+    reauthorize: true
+
+- name: Start the container
+  community.docker.docker_container:
+    name: instruct-lab-bot
+    image: ghcr.io/redhat-et/instruct-lab-bot:main
+    state: started
+    links:
+      - "instructlab:instructlab"
+    ports:
+      # Publish container port 9000 as host port 8080
+      - "3000:3000"
+    env:
+      - APP_ID: "{{ app_id }}"
+      - PRIVATE_KEY: "{{ private_key }}"
+      - WEBHOOK_SECRET: "{{ webhook_secret }}"
+      - WORK_DIR: "/src/instructlab"
+      - VENV_DIR: "venv"
+    volumes:
+      - "/home/{{ ansible_user }}/instructlab:/src/instructlab"

@@ -23,17 +23,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      - name: Extract metadata (tags, labels) for bot image
+        id: bot_meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}/bot
+            ghcr.io/${{ github.repository }}/instruct-lab-bot
 
-      - name: Build and push Docker images
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+      - name: Build and push bot image
+        uses: docker/build-push-action@v4
         with:
           context: .
+          file: Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.bot_meta.outputs.tags }}
+          labels: ${{ steps.bot_meta.outputs.labels }}
+
+      - name: Extract metadata (tags, labels) for labserve image
+        id: labserve_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}/instruct-lab-serve
+
+      - name: Build and push serve image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.labserve_meta.outputs.tags }}
+          labels: ${{ steps.labserve_meta.outputs.labels }}

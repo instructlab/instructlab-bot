@@ -1,2 +1,2 @@
 [labNodes]
-18.216.243.25
+18.216.243.25 ansible_ssh_user=fedora ansible_ssh_private_key_file=~/.ssh/id_rsa

@@ -1,0 +1,6 @@
+FROM docker.io/library/python:3.10
+VOLUME /src
+ENV VENV_DIR=venv
+COPY ./scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+WORKDIR /src
+ENTRYPOINT [ "/usr/local/bin/entrypoint.sh"]

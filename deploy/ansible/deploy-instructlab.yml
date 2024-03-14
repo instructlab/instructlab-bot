@@ -1,0 +1,4 @@
+- name: Deploy InstructLab
+  hosts: labNodes
+  roles:
+    - role: instructlab

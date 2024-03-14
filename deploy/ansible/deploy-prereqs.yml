@@ -1,0 +1,9 @@
+- name: Deploy Node Prereqs
+  hosts: labNodes
+  roles:
+    - role: geerlingguy.docker
+      become: true
+    - role: "nvidia-container-toolkit"
+      become: true
+    - role: packages
+      become: true

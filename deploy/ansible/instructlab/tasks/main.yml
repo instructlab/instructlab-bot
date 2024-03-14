@@ -1,0 +1,124 @@
+---
+- name: Log into GHCR
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: instruct-lab-bot
+    password: "{{ github_token }}"
+    reauthorize: true
+
+- name: Remove git credential helper
+  community.general.git_config:
+    name: credential.https://github.com.username.helper
+    state: absent
+    scope: global
+
+- name: Set git username
+  community.general.git_config:
+    name: credential.https://github.com.username
+    value: instruct-lab-bot
+    scope: global
+
+- name: Set git password
+  community.general.git_config:
+    name: credential.https://github.com.password
+    value: "{{ github_token }}"
+    scope: global
+
+- name: Check if the cli directory exists
+  ansible.builtin.stat:
+    path: "{{ cli_directory }}"
+  register: cli_dir
+
+- name: Delete the cli directory if it exists
+  ansible.builtin.file:
+    path: "{{ cli_directory }}"
+    state: absent
+  when: cli_dir.stat.exists
+
+- name: Clone the cli repository
+  ansible.builtin.git: # noqa latest[git]
+    repo: https://github.com/redhat-et/instruct-lab-cli
+    dest: "{{ cli_directory }}"
+    clone: true
+    update: true
+
+- name: Check if the taxonomy directory exists
+  ansible.builtin.stat:
+    path: "{{ taxonomy_directory }}"
+  register: taxonomy_dir
+
+- name: Delete the taxonomy directory if it exists
+  ansible.builtin.file:
+    path: "{{ taxonomy_directory }}"
+    state: absent
+  when: taxonomy_dir.stat.exists
+
+- name: Clone the taxonomy repository
+  ansible.builtin.git: # noqa latest[git]
+    repo: https://github.com/redhat-et/taxonomy
+    dest: "{{ taxonomy_directory }}"
+    clone: true
+    update: true
+
+- name: Create Python virtual environment if it does not exist
+  ansible.builtin.shell: |
+    python3 -m venv {{ python_venv_path }}
+  args:
+    executable: /bin/bash
+    creates: "{{ python_venv_path }}/bin/activate"
+
+- name: Install Labrador CLI
+  ansible.builtin.pip:
+    name: .
+    virtualenv: "{{ python_venv_path }}"
+    state: present
+    chdir: "{{ cli_directory }}"
+
+- name: Install additional packages
+  ansible.builtin.pip:
+    name: hugging-face-hub
+    virtualenv: "{{ python_venv_path }}"
+    state: present
+
+- name: Create the models directory
+  ansible.builtin.file:
+    path: "{{ models_directory }}"
+    state: directory
+    mode: "0755"
+
+- name: Download model from Hugging Face # noqa no-changed-when
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    mkdir -p {{ models_directory }}
+    huggingface-cli download \
+      TheBloke/Mistral-7B-Instruct-v0.1-GGUF \
+      mistral-7b-instruct-v0.1.Q4_K_M.gguf \
+      --local-dir {{ models_directory }} \
+      --local-dir-use-symlinks False
+  args:
+    executable: /bin/bash
+    chdir: "{{ models_directory }}"
+
+- name: Initialize lab # noqa no-changed-when
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    lab init --non-interactive
+  args:
+    executable: /bin/bash
+    chdir: "{{ app_directory }}"
+
+- name: Update the model path in config.yaml
+  ansible.builtin.replace:
+    path: "{{ app_directory }}/config.yaml"
+    regexp: "model_path: models/merlinite-7b-Q4_K_M.gguf"
+    replace: "model_path: {{ new_model_path }}"
+
+- name: Serve the model
+  community.docker.docker_container:
+    name: instruct-lab-serve
+    image: ghcr.io/redhat-et/instruct-lab-serve:main
+    state: started
+    ports:
+      - "8000:8000"
+    volumes:
+      - "/home/{{ ansible_user }}/instructlab:/src"

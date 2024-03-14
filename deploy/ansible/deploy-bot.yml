@@ -1,0 +1,4 @@
+- name: Deploy Lab Bot
+  hosts: labNodes
+  roles:
+    - role: bot
