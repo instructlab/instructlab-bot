@@ -23,3 +23,19 @@ md-lint: ## Lint markdown files
 shellcheck: ## Run shellcheck on scripts/*.sh
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[SHELLCHECK] scripts/*.sh"
 	$(CMD_PREFIX) shellcheck scripts/*.sh
+
+.PHONY: ansible-lint
+ansible-lint: ## Run ansible-lint on playbooks/*.yml
+	$(CMD_PREFIX) if ! which ansible-galaxy >/dev/null 2>&1; then \
+		echo "Please install ansible-galaxy." ; \
+		echo "See: https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html" ; \
+		exit 1 ; \
+	fi
+	$(CMD_PREFIX) if ! which ansible-lint >/dev/null 2>&1; then \
+		echo "Please install ansible-lint." ; \
+		echo "See: https://ansible.readthedocs.io/projects/lint/installing/#installing-the-latest-version" ; \
+		exit 1 ; \
+	fi
+	$(CMD_PREFIX) ansible-galaxy install -r ./deploy/ansible/requirements.yml
+	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[ANSIBLE LINT]"
+	$(CMD_PREFIX) ansible-lint
