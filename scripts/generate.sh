@@ -2,12 +2,14 @@
 
 VENV_DIR=""
 WORK_DIR=""
+NUM_INSTRUCTIONS=10
 
 usage() {
     echo "Usage: $0 [--work-dir PATH] [--venv-dir PATH] PR_NUMBER"
     echo
     echo "  --work-dir PATH: Path to the working directory to move into"
     echo "  --venv-dir PATH: Path to the virtual environment to activate, relative to the working directory"
+    echo "  --num-instructions NUM: The number of instructions to generate (default: ${NUM_INSTRUCTIONS})"
     echo "  PR_NUMBER: The number of the pull request to generate data for"
 }
 
@@ -56,7 +58,7 @@ generate() {
     cd ..
     OUTPUT_DIR="generate-pr-${PR_ID}"
     mkdir -p "$OUTPUT_DIR"
-    lab generate --output-dir "$OUTPUT_DIR"
+    lab generate --output-dir "$OUTPUT_DIR" --num-instructions "${NUM_INSTRUCTIONS}"
 }
 
 # Parse command line arguments
