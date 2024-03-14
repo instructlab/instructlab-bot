@@ -31,21 +31,44 @@
     state: present
   become: yes
 
-- name: Setup Python virtual environment
-  ansible.builtin.shell: |
-    git clone git@github.com:instruct-lab/cli.git
+- name: Check if the cli directory exists
+  stat:
+    path: /home/{{ ansible_user }}/cli
+  register: cli_dir
 
-- name: Setup Python virtual environment
+- name: Delete the cli directory if it exists
+  file:
+    path: /home/{{ ansible_user }}/cli
+    state: absent
+  when: cli_dir.stat.exists
+
+- name: Clone the cli repository
+  git:
+    repo: https://github.com/instruct-lab/cli
+    dest: /home/{{ ansible_user }}/cli
+    clone: yes
+    update: yes
+
+#- name: Clone the CLI repo
+#  ansible.builtin.shell: |
+#    git clone git@github.com:instruct-lab/cli.git
+
+- name: Create Python virtual environment if it does not exist
   ansible.builtin.shell: |
     python3 -m venv {{ python_venv_path }}
+  args:
+    executable: /bin/bash
+    creates: "{{ python_venv_path }}/bin/activate"
+
+- name: Install Labrador CLI
+  ansible.builtin.shell: |
     source {{ python_venv_path }}/bin/activate
     cd {{ app_directory }}
     pip install -e .
   args:
     executable: /bin/bash
-    creates: "{{ python_venv_path }}/bin/activate"
 
-- name: Install additional Python packages
+- name: Install additional packages
   ansible.builtin.shell: |
     source {{ python_venv_path }}/bin/activate
     pip3 install huggingface-hub
@@ -57,6 +80,14 @@
     source {{ python_venv_path }}/bin/activate
     mkdir -p {{ models_directory }}
     huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.1-GGUF mistral-7b-instruct-v0.1.Q4_K_M.gguf --local-dir {{ models_directory }} --local-dir-use-symlinks False
+  args:
+    executable: /bin/bash
+
+- name: Initialize lab
+  ansible.builtin.shell: |
+    source {{ python_venv_path }}/bin/activate
+    cd {{ app_directory }}
+    lab init --non-interactive
   args:
     executable: /bin/bash
 
@@ -76,10 +107,3 @@
     async: 10
     poll: 0
 
-- name: Initialize the lab
-  ansible.builtin.shell: |
-    source {{ python_venv_path }}/bin/activate
-    cd {{ app_directory }}
-    lab init --non-interactive
-  args:
-    executable: /bin/bash
