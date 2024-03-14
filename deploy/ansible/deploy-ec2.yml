@@ -8,4 +8,6 @@
     models_directory: "{{ app_directory }}/models"
     new_model_path: "models/mistral-7b-instruct-v0.1.Q4_K_M.gguf"
   roles:
+    - geerlingguy.pip
+    - geerlingguy.supervisor
     - role: deploy-lab
