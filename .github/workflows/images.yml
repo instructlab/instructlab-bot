@@ -50,7 +50,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile.serve
           push: true
           tags: ${{ steps.labserve_meta.outputs.tags }}
           labels: ${{ steps.labserve_meta.outputs.labels }}

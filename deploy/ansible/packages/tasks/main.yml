@@ -11,3 +11,9 @@
       - python3
       - python3-devel
     state: present
+
+- name: Add user to the Docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes

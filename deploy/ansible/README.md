@@ -23,7 +23,7 @@ ansible-playbook -i inventory.txt deploy-prereqs.yml
 ## Run Playbook to Setup the InstructLab environment
 
 ```console
-ansible-playbook -i inventory.txt deploy-instructlab.yml
+ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-instructlab.yml
 ```
 
 ## Run Playbook to Deploy the bot
