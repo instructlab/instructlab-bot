@@ -1,6 +1,12 @@
 import { exec } from "node:child_process";
 
+import dotenv from "dotenv";
 import { Probot } from "probot";
+
+dotenv.config();
+
+const WORK_DIR = process.env.WORK_DIR;
+const VENV_DIR = process.env.VENV_DIR;
 
 function run(cmd: string) {
   return new Promise((resolve, reject) => {
@@ -46,7 +52,7 @@ export default (app: Probot) => {
       try {
         const prNumber = context.payload.issue.number;
         await run(
-          `./scripts/generate.sh --work-dir instruct-lab --venv-dir venv ${prNumber}`,
+          `./scripts/generate.sh --work-dir ${WORK_DIR} --venv-dir ${VENV_DIR} ${prNumber}`,
         );
         const issueComment = context.issue({
           body:
