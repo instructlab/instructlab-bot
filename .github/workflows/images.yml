@@ -31,7 +31,7 @@ jobs:
             ghcr.io/${{ github.repository }}/instruct-lab-bot
 
       - name: Build and push bot image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           build-args: |
@@ -52,7 +52,7 @@ jobs:
             ghcr.io/${{ github.repository }}/instruct-lab-serve
 
       - name: Build and push serve image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           build-args: |
