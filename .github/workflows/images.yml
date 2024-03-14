@@ -37,10 +37,12 @@ jobs:
           build-args: |
             GITHUB_USER=instruct-lab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
-          file: Dockerfile
+          target: bot
           push: true
           tags: ${{ steps.bot_meta.outputs.tags }}
           labels: ${{ steps.bot_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Extract metadata (tags, labels) for labserve image
         id: labserve_meta
@@ -56,7 +58,9 @@ jobs:
           build-args: |
             GITHUB_USER=instruct-lab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
-          file: Dockerfile.serve
+          target: serve
           push: true
           tags: ${{ steps.labserve_meta.outputs.tags }}
           labels: ${{ steps.labserve_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

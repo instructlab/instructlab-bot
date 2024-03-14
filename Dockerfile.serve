@@ -1,8 +1,0 @@
-FROM docker.io/library/python:3.10
-ARG GITHUB_USER
-ARG GITHUB_TOKEN
-RUN pip install -e git+https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli#egg=cli
-COPY ./scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-VOLUME [ "/data" ]
-WORKDIR /data
-ENTRYPOINT [ "lab", "serve"]
