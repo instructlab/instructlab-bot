@@ -16,12 +16,12 @@ export default (app: Probot) => {
     const issueComment = context.issue({
       body:
         `Beep, boop 🤖  Hi, I'm instruct-lab-bot and I'm going to help you` +
-        `with your pull request. Thanks for you contribution! 🎉\n` +
+        ` with your pull request. Thanks for you contribution! 🎉\n` +
         `In order to proceed please reply with the following comment:\n` +
         `\`@instruct-lab-bot generate\`\n` +
         `This will trigger the generation of some test data for your` +
-        `contribution. Once the data is generated, I will let you know` +
-        `and you can proceed with the review.`,
+        ` contribution. Once the data is generated, I will let you know` +
+        ` and you can proceed with the review.`,
     });
     await context.octokit.issues.createComment(issueComment);
   });
