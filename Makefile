@@ -18,3 +18,8 @@ endif
 md-lint: ## Lint markdown files
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[MD LINT]"
 	$(CMD_PREFIX) docker run --rm -v $(CURDIR):/workdir docker.io/davidanson/markdownlint-cli2:v0.6.0 > /dev/null
+
+.PHONY: shellcheck
+shellcheck: ## Run shellcheck on scripts/*.sh
+	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[SHELLCHECK] scripts/*.sh"
+	$(CMD_PREFIX) shellcheck scripts/*.sh
