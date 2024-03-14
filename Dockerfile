@@ -9,7 +9,12 @@ RUN dnf install -y nodejs npm python3 python3-pip python3-devel git gcc gcc-c++ 
 # Install lab CLI
 RUN pip install -e git+https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli#egg=cli
 
-# Install the app
+# Install awscliv2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install
+
+# Install the bot
 WORKDIR /usr/src/app
 COPY package.json package-lock.json ./
 RUN npm install
