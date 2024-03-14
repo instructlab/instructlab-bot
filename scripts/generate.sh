@@ -17,7 +17,7 @@ fi
 
 check_work_dir() {
     if [ -n "$WORK_DIR" ]; then
-        cd "$WORK_DIR"
+        cd "$WORK_DIR" || exit 1
     fi
     if [ ! -d taxonomy ]; then
         echo "taxonomy directory not found"
@@ -45,9 +45,10 @@ generate() {
     check_work_dir
 
     if [ -n "$VENV_DIR" ]; then
+        # shellcheck source=/dev/null
         source "$VENV_DIR/bin/activate"
     fi
-    cd taxonomy
+    cd taxonomy || exit 1
     git fetch origin
     git branch -D "pr-${PR_ID}" 2>/dev/null
     git fetch origin "pull/${PR_ID}/head:pr-${PR_ID}"
