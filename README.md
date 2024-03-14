@@ -62,20 +62,55 @@ If we decide to move forward with this workflow after the PoC, we envision:
 
 > GitHub bot interface built with [Probot](https://github.com/probot/probot)
 
-## Setup
+## Local Setup
+
+Clone your fork of the [instruct-lab-bot](https://github.com/redhat-et/instruct-lab-bot) repository and run the following commands
 
 ```sh
+
+cd instruct-lab-bot
+
 # Install dependencies
 npm install
 
 # Run the bot
 npm start
 
+or
+
 # Run the bot with nodemon - hot reload on file changes
 npm run dev
 ```
 
+Once you run the bot first time, it will output text similar to the following
+```
+npm start
+
+> instruct-lab-bot@1.0.0 start
+> ts-node ./src/main.ts
+
+INFO (probot):
+INFO (probot): Welcome to Probot!
+INFO (probot): Probot is in setup mode, webhooks cannot be received and
+INFO (probot): custom routes will not work until APP_ID and PRIVATE_KEY
+INFO (probot): are configured in .env.
+INFO (probot): Please follow the instructions at http://localhost:3000 to configure .env.
+INFO (probot): Once you are done, restart the server.
+INFO (probot):
+INFO (server): Running Probot v13.1.0 (Node.js: v21.7.1)
+```
+
+Hit the URL http://localhost:3000 and it should give you the option to Register as a New App or use an existing app. Click on Register as a New App and it will take you to GitHub where you can create a new app. Once you create the app, it will ask you to install the app for all of your repository or select the repository where you want to install the app. Once you select the repository, it will take you to the page where you can install the app.
+
+For development purposes if you want to run the bot on a local taxonomy repository, make sure it's already forked in your account. Select the repository in the above process and it should hook your repository with the bot.
+
+Once the app is set up, restart the bot app and it should start receiving the webhooks from the repository.
+
+To verify, just create a PR on your repository and you should see the bot doing its magic.
+
 ## Docker
+
+If you prefer to run the bot in a container, you can use the following commands:
 
 ```sh
 # 1. Build container
@@ -84,6 +119,7 @@ docker build -t instruct-lab-bot .
 # 2. Start container
 docker run -e APP_ID=<app-id> -e PRIVATE_KEY=<pem-value> instruct-lab-bot
 ```
+Once you follow the steps to register your app, you can go to Settings -> Developer Settings -> instruct-lab-bot, click `Edit`, and you should see "App ID" and "Private Key" which you can use to run the bot in the container.
 
 ## Contributing
 
