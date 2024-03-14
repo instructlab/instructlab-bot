@@ -48,6 +48,9 @@ generate() {
         source "$VENV_PATH/bin/activate"
     fi
     cd taxonomy
+    git fetch origin
+    git checkout origin/main
+    git branch -D "pr-${PR_ID}" 2>/dev/null
     git fetch origin "pull/${PR_ID}/head:pr-${PR_ID}"
     git checkout "pr-${PR_ID}"
     cd ..
