@@ -5,11 +5,11 @@ import { Probot } from "probot";
 
 dotenv.config();
 
-function run(cmd: string) {
+function run(cmd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     exec(cmd, (error, stdout, stderr) => {
       if (error) return reject(error);
-      if (stderr) return reject(stderr);
+      if (stderr) console.log(stderr);
       resolve(stdout);
     });
   });
@@ -41,28 +41,44 @@ export default (app: Probot) => {
       }
       const issueComment = context.issue({
         body:
-          `Beep, boop 🤖  Generating test data for your pull request.\n` +
+          `Beep, boop 🤖  Generating test data for your pull request.\n\n` +
           `This may take a few seconds...`,
       });
       await context.octokit.issues.createComment(issueComment);
 
       try {
         const prNumber = context.payload.issue.number;
-        var optionalArgs = ``;
+        let optionalArgs = ``;
         if (process.env.WORK_DIR != null) {
           optionalArgs = ` --work-dir ${process.env.WORK_DIR}`;
         }
         if (process.env.VENV_DIR != null) {
           optionalArgs = optionalArgs + ` --venv-dir ${process.env.VENV_DIR}`;
         }
-        const stdout = await run(`./scripts/generate.sh ${optionalArgs} ${prNumber}`);
-        console.log(stdout);
-        const issueComment = context.issue({
-          body:
-            `Beep, boop 🤖  The test data has been generated!\n` +
-            `You can now proceed with the review.`,
-        });
-        await context.octokit.issues.createComment(issueComment);
+        const stdout: string = await run(`./scripts/generate.sh ${optionalArgs} ${prNumber}`);
+        let url = "";
+        // Set url to the last line of stdout
+        if (stdout != null) {
+          url = stdout.trim().split("\n").slice(-1)[0];
+        }
+        // Make sure url starts with https://
+        if (url.startsWith("https://")) {
+          const issueComment = context.issue({
+            body:
+              `Beep, boop 🤖  The test data has been generated!\n\n` +
+              `Find your results [here](${url}).`,
+          });
+          await context.octokit.issues.createComment(issueComment);
+        } else {
+          const issueComment = context.issue({
+            body:
+              `Beep, boop 🤖  An error occurred executing your command.\n` +
+              `\`\`\`console\n` +
+              stdout +
+              `\n\`\`\`\n`,
+          });
+          await context.octokit.issues.createComment(issueComment);
+        }
       } catch (err) {
         const issueComment = context.issue({
           body:
