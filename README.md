@@ -83,7 +83,8 @@ npm run dev
 ```
 
 Once you run the bot first time, it will output text similar to the following
-```
+
+```text
 npm start
 
 > instruct-lab-bot@1.0.0 start
@@ -100,7 +101,7 @@ INFO (probot):
 INFO (server): Running Probot v13.1.0 (Node.js: v21.7.1)
 ```
 
-Hit the URL http://localhost:3000 and it should give you the option to Register as a New App or use an existing app. Click on Register as a New App and it will take you to GitHub where you can create a new app. Once you create the app, it will ask you to install the app for all of your repository or select the repository where you want to install the app. Once you select the repository, it will take you to the page where you can install the app.
+Hit the bot localhost [http://localhost:3000](http://localhost:3000) and it should give you the option to Register as a New App or use an existing app. Click on Register as a New App and it will take you to GitHub where you can create a new app. Once you create the app, it will ask you to install the app for all of your repository or select the repository where you want to install the app. Once you select the repository, it will take you to the page where you can install the app.
 
 For development purposes if you want to run the bot on a local taxonomy repository, make sure it's already forked in your account. Select the repository in the above process and it should hook your repository with the bot.
 
@@ -119,6 +120,7 @@ docker build -t instruct-lab-bot .
 # 2. Start container
 docker run -e APP_ID=<app-id> -e PRIVATE_KEY=<pem-value> instruct-lab-bot
 ```
+
 Once you follow the steps to register your app, you can go to Settings -> Developer Settings -> instruct-lab-bot, click `Edit`, and you should see "App ID" and "Private Key" which you can use to run the bot in the container.
 
 ## Contributing
