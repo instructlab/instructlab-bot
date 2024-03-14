@@ -85,6 +85,7 @@ EOF
 </html>
 EOF
     aws s3 cp "$OUTPUT_DIR/index.html" "s3://instruct-lab-bot/generate/${OUTPUT_DIR}/index.html"
+    rm -rf "${OUTPUT_DIR}"
     aws s3 presign --region us-east-2 "s3://instruct-lab-bot/generate/${OUTPUT_DIR}/index.html"
 }
 
