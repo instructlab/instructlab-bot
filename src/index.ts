@@ -48,7 +48,15 @@ export default (app: Probot) => {
 
       try {
         const prNumber = context.payload.issue.number;
-        await run(`./scripts/generate.sh ${prNumber}`);
+        var optionalArgs = ``;
+        if (process.env.WORK_DIR != null) {
+          optionalArgs = ` --work-dir ${process.env.WORK_DIR}`;
+        }
+        if (process.env.VENV_DIR != null) {
+          optionalArgs = optionalArgs + ` --venv-dir ${process.env.VENV_DIR}`;
+        }
+        const stdout = await run(`./scripts/generate.sh ${optionalArgs} ${prNumber}`);
+        console.log(stdout);
         const issueComment = context.issue({
           body:
             `Beep, boop 🤖  The test data has been generated!\n` +
