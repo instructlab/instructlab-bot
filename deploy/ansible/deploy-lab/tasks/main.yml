@@ -94,8 +94,8 @@
 - name: Update the model path in config.yaml
   ansible.builtin.replace:
     path: "{{ app_directory }}/config.yaml"
-    regexp: 'model_path: models/merlinite-7b-Q4_K_M.gguf'
-    replace: 'model_path: {{ new_model_path }}'
+    regexp: "model_path: models/merlinite-7b-Q4_K_M.gguf"
+    replace: "model_path: {{ new_model_path }}"
 
 - name: Serve the lab
   ansible.builtin.shell: |
@@ -106,4 +106,3 @@
     executable: /bin/bash
     async: 10
     poll: 0
-

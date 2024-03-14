@@ -1,16 +1,15 @@
 // You can import your modules
 // import index from '../src/index'
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import nock from "nock";
-// Requiring our app implementation
-import myProbotApp from "../src/index";
 import { Probot, ProbotOctokit } from "probot";
-// Requiring our fixtures
-//import payload from "./fixtures/issues.opened.json" with { "type": "json"};
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { describe, beforeEach, afterEach, test, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+
+import myProbotApp from "../src/index";
 
 const issueCreatedBody = {
   body:
@@ -27,15 +26,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const privateKey = fs.readFileSync(
   path.join(__dirname, "fixtures/mock-cert.pem"),
-  "utf-8"
+  "utf-8",
 );
 
 const payload = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "fixtures/pr.opened.json"), "utf-8")
+  fs.readFileSync(path.join(__dirname, "fixtures/pr.opened.json"), "utf-8"),
 );
 
 describe("My Probot app", () => {
-  let probot: any;
+  let probot: Probot;
 
   beforeEach(() => {
     nock.disableNetConnect();
@@ -67,15 +66,15 @@ describe("My Probot app", () => {
       // Test that a comment is posted
       .post(
         "/repos/instruct-lab-bot/taxonomy/issues/1/comments",
-        (body: any) => {
+        (body: unknown) => {
           expect(body).toMatchObject(issueCreatedBody);
           return true;
-        }
+        },
       )
       .reply(200);
 
     // Receive a webhook event
-    await probot.receive({ name: "pull_request", payload });
+    await probot.receive({ id: "1234", name: "pull_request", payload });
 
     expect(mock.pendingMocks()).toStrictEqual([]);
   });

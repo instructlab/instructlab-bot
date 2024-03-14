@@ -6,8 +6,8 @@ config:
   no-duplicate-header: false
   single-trailing-newline: false
 globs:
- - "**/*.md"
+  - "**/*.md"
 ignores:
- - "pkg"
- - "**/node_modules/*"
- - "**/node_modules/**"
+  - "pkg"
+  - "**/node_modules/*"
+  - "**/node_modules/**"

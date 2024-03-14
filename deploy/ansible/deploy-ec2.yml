@@ -7,7 +7,7 @@
 
 # Deploy Lab Bot
 - hosts: labNodes
-#  become: yes
+  #  become: yes
   vars:
     git_repo: git@github.com:instruct-lab/cli.git
     python_venv_path: "{{ ansible_env.HOME }}/venv"

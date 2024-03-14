@@ -3,18 +3,23 @@ name: linters
 on:
   push:
     branches: ["main"]
-    paths:
-      - '**/*.md'
   pull_request:
     branches: ["main"]
-    paths:
-      - '**/*.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm run lint
   markdown-lint:
     runs-on: ubuntu-latest
     steps:
@@ -22,4 +27,4 @@ jobs:
       - name: markdownlint-cli2-action
         uses: DavidAnson/markdownlint-cli2-action@v15
         with:
-          globs: '**/*.md'
+          globs: "**/*.md"

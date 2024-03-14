@@ -1,5 +1,6 @@
-import { Probot } from "probot";
 import { exec } from "node:child_process";
+
+import { Probot } from "probot";
 
 function run(cmd: string) {
   return new Promise((resolve, reject) => {
@@ -43,8 +44,10 @@ export default (app: Probot) => {
       await context.octokit.issues.createComment(issueComment);
 
       try {
-        let prNumber = context.payload.issue.number;
-        await run(`./scripts/generate.sh --work-dir instruct-lab --venv-dir venv ${prNumber}`);
+        const prNumber = context.payload.issue.number;
+        await run(
+          `./scripts/generate.sh --work-dir instruct-lab --venv-dir venv ${prNumber}`,
+        );
         const issueComment = context.issue({
           body:
             `Beep, boop 🤖  The test data has been generated!\n` +
