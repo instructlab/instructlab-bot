@@ -82,7 +82,7 @@ default_permissions:
 
   # Pull requests and related comments, assignees, labels, milestones, and merges.
   # https://developer.github.com/v3/apps/permissions/#permission-on-pull-requests
-  # pull_requests: read
+  pull_requests: write
 
   # Manage the post-receive hooks for a repository.
   # https://developer.github.com/v3/apps/permissions/#permission-on-repository-hooks
@@ -127,11 +127,11 @@ default_permissions:
 # name: My Probot App
 
 # The homepage of your GitHub App.
-# url: https://example.com/
+url: https://github.com/redhat-et/instruct-lab-bot
 
 # A description of the GitHub App.
 # description: A description of my awesome app
 
 # Set to true when your GitHub App is available to the public or false when it is only accessible to the owner of the app.
 # Default: true
-# public: false
+public: false
