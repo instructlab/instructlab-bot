@@ -1,13 +1,13 @@
 #!/bin/bash
 
-VENV_PATH=""
+VENV_DIR=""
 WORK_DIR=""
 
 usage() {
-    echo "Usage: $0 [--work-dir PATH] [--venv-path PATH] PR_NUMBER"
+    echo "Usage: $0 [--work-dir PATH] [--venv-dir PATH] PR_NUMBER"
     echo
     echo "  --work-dir PATH: Path to the working directory to move into"
-    echo "  --venv-path PATH: Path to the virtual environment to activate, relative to the working directory"
+    echo "  --venv-dir PATH: Path to the virtual environment to activate, relative to the working directory"
     echo "  PR_NUMBER: The number of the pull request to generate data for"
 }
 
@@ -27,8 +27,8 @@ check_work_dir() {
         echo "lab config.yaml file not found"
         exit 1
     fi
-    if [ -n "$VENV_PATH" ]; then
-        if [ ! -d "$VENV_PATH" ]; then
+    if [ -n "$VENV_DIR" ]; then
+        if [ ! -d "$VENV_DIR" ]; then
             echo "venv directory not found"
             exit 1
         fi
@@ -44,12 +44,11 @@ check_work_dir() {
 generate() {
     check_work_dir
 
-    if [ -n "$VENV_PATH" ]; then
-        source "$VENV_PATH/bin/activate"
+    if [ -n "$VENV_DIR" ]; then
+        source "$VENV_DIR/bin/activate"
     fi
     cd taxonomy
     git fetch origin
-    git checkout origin/main
     git branch -D "pr-${PR_ID}" 2>/dev/null
     git fetch origin "pull/${PR_ID}/head:pr-${PR_ID}"
     git checkout "pr-${PR_ID}"
@@ -66,8 +65,8 @@ while [ $# -gt 0 ]; do
             usage
             exit 0
             ;;
-        --venv-path)
-            VENV_PATH="$2"
+        --venv-dir)
+            VENV_DIR="$2"
             shift
             ;;
         --work-dir)
