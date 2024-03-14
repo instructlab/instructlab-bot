@@ -72,11 +72,12 @@ generate() {
     <ul>
 EOF
     for file in "$OUTPUT_DIR"/*; do
-        if [ "$(basename ${file})" == "index.html" ]; then
+        fname=$(basename "${file}")
+        if [ "${fname}" == "index.html" ]; then
             continue
         fi
         URL=$(aws s3 presign --region us-east-2 "s3://instruct-lab-bot/generate/${file}")
-        echo "        <li><a href=\"${URL}\">$(basename ${file})</a></li>" >> "$OUTPUT_DIR/index.html"
+        echo "        <li><a href=\"${URL}\">${fname}</a></li>" >> "$OUTPUT_DIR/index.html"
     done
     cat << EOF >> "$OUTPUT_DIR/index.html"
     </ul>
