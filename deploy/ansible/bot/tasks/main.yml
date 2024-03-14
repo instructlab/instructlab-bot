@@ -9,7 +9,7 @@
 - name: Start the container
   community.docker.docker_container:
     name: instruct-lab-bot
-    image: ghcr.io/redhat-et/instruct-lab-bot:main
+    image: ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-bot:main
     state: started
     links:
       - "instructlab:instructlab"
