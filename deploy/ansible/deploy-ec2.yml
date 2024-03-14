@@ -1,13 +1,5 @@
-# Create the ec2 instance
-#- hosts: localhost
-#  vars_files:
-#    - vars.yml
-#  roles:
-#    - role: setup-ec2
-
-# Deploy Lab Bot
-- hosts: labNodes
-  #  become: yes
+- name: Deploy Lab Bot
+  hosts: labNodes
   vars:
     git_repo: git@github.com:instruct-lab/cli.git
     python_venv_path: "{{ ansible_env.HOME }}/venv"

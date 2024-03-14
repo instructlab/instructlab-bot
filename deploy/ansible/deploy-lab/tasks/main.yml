@@ -3,7 +3,7 @@
   ansible.builtin.dnf:
     name: "*"
     state: latest
-  become: yes
+  become: true
 
 - name: Install base required packages
   ansible.builtin.dnf:
@@ -14,11 +14,11 @@
       - nodejs
       - dnf-plugins-core
     state: present
-  become: yes
+  become: true
 
 - name: Add container runtime repo
   ansible.builtin.command: dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-  become: yes
+  become: true
 
 - name: Install container runtime
   ansible.builtin.dnf:
@@ -29,73 +29,68 @@
       - docker-buildx-plugin
       - docker-compose-plugin
     state: present
-  become: yes
+  become: true
 
 - name: Install pm2 using npm
   ansible.builtin.npm:
     name: pm2
-    global: yes
-  become: yes
+    global: true
+  become: true
 
 - name: Check if the instruct-lab-bot directory exists
   stat:
-    path: {{ ghbot_directory }}/instruct-lab-bot
+    path: "{{ ghbot_directory }}/instruct-lab-bot"
   register: instruct_lab_bot_dir
 
 - name: Delete the instruct-lab-bot directory if it exists
   file:
-    path: {{ ghbot_directory }}/instruct-lab-bot
+    path: "{{ ghbot_directory }}/instruct-lab-bot"
     state: absent
   when: instruct_lab_bot_dir.stat.exists
 
 - name: Clone the instruct-lab-bot repository
   git:
     repo: https://github.com/redhat-et/instruct-lab-bot
-    dest: {{ ghbot_directory }}/instruct-lab-bot
-    clone: yes
-    update: yes
+    dest: "{{ ghbot_directory }}/instruct-lab-bot"
+    clone: true
+    update: true
 
 - name: Install instruct lab bot dependencies
   ansible.builtin.shell: |
-    cd {{ ghbot_directory }}
     npm install
   args:
     executable: /bin/bash
+    chdir: "{{ ghbot_directory }}"
 
-- name: Setup environment variables for instruct lab bot
+- name: Build instruct lab bot
   ansible.builtin.shell: |
-    cd {{ ghbot_directory }}
-    echo "export GITHUB_TOKEN={{ github_token }}" > .env
+    npm run build
   args:
     executable: /bin/bash
+    chdir: "{{ ghbot_directory }}"
 
 - name: Setup environment variables for instruct lab bot
-  vars:
-    env_file_path: {{ ghbot_directory }}/.env
-  tasks:
-    - name: Ensure key-value pairs are in .env file
-      ansible.builtin.lineinfile:
-        path: "{{ env_file_path }}"
-        line: "{{ item.key }}={{ item.value }}"
-        insertafter: EOF
-      loop:
-        - { key: "WEBHOOK_PROXY_URL", value: ${{ secrets.WEBHOOK_PROXY_URL }} }
-        - { key: "APP_ID", value: ${{ secrets.APP_ID }} }
-        - { key: "PRIVATE_KEY", value: ${{ secrets.PRIVATE_KEY }} }
-        - { key: "WEBHOOK_SECRET", value: ${{ secrets.WEBHOOK_SECRET }} }
-        - { key: "GITHUB_CLIENT_ID", value: ${{ secrets.GITHUB_CLIENT_ID }} }
-        - { key: "GITHUB_CLIENT_SECRET", value: ${{ secrets.GITHUB_CLIENT_SECRET }} }
+  ansible.builtin.lineinfile:
+    path: "{{ ghbot_directory }}/.env"
+    line: "{{ item.key }}={{ item.value }}"
+    insertafter: EOF
+  loop:
+    - { key: "APP_ID", value: "{{ app_id }}" }
+    - { key: "PRIVATE_KEY", value: "{{ private_key }}" }
+    - { key: "WEBHOOK_SECRET", value: "{{ webhook_secret }}" }
+    - { key: "WORK_DIR", value: "{{ ansible_env.HOME }}" }
+    - { key: "VENV_DIR", value: "{{ venv }}" }
 
 - name: Run the instruct lab bot
   ansible.builtin.shell: |
-    cd {{ ghbot_directory }}
-    pm2 start npm --name "ghbot" -- start
+    pm2 start npm --name "ghbot" ./lib/index.js
   args:
+    chdir: "{{ ghbot_directory }}"
     executable: /bin/bash
 
 - name: Check if the cli directory exists
   stat:
-    path: /home/{{ ansible_user }}/cli
+    ansible.builtin.path: /home/{{ ansible_user }}/cli
   register: cli_dir
 
 - name: Delete the cli directory if it exists
@@ -108,8 +103,8 @@
   git:
     repo: https://github.com/instruct-lab/cli
     dest: /home/{{ ansible_user }}/cli
-    clone: yes
-    update: yes
+    clone: true
+    update: true
 
 #- name: Clone the CLI repo
 #  ansible.builtin.shell: |
@@ -125,9 +120,9 @@
 - name: Install Labrador CLI
   ansible.builtin.shell: |
     source {{ python_venv_path }}/bin/activate
-    cd {{ app_directory }}
     pip install -e .
   args:
+    chdir: "{{ app_directory }}"
     executable: /bin/bash
 
 - name: Install additional packages
@@ -148,10 +143,10 @@
 - name: Initialize lab
   ansible.builtin.shell: |
     source {{ python_venv_path }}/bin/activate
-    cd {{ app_directory }}
     lab init --non-interactive
   args:
     executable: /bin/bash
+    chdir: "{{ app_directory }}"
 
 - name: Update the model path in config.yaml
   ansible.builtin.replace:
@@ -162,9 +157,9 @@
 - name: Serve the lab
   ansible.builtin.shell: |
     source {{ python_venv_path }}/bin/activate
-    cd {{ app_directory }}
     lab serve --model-path ./{{ new_model_path }}
   args:
     executable: /bin/bash
+    chdir: "{{ app_directory }}"
     async: 10
     poll: 0
