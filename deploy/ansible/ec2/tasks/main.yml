@@ -1,0 +1,63 @@
+---
+# tasks file for setup-ec2
+- name: Installing boto library
+  ansible.builtin.pip:
+    name: boto
+    state: present
+
+### VPC Security Group ###
+- name: Creating Security Group for VPC Instruct Bot
+  amazon.aws.ec2_security_group:
+    name: "{{ secgroup_name }}"
+    aws_region: "{{ aws_region }}"
+    description: "{{ security_group_description }}"
+    vpc_id: "{{ vpc_id }}"
+    rules:
+      - proto: all
+        cidr_ip: "0.0.0.0/0"
+
+#### Node Deployment ###
+- name: Deploying EC2 Node
+  amazon.aws.ec2_instance:
+    name: "{{ aws_nodetype_tag }}-{{ item + 1 }}"
+    aws_region: "{{ aws_region }}"
+    key_name: "{{ aws_key_name }}"
+    instance_type: "{{ aws_instance_type }}"
+    image_id: "{{ aws_image_id }}"
+    security_group: "{{ secgroup_name }}"
+    volumes:
+      - device_name: /dev/sda1
+        ebs:
+          volume_size: 250
+          delete_on_termination: true
+          volume_type: standard
+    network:
+      assign_public_ip: true
+    subnet_id: "{{ aws_subnet }}"
+    tags:
+      NodeType: "{{ aws_nodetype_tag }}"
+    state: running
+    wait: true
+  register: node_ip
+  loop: "{{ range(0, node_count | int) }}"
+  async: 7200
+  poll: 0
+
+- name: Wait for all instances to finish initializing
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+  register: ec2_jobs
+  loop: "{{ node_ip['results'] }}"
+  until: ec2_jobs.finished
+  retries: 300
+
+- name: Combine ec2_jobs and index
+  ansible.builtin.set_fact:
+    ec2_jobs_with_index: "{{ ec2_jobs.results | zip(range(0, node_count | int)) | list }}"
+
+- name: Updating the node's public ip in inventory
+  ansible.builtin.lineinfile:
+    path: "{{ inventory_location }}"
+    regexp: "labNodes"
+    line: "[labNodes]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file=~/.ssh/id_rsa"
+  loop: "{{ ec2_jobs_with_index }}"
