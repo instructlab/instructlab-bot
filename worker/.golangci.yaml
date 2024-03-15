@@ -1,0 +1,15 @@
+run:
+  allow-parallel-runners: true
+  skip-dirs-use-default: false
+
+linters:
+  enable:
+    - gofmt
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - typecheck
+    - loggercheck
