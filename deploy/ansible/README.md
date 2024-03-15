@@ -8,6 +8,22 @@ This directory contains the Ansible playbooks and roles to deploy the applicatio
 - Python
 - SSH Access to the target server
 
+## Deploying EC2 Instances
+
+This playbook deploys an EC2 instance with the variables
+defined in the role's default directory.
+
+The variables are generally region region specific so update
+accordingly.
+
+Then run the playbook with the following.
+
+```console
+pip3 install boto boto3 ansible-vault ansible-core
+ansible-galaxy collection install amazon.aws
+ansible-playbook ./deploy-ec2.yml
+```
+
 ## Install Pre-requisites
 
 ```console
