@@ -6,8 +6,8 @@
     state: present
 
 ### VPC Security Group ###
-- name: Creating Security Group for VPC Instruct Bot
-  amazon.aws.ec2_group:
+- name: Creating Security Group for VPC Instruct Bot  # noqa
+  amazon.aws.ec2_group:  # noqa
     name: "{{ secgroup_name }}"
     aws_region: "{{ aws_region }}"
     description: "{{ security_group_description }}"
