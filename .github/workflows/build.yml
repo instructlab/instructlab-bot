@@ -21,8 +21,8 @@ jobs:
           cache: false
       - id: build
         run: |
-          go build -o worker_${GOOS}_${GOARCH} main.go
-          echo bin="worker_${GOOS}_${GOARCH}" >> $GITHUB_OUTPUT
+          go build -o worker_$(go env GOOS)_${GOARCH} main.go
+          echo bin="worker_$(go env GOOS)_${GOARCH}" >> $GITHUB_OUTPUT
         working-directory: ./worker
       - uses: actions/upload-artifact@v4
         with:
