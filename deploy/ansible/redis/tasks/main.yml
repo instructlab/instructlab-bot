@@ -1,0 +1,35 @@
+---
+- name: Install redis
+  ansible.builtin.dnf:
+    name: redis
+    state: present
+  become: true
+
+- name: Update redis config to load redis.local.conf
+  ansible.builtin.lineinfile:
+    path: /etc/redis/redis.conf
+    line: 'include /etc/redis/redis.local.conf'
+  become: true
+
+- name: Get Nexodus Tunnel IP (v4)
+  ansible.builtin.shell: nexctl nexd get tunnelip
+  register: nexodus_tunnelip_v4
+  become: true
+
+- name: Get Nexodus Tunnel IP (v6)
+  ansible.builtin.shell: nexctl nexd get tunnelip --ipv6
+  register: nexodus_tunnelip_v6
+  become: true
+
+- name: Generate redis.local.conf
+  ansible.builtin.template:
+    src: redis/templates/redis.local.conf.j2
+    dest: /etc/redis/redis.local.conf
+  become: true
+
+- name: Start redis systemd service
+  ansible.builtin.systemd:
+    name: redis
+    state: started
+    enabled: true
+  become: true

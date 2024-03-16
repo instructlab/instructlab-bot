@@ -1,0 +1,5 @@
+- name: Deploy Redis
+  hosts: labNodes
+  roles:
+    - role: redis
+      become: true

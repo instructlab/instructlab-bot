@@ -53,3 +53,11 @@ ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-bot.ym
 ```console
 ansible-playbook -i inventory -e @secrets.enc --ask-vault-pass deploy-nexodus.yml
 ```
+
+## Install Redis
+
+Install Redis and make it listen only on the Nexodus VPC.
+
+```console
+ansible-playbook -i inventory -e @secrets.enc --ask-vault-pass deploy-redis.yml
+```
