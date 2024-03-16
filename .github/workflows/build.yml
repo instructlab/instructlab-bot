@@ -1,0 +1,29 @@
+name: build
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+        goos: ["linux", "darwin"]
+        goarch: ["amd64", "arm64"]
+    runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: false
+      - run: go build -o worker_${{ matrix.goos }}_${{ matrix.goarch }} main.go
+        working-directory: ./worker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: worker/worker_${{ matrix.goos }}_${{ matrix.goarch }}
