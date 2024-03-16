@@ -6,20 +6,20 @@
     name: nexodus/nexodus
 
 - name: Install nexodus
-  dnf:
+  ansible.builtin.dnf:
     name: nexodus
     state: present
   become: true
 
 - name: Configure nexodus by updated /etc/sysconfig/nexodus
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/sysconfig/nexodus
     line: 'NEXD_ARGS={{ nexd_args }}'
   become: true
 
 - name: Start nexodus systemd service
-  systemd:
+  ansible.builtin.systemd:
     name: nexodus
     state: started
-    enabled: yes
+    enabled: true
   become: true
