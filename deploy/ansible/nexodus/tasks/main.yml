@@ -1,0 +1,23 @@
+---
+- name: run sudo dnf copr enable nexodus/nexodus
+  command: dnf copr enable nexodus/nexodus -y
+  become: true
+
+- name: Install nexodus
+  dnf:
+    name: nexodus
+    state: present
+  become: true
+
+- name: Configure nexodus by updated /etc/sysconfig/nexodus
+  lineinfile:
+    path: /etc/sysconfig/nexodus
+    line: 'NEXD_ARGS={{ nexd_args }}'
+  become: true
+
+- name: Start nexodus systemd service
+  systemd:
+    name: nexodus
+    state: started
+    enabled: yes
+  become: true
