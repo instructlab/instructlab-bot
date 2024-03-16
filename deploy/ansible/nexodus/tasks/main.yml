@@ -1,0 +1,25 @@
+---
+- name: Enable nexodus copr repository
+  community.general.copr:
+    host: copr.fedorainfracloud.org
+    state: enabled
+    name: nexodus/nexodus
+
+- name: Install nexodus
+  ansible.builtin.dnf:
+    name: nexodus
+    state: present
+  become: true
+
+- name: Configure nexodus by updated /etc/sysconfig/nexodus
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/nexodus
+    line: 'NEXD_ARGS={{ nexd_args }}'
+  become: true
+
+- name: Start nexodus systemd service
+  ansible.builtin.systemd:
+    name: nexodus
+    state: started
+    enabled: true
+  become: true

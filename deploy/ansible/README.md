@@ -47,3 +47,9 @@ ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-instru
 ```console
 ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-bot.yml
 ```
+
+## Install Nexodus Agent
+
+```console
+ansible-playbook -i inventory -e @secrets.enc --ask-vault-pass deploy-nexodus.yml
+```

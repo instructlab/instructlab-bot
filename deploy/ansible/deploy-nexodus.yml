@@ -1,0 +1,5 @@
+- name: Deploy Nexodus Agent
+  hosts: labNodes
+  roles:
+    - role: nexodus
+      become: true

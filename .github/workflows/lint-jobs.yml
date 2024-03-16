@@ -18,8 +18,11 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: "20"
+          cache-dependency-path: bot/package-lock.json
       - run: npm ci
+        working-directory: bot
       - run: npm run lint
+        working-directory: bot
   ansible:
     runs-on: ubuntu-latest
     steps:
