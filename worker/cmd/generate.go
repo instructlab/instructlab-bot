@@ -59,12 +59,12 @@ var generateCmd = &cobra.Command{
 		// Using the SDK's default configuration, loading additional config
 		// and credentials values from the environment variables, shared
 		// credentials, and shared configuration files
-		cfg, err := awsconfig.LoadDefaultConfig(context.TODO(), awsconfig.WithRegion("us-west-2"))
+		cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion("us-east-2"))
 		if err != nil {
 			log.Fatalf("unable to load SDK config, %v", err)
 		}
 
-		// Using the Config value, create the DynamoDB client
+		// Using the Config value, create the S3 client
 		svc := s3.NewFromConfig(cfg)
 
 		sigChan := make(chan os.Signal, 1)
