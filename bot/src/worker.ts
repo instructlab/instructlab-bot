@@ -1,5 +1,6 @@
-import { createClient } from "redis";
 import { Probot } from "probot";
+import { createClient } from "redis";
+
 export class Worker {
   app: Probot;
 
@@ -14,7 +15,8 @@ export class Worker {
     })
       .on("error", (err) => this.app.log.error("Redis Client Error", err))
       .connect();
-    while (true) {
+    const foreverToMakeLiterHappy = true;
+    while (foreverToMakeLiterHappy) {
       const results = await client.rPop("results");
       if (results !== null) {
         const prNumber = await client.get(`jobs:${results}:pr_number`);
