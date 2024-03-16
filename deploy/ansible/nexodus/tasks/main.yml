@@ -1,7 +1,9 @@
 ---
-- name: run sudo dnf copr enable nexodus/nexodus
-  command: dnf copr enable nexodus/nexodus -y
-  become: true
+- name: Enable nexodus copr repository
+  community.general.copr:
+    host: copr.fedorainfracloud.org
+    state: enabled
+    name: nexodus/nexodus
 
 - name: Install nexodus
   dnf:
