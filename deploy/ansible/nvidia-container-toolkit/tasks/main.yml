@@ -32,9 +32,9 @@
 
 - name: Reboot
   ansible.builtin.reboot:
-    when: nvidia_install_kmod.changed or nvidia_install_cuda.changed
     reboot_timeout: 300
     msg: "Rebooting to load NVIDIA drivers"
+  when: nvidia_install_kmod.changed or nvidia_install_cuda.changed
 
 - name: Add Repo
   ansible.builtin.get_url:
