@@ -9,11 +9,9 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "macos-latest"]
-        goos: ["linux", "darwin"]
         goarch: ["amd64", "arm64"]
     runs-on: ${{ matrix.os }}
     env:
-      GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
     steps:
       - uses: actions/checkout@v4
@@ -21,9 +19,12 @@ jobs:
         with:
           go-version: "1.21"
           cache: false
-      - run: go build -o worker_${{ matrix.goos }}_${{ matrix.goarch }} main.go
+      - id: build
+        run: |
+          go build -o worker_${GOOS}_${GOARCH} main.go
+          echo bin="worker_${GOOS}_${GOARCH}" >> $GITHUB_OUTPUT
         working-directory: ./worker
       - uses: actions/upload-artifact@v4
         with:
-          name: worker_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: worker/worker_${{ matrix.goos }}_${{ matrix.goarch }}
+          name: ${{ steps.build.outputs.bin }}
+          path: worker/${{ steps.build.outputs.bin }}
