@@ -14,7 +14,7 @@
 
 - name: Set credentials
   ansible.builtin.copy:
-    dest: "{{ ansible_env.HOME }}/.git-credentials }}"
+    dest: "{{ ansible_env.HOME }}/.git-credentials"
     content: |
       https://instruct-lab-bot:{{ github_token }}@github.com
     mode: "0600"
