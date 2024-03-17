@@ -12,15 +12,7 @@
     image: ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-bot:main
     state: started
     pull: always
-    links:
-      - "instructlab:instructlab"
-    ports:
-      # Publish container port 9000 as host port 8080
-      - "3000:3000"
     env:
       APP_ID: "{{ app_id }}"
       PRIVATE_KEY: "{{ private_key }}"
       WEBHOOK_SECRET: "{{ webhook_secret }}"
-      WORK_DIR: "/data"
-    volumes:
-      - "/home/{{ ansible_user }}/instructlab:/data"
