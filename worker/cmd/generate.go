@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
+	"strings"
 	"sync"
 	"syscall"
 	"text/template"
@@ -222,9 +223,10 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	outDirName := fmt.Sprintf("generate-pr-%s-%s", prNumber, head.Name().Short())
+	outDirName := fmt.Sprintf("generate-pr-%s-%s", prNumber, head.Hash())
 	outputDir := path.Join(workDir, outDirName)
 
+	sugar = sugar.With("out_dir", outputDir)
 	_ = os.MkdirAll(outputDir, 0755)
 
 	lab := "lab"
@@ -254,26 +256,39 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 	presign := s3.NewPresignClient(svc, func(options *s3.PresignOptions) {
-		options.Expires = 24 * time.Hour * 30
+		// Must be less than a week
+		options.Expires = 24 * time.Hour * 5
 	})
 	presignedFiles := make([]map[string]string, 0)
 
 	for _, item := range items {
+		if strings.HasSuffix(item.Name(), "index.html") {
+			continue
+		}
 		file, err := os.Open(path.Join(outputDir, item.Name()))
 		if err != nil {
 			sugar.Errorf("Could not open file: %v", err)
 			return
 		}
 		defer file.Close()
+		_, err = svc.PutObject(ctx, &s3.PutObjectInput{
+			Bucket:      aws.String("instruct-lab-bot"),
+			Key:         aws.String(fmt.Sprintf("%s/%s", outDirName, item.Name())),
+			Body:        file,
+			ContentType: aws.String("application/json-lines+json"),
+		})
+		if err != nil {
+			sugar.Errorf("Could not upload file to S3: %v", err)
+			return
+		}
 
-		result, err := presign.PresignPutObject(ctx, &s3.PutObjectInput{
+		result, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
 			Bucket: aws.String("instruct-lab-bot"),
 			Key:    aws.String(fmt.Sprintf("%s/%s", outDirName, item.Name())),
-			Body:   file,
 		})
 
 		if err != nil {
-			sugar.Errorf("Could not presign object: %v", err)
+			sugar.Errorf("Could not generate presign get URL for object: %v", err)
 			return
 		}
 
@@ -288,17 +303,34 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		sugar.Errorf("Could not create index.html: %v", err)
 		return
 	}
-	defer indexFile.Close()
 
 	if err := generateIndexHTML(indexFile, prNumber, presignedFiles); err != nil {
 		sugar.Errorf("Could not generate index.html: %v", err)
+		indexFile.Close()
 		return
 	}
 
-	indexResult, err := presign.PresignPutObject(ctx, &s3.PutObjectInput{
+	indexFile, err = os.Open(indexFile.Name())
+	if err != nil {
+		sugar.Errorf("Could not re-read index.html: %v", err)
+		indexFile.Close()
+		return
+	}
+
+	_, err = svc.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String("instruct-lab-bot"),
+		Key:         aws.String(fmt.Sprintf("%s/index.html", outDirName)),
+		Body:        indexFile,
+		ContentType: aws.String("text/html"),
+	})
+	if err != nil {
+		sugar.Errorf("Could not upload index.html to S3: %v", err)
+		return
+	}
+
+	indexResult, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String("instruct-lab-bot"),
 		Key:    aws.String(fmt.Sprintf("%s/index.html", outDirName)),
-		Body:   indexFile,
 	})
 
 	if err != nil {

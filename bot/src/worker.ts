@@ -42,7 +42,8 @@ export class Worker {
           issue_number: parseInt(prNumber),
           body:
             `Beep, boop 🤖  The test data has been generated!\n\n` +
-            `Find your results [here](${s3Url}).`,
+            `Find your results [here](${s3Url}).\n\n` +
+            `*This URL expires in 5 days.*`,
         };
 
         const octokit = await this.app.auth(parseInt(installationId));
