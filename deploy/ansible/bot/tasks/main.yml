@@ -17,3 +17,4 @@
       PRIVATE_KEY: "{{ private_key }}"
       WEBHOOK_SECRET: "{{ webhook_secret }}"
       REDIS_URL: "redis://{{ redis_ip }}:6379"
+      WEBHOOK_PROXY_URL: "{{ webhook_proxy_url }}"
