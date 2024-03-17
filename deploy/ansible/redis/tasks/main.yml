@@ -27,7 +27,7 @@
   ansible.builtin.template:
     src: redis/templates/redis.local.conf.j2
     dest: /etc/redis/redis.local.conf
-    mode: '0644'
+    mode: '0640'
   become: true
 
 - name: Start redis systemd service
