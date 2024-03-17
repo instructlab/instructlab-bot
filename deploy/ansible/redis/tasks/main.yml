@@ -12,19 +12,22 @@
   become: true
 
 - name: Get Nexodus Tunnel IP (v4)
-  ansible.builtin.shell: nexctl nexd get tunnelip
+  ansible.builtin.command: "nexctl nexd get tunnelip"
   register: nexodus_tunnelip_v4
+  changed_when: false
   become: true
 
 - name: Get Nexodus Tunnel IP (v6)
-  ansible.builtin.shell: nexctl nexd get tunnelip --ipv6
+  ansible.builtin.command: "nexctl nexd get tunnelip --ipv6"
   register: nexodus_tunnelip_v6
+  changed_when: false
   become: true
 
 - name: Generate redis.local.conf
   ansible.builtin.template:
     src: redis/templates/redis.local.conf.j2
     dest: /etc/redis/redis.local.conf
+    mode: '0644'
   become: true
 
 - name: Start redis systemd service
