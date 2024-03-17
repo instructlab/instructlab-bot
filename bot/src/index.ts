@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { Probot } from "probot";
 import { createClient } from "redis";
+
 import { Worker } from "./worker";
 
 dotenv.config();
