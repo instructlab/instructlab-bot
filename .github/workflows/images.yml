@@ -53,3 +53,18 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository }}/instruct-lab-serve
+
+      - name: Build and push serve image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: |
+            GITHUB_USER=instruct-lab-bot
+            GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
+          target: serve
+          push: true
+          tags: ${{ steps.labserve_meta.outputs.tags }}
+          labels: ${{ steps.labserve_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          file: worker/Dockerfile
