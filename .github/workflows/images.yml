@@ -45,6 +45,7 @@ jobs:
           labels: ${{ steps.bot_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          file: bot/Dockerfile
 
       - name: Extract metadata (tags, labels) for labserve image
         id: labserve_meta
@@ -66,3 +67,4 @@ jobs:
           labels: ${{ steps.labserve_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          file: worker/Dockerfile
