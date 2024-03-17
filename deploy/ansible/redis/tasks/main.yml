@@ -28,11 +28,12 @@
     src: redis/templates/redis.local.conf.j2
     dest: /etc/redis/redis.local.conf
     mode: '0640'
+    owner: redis
   become: true
 
 - name: Start redis systemd service
   ansible.builtin.systemd:
     name: redis
-    state: started
+    state: restarted
     enabled: true
   become: true
