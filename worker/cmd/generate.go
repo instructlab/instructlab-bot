@@ -112,11 +112,7 @@ var generateCmd = &cobra.Command{
 		go func(ch <-chan string) {
 			defer wg.Done()
 			for job := range jobChan {
-				wg.Add(1)
-				go func(job string) {
-					defer wg.Done()
-					processJob(ctx, conn, svc, sugar, job)
-				}(job)
+				processJob(ctx, conn, svc, sugar, job)
 			}
 		}(jobChan)
 
