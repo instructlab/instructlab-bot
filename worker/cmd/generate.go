@@ -253,7 +253,9 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		sugar.Errorf("Could not read output directory: %v", err)
 		return
 	}
-	presign := s3.NewPresignClient(svc)
+	presign := s3.NewPresignClient(svc, func(options *s3.PresignOptions) {
+		options.Expires = 24 * time.Hour * 30
+	})
 	presignedFiles := make([]map[string]string, 0)
 
 	for _, item := range items {
