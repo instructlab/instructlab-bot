@@ -33,7 +33,13 @@ ansible-galaxy install -r requirements.yml
 ## Run Playbook to install Docker and NVIDIA Container Toolkit
 
 ```console
-ansible-playbook -i inventory.txt deploy-prereqs.yml
+ansible-playbook -i inventory.txt deploy-worker-prereqs.yml
+```
+
+## Run Playbook to install Docker and other bot prereqs
+
+```console
+ansible-playbook -i inventory.txt deploy-bot-prereqs.yml
 ```
 
 ## Run Playbook to Setup the InstructLab environment

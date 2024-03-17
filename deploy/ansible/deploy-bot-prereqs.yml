@@ -1,0 +1,7 @@
+- name: Deploy Node Prereqs
+  hosts: labNodes
+  roles:
+    - role: geerlingguy.docker
+      become: true
+    - role: packages
+      become: true

@@ -1,2 +1,2 @@
 [labNodes]
-instruct-lab-bot
+instruct-lab-bot ansible_ssh_user=fedora
