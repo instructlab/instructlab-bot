@@ -59,10 +59,12 @@ install_prereqs_fedora() {
         gcc \
         gcc-c++ \
         git \
+        go \
         make \
         python3 \
         python3-pip \
         python3-virtualenv \
+        redis \
         unzip
 
     if [ "${GPU_TYPE}" = "cuda" ]; then
@@ -203,12 +205,49 @@ install_lab() {
     config_lab_systemd
 }
 
+install_bot_worker() {
+    cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
+    if [ ! -d bot-repo ]; then
+        git clone git@github.com:redhat-et/instruct-lab-bot.git bot-repo
+    fi
+    pushd bot-repo
+    git pull -r
+    pushd worker
+    go build -o worker main.go
+    chmod +x worker
+    sudo install -m 755 worker /usr/local/bin/instruct-lab-bot-worker
+    popd
+    popd
+
+    cat << EOF > labbotworker.service
+[Unit]
+Description=Instruct Lab GitHub Bot Worker
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379
+WorkingDirectory=/home/fedora/instruct-lab-bot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo install -m 0644 labbotworker.service /usr/lib/systemd/system/labbotworker.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now labbotworker
+}
+
 command_install() {
     check_os
     install_prereqs
     install_nexodus
     setup_workdir
     install_lab
+    install_bot_worker
 
     echo "TODO: Finish install here"
 }
