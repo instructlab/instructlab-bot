@@ -10,3 +10,4 @@ config.yaml
 models
 generated
 .idea
+.DS_Store
