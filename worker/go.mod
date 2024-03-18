@@ -1,6 +1,6 @@
 module github.com/redhat-et/instruct-lab-bot/worker
 
-go 1.22.1
+go 1.21.8
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.25.3
