@@ -1,6 +1,7 @@
 #!/bin/bash
 
 COMMAND=""
+GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 GPU_TYPE=${GPU_TYPE:-""}
 NEXODUS_REG_KEY=${NEXODUS_REG_KEY:-""}
 OS=""
@@ -22,6 +23,7 @@ usage() {
     echo
     echo "Options:"
     echo "  -h, --help: Show this help message and exit"
+    echo "  --github-token TOKEN: GitHub token to use for the worker for accessing taxonomy PRs."
     echo "  --gpu-type TYPE: Optionally the type of GPU to use. Supported: cuda"
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
     echo "  --redis-ip IP: Optionally the IP address of the Redis server. Default: ${REDIS_IP}"
@@ -219,6 +221,11 @@ install_bot_worker() {
     popd
     popd
 
+    cat << EOF > labbotworker.sysconfig
+GITHUB_TOKEN=${GITHUB_TOKEN}
+EOF
+    sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
+
     cat << EOF > labbotworker.service
 [Unit]
 Description=Instruct Lab GitHub Bot Worker
@@ -230,8 +237,9 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379
+EnvironmentFile=/etc/sysconfig/labbotworker
 WorkingDirectory=/home/fedora/instruct-lab-bot
+ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379
 
 [Install]
 WantedBy=multi-user.target
@@ -259,6 +267,10 @@ fi
 # Parse command line arguments
 while [ $# -gt 0 ]; do
     case "$1" in
+        --github-token)
+            GITHUB_TOKEN="$2"
+            shift
+            ;;
         --gpu-type)
             GPU_TYPE="$2"
             shift
