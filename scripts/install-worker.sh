@@ -231,7 +231,7 @@ install_bot_worker() {
     popd
 
     cat << EOF > labbotworker.sysconfig
-GITHUB_TOKEN=${GITHUB_TOKEN}
+ILWORKER_GITHUB_TOKEN=${GITHUB_TOKEN}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
