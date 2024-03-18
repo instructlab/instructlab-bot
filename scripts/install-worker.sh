@@ -148,40 +148,69 @@ setup_workdir() {
     fi
 }
 
+config_lab_systemd() {
+    cat << EOF > lab-serve.sh
+#!/bin/bash
+source venv/bin/activate
+lab serve
+EOF
+    sudo install -m 755 lab-serve.sh /usr/local/bin/lab-serve.sh
+
+    cat << EOF > labserve.service
+[Unit]
+Description=Instruct Lab Model Server
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/usr/local/bin/lab-serve.sh
+WorkingDirectory=/home/fedora/instruct-lab-bot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo install -m 0644 labserve.service /usr/lib/systemd/system/labserve.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now labserve
+}
+
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     # shellcheck disable=SC1091
     source venv/bin/activate
-    if command_exists "lab"; then
-        echo "lab CLI already installed"
-        return 0
-    fi
-    pip install ./cli
-    if [ "${GPU_TYPE}" = "cuda" ]; then
-        export PATH=/usr/local/cuda-12/bin${PATH:+:${PATH}}
-        export LD_LIBRARY_PATH=/usr/local/cuda-12/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-        CUDACXX="/usr/local/cuda-12/bin/nvcc" \
-            CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=native" \
-            FORCE_CMAKE=1 \
-            pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
-    elif [ -n "${GPU_TYPE}" ]; then
-        echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
-        exit 1
+    if ! command_exists "lab"; then
+        pip install ./cli
+        if [ "${GPU_TYPE}" = "cuda" ]; then
+            export PATH=/usr/local/cuda-12/bin${PATH:+:${PATH}}
+            export LD_LIBRARY_PATH=/usr/local/cuda-12/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+            CUDACXX="/usr/local/cuda-12/bin/nvcc" \
+                CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=native" \
+                FORCE_CMAKE=1 \
+                pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
+        elif [ -n "${GPU_TYPE}" ]; then
+            echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
+            exit 1
+        fi
     fi
     if [ ! -f config.yaml ]; then
         lab init --non-interactive
     fi
     lab download
+    config_lab_systemd
 }
 
-install() {
+command_install() {
     check_os
     install_prereqs
     install_nexodus
     setup_workdir
     install_lab
 
-    echo "Install here"
+    echo "TODO: Finish install here"
 }
 
 if [ $# -lt 1 ]; then
@@ -222,7 +251,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$COMMAND" == "install" ]; then
-    install
+    command_install
 else
     printf "Invalid command: %s\n" "${COMMAND}"
     usage
