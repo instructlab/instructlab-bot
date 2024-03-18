@@ -23,7 +23,7 @@ usage() {
     echo
     echo "Options:"
     echo "  -h, --help: Show this help message and exit"
-    echo "  --github-token TOKEN: GitHub token to use for the worker for accessing taxonomy PRs."
+    echo "  --github-token TOKEN: GitHub token to use for the worker for accessing taxonomy PRs. Required."
     echo "  --gpu-type TYPE: Optionally the type of GPU to use. Supported: cuda"
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
     echo "  --redis-ip IP: Optionally the IP address of the Redis server. Default: ${REDIS_IP}"
@@ -44,6 +44,15 @@ check_os() {
         OS="Fedora"
     else
         unsupported
+    fi
+}
+
+check_install_prereqs() {
+    check_os
+
+    if [ -z "${GITHUB_TOKEN}" ]; then
+        echo "GitHub token not provided"
+        exit 1
     fi
 }
 
@@ -142,10 +151,10 @@ setup_workdir() {
     mkdir -p "${WORK_DIR}"
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if [ ! -d cli ]; then
-        git clone git@github.com:redhat-et/instruct-lab-cli.git cli
+        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli.git" cli
     fi
     if [ ! -d taxonomy ]; then
-        git clone git@github.com:redhat-et/taxonomy.git
+        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/taxonomy.git"
     fi
     if [ ! -d venv ]; then
         python3 -m venv venv
@@ -210,7 +219,7 @@ install_lab() {
 install_bot_worker() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if [ ! -d bot-repo ]; then
-        git clone git@github.com:redhat-et/instruct-lab-bot.git bot-repo
+        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-bot.git" bot-repo
     fi
     pushd bot-repo
     git pull -r
@@ -250,7 +259,7 @@ EOF
 }
 
 command_install() {
-    check_os
+    check_install_prereqs
     install_prereqs
     install_nexodus
     setup_workdir
