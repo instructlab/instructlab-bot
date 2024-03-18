@@ -150,25 +150,12 @@ install_nexodus() {
 setup_workdir() {
     mkdir -p "${WORK_DIR}"
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
-    if [ ! -d cli ]; then
-        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli.git" cli
-    fi
     if [ ! -d taxonomy ]; then
         git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/taxonomy.git"
-    fi
-    if [ ! -d venv ]; then
-        python3 -m venv venv
     fi
 }
 
 config_lab_systemd() {
-    cat << EOF > lab-serve.sh
-#!/bin/bash
-source venv/bin/activate
-lab serve
-EOF
-    sudo install -m 755 lab-serve.sh /usr/local/bin/lab-serve.sh
-
     cat << EOF > labserve.service
 [Unit]
 Description=Instruct Lab Model Server
@@ -180,7 +167,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/usr/local/bin/lab-serve.sh
+ExecStart=lab serve
 WorkingDirectory=/home/fedora/instruct-lab-bot
 
 [Install]
@@ -189,21 +176,20 @@ EOF
     sudo install -m 0644 labserve.service /usr/lib/systemd/system/labserve.service
     sudo systemctl daemon-reload
     sudo systemctl enable --now labserve
+    sudo systemctl restart labserve
 }
 
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
-    # shellcheck disable=SC1091
-    source venv/bin/activate
     if ! command_exists "lab"; then
-        pip install ./cli
+        sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli#egg=cli"
         if [ "${GPU_TYPE}" = "cuda" ]; then
             export PATH=/usr/local/cuda-12/bin${PATH:+:${PATH}}
             export LD_LIBRARY_PATH=/usr/local/cuda-12/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
             CUDACXX="/usr/local/cuda-12/bin/nvcc" \
                 CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=native" \
                 FORCE_CMAKE=1 \
-                pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
+                sudo pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
         elif [ -n "${GPU_TYPE}" ]; then
             echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
             exit 1
@@ -221,14 +207,14 @@ install_bot_worker() {
     if [ ! -d bot-repo ]; then
         git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-bot.git" bot-repo
     fi
-    pushd bot-repo
+    pushd bot-repo || (echo "Failed to change to bot-repo directory" && exit 1)
     git pull -r
-    pushd worker
+    pushd worker || (echo "Failed to change to worker directory" && exit 1)
     go build -o worker main.go
     chmod +x worker
     sudo install -m 755 worker /usr/local/bin/instruct-lab-bot-worker
-    popd
-    popd
+    popd || (echo "Failed to change to bot-repo directory" && exit 1)
+    popd || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
 
     cat << EOF > labbotworker.sysconfig
 GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -256,6 +242,7 @@ EOF
     sudo install -m 0644 labbotworker.service /usr/lib/systemd/system/labbotworker.service
     sudo systemctl daemon-reload
     sudo systemctl enable --now labbotworker
+    sudo systemctl restart labbotworker
 }
 
 command_install() {
