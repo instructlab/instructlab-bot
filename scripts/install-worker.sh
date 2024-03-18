@@ -62,7 +62,8 @@ install_prereqs_fedora() {
         make \
         python3 \
         python3-pip \
-        python3-virtualenv
+        python3-virtualenv \
+        unzip
 
     if [ "${GPU_TYPE}" = "cuda" ]; then
         sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/fedora39/x86_64/cuda-fedora39.repo
@@ -78,6 +79,12 @@ install_prereqs_fedora() {
     elif [ -n "${GPU_TYPE}" ]; then
         echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
         exit 1
+    fi
+
+    if ! command_exists "aws"; then
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+        unzip awscliv2.zip && \
+        sudo ./aws/install
     fi
 }
 
