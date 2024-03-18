@@ -49,6 +49,18 @@ command_exists() {
     fi
 }
 
+install_prereqs_fedora() {
+    sudo dnf install -y git
+}
+
+install_prereqs() {
+    if [ "${OS}" == "Fedora" ]; then
+        install_prereqs_fedora
+    else
+        unsupported
+    fi
+}
+
 install_nexodus_fedora() {
     if command_exists "nexctl"; then
         echo "Nexodus already installed"
@@ -89,6 +101,7 @@ install_nexodus() {
 
 install() {
     check_os
+    install_prereqs
     install_nexodus
 
     echo "Install here"
