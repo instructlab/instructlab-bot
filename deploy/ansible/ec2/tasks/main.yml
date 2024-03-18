@@ -61,3 +61,16 @@
     regexp: "labNodes"
     line: "[labNodes]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file=~/.ssh/id_rsa"
   loop: "{{ ec2_jobs_with_index }}"
+
+- name: Parse the first host from the inventory
+  ansible.builtin.set_fact:
+    first_instance_ip: "{{ ec2_jobs_with_index[0][0]['instances'][0]['public_ip_address'] }}"
+
+- name: Wait until the host is reachable via SSH
+  ansible.builtin.wait_for:
+    host: "{{ first_instance_ip }}"
+    port: 22
+    delay: 10
+    timeout: 180
+    state: started
+  delegate_to: localhost

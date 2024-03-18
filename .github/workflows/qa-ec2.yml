@@ -1,0 +1,55 @@
+name: qa
+
+concurrency:
+  group: qa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-ec2:
+    name: deploy-ec2-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AWS_REGION: "us-east-1"
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+      BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+      ANSIBLE_HOST_KEY_CHECKING: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ansible and Dependencies
+        run: pip install boto boto3 ansible-vault ansible-core
+
+      - name: Install amazon.aws Ansible library
+        run: ansible-galaxy collection install amazon.aws
+
+      - name: SSH key setup
+        run: |
+          echo "${{ secrets.QA_ANSIBLE_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 0400 ~/.ssh/id_rsa
+
+      - name: Run Playbook to initialize the EC2 instance
+        run: |
+          ansible-playbook -i inventory.txt deploy-ec2.yml
+
+      - name: Run Playbook to install prerequisites
+        run: |
+          ansible-galaxy install -r requirements.yml
+          ansible-playbook -i inventory.txt deploy-prereqs.yml
+
+      - name: Deploy the bot container
+        run: |
+          echo "${ANSIBLE_VAULT_PASSWORD}" > ansible_vault_password_file
+          ansible-playbook -i inventory.txt -e @secrets.enc \
+          --vault-password-file ansible_vault_password_file \
+          -e "github_token=${BOT_GITHUB_TOKEN}" deploy-bot.yml
+          rm -f ansible_vault_password_file
