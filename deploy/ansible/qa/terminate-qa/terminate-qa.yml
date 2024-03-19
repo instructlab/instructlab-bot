@@ -1,0 +1,5 @@
+# Terminate QA EC2 Instances
+- name: Terminate QA instances matching the defined EC2 tags
+  hosts: localhost
+  roles:
+    - role: terminate

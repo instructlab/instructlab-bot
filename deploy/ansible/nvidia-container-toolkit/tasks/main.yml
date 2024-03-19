@@ -32,7 +32,7 @@
 
 - name: Reboot
   ansible.builtin.reboot:
-    reboot_timeout: 300
+    reboot_timeout: 500
     msg: "Rebooting to load NVIDIA drivers"
   when: nvidia_install_kmod.changed or nvidia_install_cuda.changed
 
