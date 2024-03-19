@@ -72,11 +72,13 @@ install_prereqs_fedora() {
         git \
         go \
         make \
+        nvtop \
         python3 \
         python3-pip \
         python3-virtualenv \
         redis \
-        unzip
+        unzip \
+        vim
 
     if [ "${GPU_TYPE}" = "cuda" ]; then
         sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/fedora39/x86_64/cuda-fedora39.repo
@@ -166,7 +168,8 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=1
-User=root
+User=fedora
+Group=fedora
 ExecStart=lab serve
 WorkingDirectory=/home/fedora/instruct-lab-bot
 
@@ -231,7 +234,8 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=1
-User=root
+User=fedora
+Group=fedora
 EnvironmentFile=/etc/sysconfig/labbotworker
 WorkingDirectory=/home/fedora/instruct-lab-bot
 ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379
