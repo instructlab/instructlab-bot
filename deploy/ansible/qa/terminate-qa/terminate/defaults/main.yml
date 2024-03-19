@@ -1,0 +1,1 @@
+aws_nodetype_tag: instruct-bot-qa     # Unique qa tag identifier for ec2 instances

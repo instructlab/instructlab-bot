@@ -1,0 +1,5 @@
+- name: QA Build Worker Image
+  hosts: labNodes
+  roles:
+    - role: worker
+      become: true
