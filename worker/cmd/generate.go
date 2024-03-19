@@ -31,6 +31,7 @@ var (
 	VenvDir         string
 	NumInstructions int
 	Origin          string
+	GithubToken     string
 )
 
 func init() {
@@ -38,6 +39,8 @@ func init() {
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
+	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
+	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
 
@@ -49,7 +52,7 @@ var generateCmd = &cobra.Command{
 		sugar := logger.Sugar()
 		ctx := cmd.Context()
 
-		sugar.Info("Starting worker")
+		sugar.Info("Starting generate worker")
 		// Connect to Redis
 		conn, err := redis.DialContext(ctx, "tcp", RedisHost)
 		if err != nil {
@@ -156,7 +159,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		RemoteName: Origin,
 		Auth: &http.BasicAuth{
 			Username: "instruct-lab-bot",
-			Password: os.Getenv("GITHUB_TOKEN"),
+			Password: GithubToken,
 		},
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
@@ -196,7 +199,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		RefSpecs:   []gitconfig.RefSpec{refspec},
 		Auth: &http.BasicAuth{
 			Username: "instruct-lab-bot",
-			Password: os.Getenv("GITHUB_TOKEN"),
+			Password: GithubToken,
 		},
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {

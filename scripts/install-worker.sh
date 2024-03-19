@@ -220,7 +220,7 @@ install_bot_worker() {
     popd || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
 
     cat << EOF > labbotworker.sysconfig
-GITHUB_TOKEN=${GITHUB_TOKEN}
+ILWORKER_GITHUB_TOKEN=${GITHUB_TOKEN}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
