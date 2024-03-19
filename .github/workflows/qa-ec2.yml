@@ -34,7 +34,7 @@ jobs:
 
       - name: SSH key setup
         run: |
-          mdkdir ~/.ssh/
+          mkdir ~/.ssh/
           echo "${{ secrets.QA_ANSIBLE_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 0400 ~/.ssh/id_rsa
 
