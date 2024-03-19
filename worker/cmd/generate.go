@@ -237,11 +237,12 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	}
 
 	cmd.Env = os.Environ()
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 
 	sugar.Debug("Running lab generate")
 	// Run the command
 	if err := cmd.Run(); err != nil {
-		// TODO: Log stderr
 		sugar.Errorf("Could not run lab generate: %v, %s", err)
 		return
 	}
