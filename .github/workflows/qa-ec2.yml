@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 120
     env:
       AWS_REGION: "us-east-1"
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      QA_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      QA_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
       BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
       QA_GITHUB_TOKEN: ${{ secrets.QA_GITHUB_TOKEN }}
@@ -41,7 +41,8 @@ jobs:
 
       - name: Run Playbook to initialize the EC2 instance
         run: |
-          ansible-playbook -i deploy/ansible/inventory.txt deploy/ansible/deploy-ec2.yml
+          ansible-playbook -i deploy/ansible/inventory.txt \
+          deploy/ansible/deploy-ec2.yml
 
       - name: Run Playbook to install worker node prerequisites
         run: |
@@ -67,5 +68,4 @@ jobs:
       - name: Terminate EC2 Instances
         if: always()
         run: |
-          ansible-playbook deploy/ansible/qa/terminate-qa/terminate-qa.yml \
-          --private-key ~/.ssh/id_rsa
+          ansible-playbook deploy/ansible/qa/terminate-qa/terminate-qa.yml
