@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Playbook to install worker node prerequisites
         run: |
-          ansible-galaxy install -r requirements.yml
+          ansible-galaxy install -r deploy/ansible/requirements.yml
           ansible-playbook -i deploy/ansible/inventory.txt deploy/ansible/deploy-worker-prereqs.yml
 
       - name: Build and deploy the worker image
