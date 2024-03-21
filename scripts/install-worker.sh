@@ -8,6 +8,10 @@ OS=""
 REDIS_IP=${REDIS_IP:-"127.0.0.1"}
 WORK_DIR=${WORK_DIR:-"${HOME}/instruct-lab-bot"}
 
+# Export CUDA environment variables
+export CUDA_HOME=/usr/local/cuda
+export PATH="/usr/local/cuda/bin:${PATH}"
+
 supported_envs() {
     echo "Supported Environments:"
     echo "  - Fedora 39"
@@ -83,7 +87,7 @@ install_prereqs_fedora() {
     if [ "${GPU_TYPE}" = "cuda" ]; then
         sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/fedora39/x86_64/cuda-fedora39.repo
         sudo dnf module install -y nvidia-driver:latest-dkms
-        sudo dnf install -y cuda
+        sudo dnf install -y cuda cuda-toolkit
         NVIDIA_CHECK=$(sudo lsmod | grep nvidia)
         if [ -z "${NVIDIA_CHECK}" ]; then
             echo
@@ -187,12 +191,7 @@ install_lab() {
     if ! command_exists "lab"; then
         sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli#egg=cli"
         if [ "${GPU_TYPE}" = "cuda" ]; then
-            export PATH=/usr/local/cuda-12/bin${PATH:+:${PATH}}
-            export LD_LIBRARY_PATH=/usr/local/cuda-12/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-            CUDACXX="/usr/local/cuda-12/bin/nvcc" \
-                CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=native" \
-                FORCE_CMAKE=1 \
-                sudo pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
+            CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
         elif [ -n "${GPU_TYPE}" ]; then
             echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
             exit 1
