@@ -40,7 +40,7 @@ export default (app: Probot) => {
       const issueComment = context.issue({
         body:
           `Beep, boop 🤖  Generating test data for your pull request.\n\n` +
-          `This may take a few seconds...`,
+          `This will take several minutes...`,
       });
       await context.octokit.issues.createComment(issueComment);
       const jobNumber = await client.incr("jobs");
