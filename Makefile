@@ -39,3 +39,15 @@ ansible-lint: ## Run ansible-lint on playbooks/*.yml
 	$(CMD_PREFIX) ansible-galaxy install -r ./deploy/ansible/requirements.yml
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[ANSIBLE LINT]"
 	$(CMD_PREFIX) ansible-lint
+
+.PHONY: png-lint
+png-lint: ## Lint the png files from excalidraw
+	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[PNG LINT]"
+	$(CMD_PREFIX) for file in $^; do \
+		if echo "$$file" | grep -q --basic-regexp --file=.excalidraw-ignore; then continue ; fi ; \
+		if ! grep -q "excalidraw+json" $$file; then \
+			echo "$$file was not exported from excalidraw with 'Embed Scene' enabled." ; \
+			echo "If this is not an excalidraw file, add it to .excalidraw-ignore" ; \
+			exit 1 ; \
+		fi \
+	done
