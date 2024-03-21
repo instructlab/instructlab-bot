@@ -1,5 +1,7 @@
 #!/bin/bash
 
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
 COMMAND=""
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 GPU_TYPE=${GPU_TYPE:-""}
@@ -27,6 +29,8 @@ usage() {
     echo
     echo "Options:"
     echo "  -h, --help: Show this help message and exit"
+    echo "  --aws-access-key-id KEY: AWS access key ID to use for the worker. Default: ${AWS_ACCESS_KEY_ID}"
+    echo "  --aws-secret-access-key KEY: AWS secret access key to use for the worker. Default: ${AWS_SECRET_ACCESS_KEY}"
     echo "  --github-token TOKEN: GitHub token to use for the worker for accessing taxonomy PRs. Required."
     echo "  --gpu-type TYPE: Optionally the type of GPU to use. Supported: cuda"
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
@@ -56,6 +60,10 @@ check_install_prereqs() {
 
     if [ -z "${GITHUB_TOKEN}" ]; then
         echo "GitHub token not provided"
+        exit 1
+    fi
+    if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+        echo "AWS access key ID and secret access key are required"
         exit 1
     fi
 }
@@ -220,6 +228,8 @@ install_bot_worker() {
 
     cat << EOF > labbotworker.sysconfig
 ILWORKER_GITHUB_TOKEN=${GITHUB_TOKEN}
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
@@ -256,7 +266,21 @@ command_install() {
     install_lab
     install_bot_worker
 
-    echo "TODO: Finish install here"
+    cat << EOF
+
+*************************
+*** Install complete! ***
+*************************
+
+Check the status of the local model server (labserve):
+  systemctl status labserve
+  journalctl -u labserve
+
+Check the status of the bot worker service (labbotworker):
+  sudo systemctl status labbotworker
+  sudo journalctl -u labbotworker
+
+EOF
 }
 
 if [ $# -lt 1 ]; then
@@ -266,6 +290,14 @@ fi
 # Parse command line arguments
 while [ $# -gt 0 ]; do
     case "$1" in
+        --aws-access-key-id)
+            AWS_ACCESS_KEY_ID="$2"
+            shift
+            ;;
+        --aws-secret-access-key)
+            AWS_SECRET_ACCESS_KEY="$2"
+            shift
+            ;;
         --github-token)
             GITHUB_TOKEN="$2"
             shift
