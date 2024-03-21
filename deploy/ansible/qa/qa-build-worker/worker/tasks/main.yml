@@ -1,8 +1,14 @@
 ---
-- name: Build Docker image
+- name: Clone the bot repo # noqa latest[git]
+  ansible.builtin.git:
+    clone: true
+    repo: "https://{{ qa_github_token }}@github.com/redhat-et/instruct-lab-bot.git"
+    dest: /home/{{ ansible_user }}/instruct-lab-bot
+
+- name: Build worker image
   community.docker.docker_image:
     build:
-      path: "./worker"
+      path: "/home/{{ ansible_user }}/instruct-lab-bot/worker"
       args:
         GITHUB_USER: "{{ qa_github_uid }}"
         GITHUB_TOKEN: "{{ qa_github_token }}"
