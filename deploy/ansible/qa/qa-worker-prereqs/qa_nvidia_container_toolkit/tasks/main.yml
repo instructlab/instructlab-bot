@@ -1,0 +1,97 @@
+---
+- name: Check ansible_become_timeout
+  ansible.builtin.debug:
+    msg: "{{ ansible_become_timeout }}"
+
+- name: Remove Packages
+  ansible.builtin.dnf:
+    name:
+      - nvidia-docker
+      - nvidia-docker2
+      - nvidia-container-runtime
+    state: absent
+    autoremove: true
+
+- name: Add NVIDIA drivers
+  ansible.builtin.get_url:
+    url: https://developer.download.nvidia.com/compute/cuda/repos/fedora39/x86_64/cuda-fedora39.repo
+    dest: "/etc/yum.repos.d/cuda-fedora39.repo"
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Create installation script on remote host # noqa no-changed-when
+  ansible.builtin.shell: |
+    cat <<'EOF' > /tmp/install_nvidia_cuda.sh
+    #!/bin/bash
+    set -e
+
+    # Ensure NVIDIA driver and CUDA toolkit installations are attempted only if not already installed.
+
+    # Install NVIDIA kmod using dnf if necessary
+    if ! dnf list installed "@nvidia-driver:latest-dkms" &>/dev/null; then
+      echo "Installing NVIDIA kmod..."
+      dnf install -y "@nvidia-driver:latest-dkms" && dnf makecache
+    else
+      echo "NVIDIA kmod is already installed."
+    fi
+
+    # Install CUDA Toolkit using dnf if necessary
+    if ! dnf list installed cuda-toolkit &>/dev/null; then
+      echo "Installing CUDA Toolkit..."
+      dnf install -y cuda-toolkit cuda
+    else
+      echo "CUDA Toolkit is already installed."
+    fi
+
+    exit 0
+    EOF
+    chmod +x /tmp/install_nvidia_cuda.sh
+  args:
+    executable: /bin/bash
+
+- name: Installation script on remote host asynchronously (hack due to runner/ec2 ssh breakage) # noqa no-changed-when
+  ansible.builtin.shell: /tmp/install_nvidia_cuda.sh > /tmp/install_script_output.log 2>&1
+  async: 3600
+  poll: 0
+  register: script_async_result
+
+- name: Pause for 15 minutes for the installer to finish - polling breaks from GH to EC2 (-_-)
+  ansible.builtin.pause:
+    minutes: 15
+
+- name: Display the contents of the installation log # noqa no-changed-when
+  ansible.builtin.command:
+    cmd: cat /tmp/install_script_output.log
+  register: log_content
+
+- name: Print log content
+  ansible.builtin.debug:
+    msg: "{{ log_content.stdout }}"
+
+- name: Reboot
+  ansible.builtin.reboot:
+    reboot_timeout: 400
+    msg: "Rebooting to load NVIDIA drivers"
+
+- name: Add Repo
+  ansible.builtin.get_url:
+    url: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+    dest: "/etc/yum.repos.d/nvidia-container-toolkit.repo"
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Install Packages
+  ansible.builtin.dnf:
+    name:
+      - nvidia-container-runtime
+    state: present
+    update_cache: true
+  notify: restart docker
+
+- name: Set docker daemon configuration
+  ansible.builtin.shell: |
+    nvidia-ctk runtime configure --runtime=docker
+  changed_when: true
+  notify: restart docker

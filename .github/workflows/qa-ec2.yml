@@ -20,6 +20,7 @@ jobs:
       QA_GITHUB_TOKEN: ${{ secrets.QA_GITHUB_TOKEN }}
       ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/id_rsa
       ANSIBLE_HOST_KEY_CHECKING: "false"
+      ANSIBLE_CONFIG: '${{ github.workspace }}/deploy/ansible/ansible.cfg'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,7 +49,9 @@ jobs:
       - name: Run Playbook to install worker node prerequisites
         run: |
           ansible-galaxy install -r deploy/ansible/requirements.yml
-          ansible-playbook -i deploy/ansible/inventory.txt deploy/ansible/deploy-worker-prereqs.yml
+          ANSIBLE_SSH_TIMEOUT=40 ANSIBLE_BECOME_TIMEOUT=60 ansible-playbook \
+          -i deploy/ansible/inventory.txt \
+          deploy/ansible/qa/qa-worker-prereqs/qa-worker-prereqs.yml
 
       - name: Build and deploy the worker image
         run: |
@@ -56,17 +59,17 @@ jobs:
           ansible-playbook -i deploy/ansible/inventory.txt \
           -e "qa_github_token=${QA_GITHUB_TOKEN}" \
           --vault-password-file ansible_vault_password_file \
-          deploy/ansible/qa/build-worker/build-worker-img.yml
+          deploy/ansible/qa/qa-build-worker/build-worker-img.yml
 
-#      - name: Deploy the bot container
-#        run: |
-#          echo "${ANSIBLE_VAULT_PASSWORD}" > ansible_vault_password_file
-#          ansible-playbook -i deploy/ansible/inventory.txt -e @secrets.enc \
-#          --vault-password-file ansible_vault_password_file \
-#          -e "github_token=${BOT_GITHUB_TOKEN}" deploy/ansible/deploy-bot.yml
-#          rm -f ansible_vault_password_file
+      #      - name: Deploy the bot container
+      #        run: |
+      #          echo "${ANSIBLE_VAULT_PASSWORD}" > ansible_vault_password_file
+      #          ansible-playbook -i deploy/ansible/inventory.txt -e @secrets.enc \
+      #          --vault-password-file ansible_vault_password_file \
+      #          -e "github_token=${BOT_GITHUB_TOKEN}" deploy/ansible/deploy-bot.yml
+      #          rm -f ansible_vault_password_file
 
       - name: Terminate EC2 Instances
         if: always()
         run: |
-          ansible-playbook deploy/ansible/qa/terminate-qa/terminate-qa.yml
+          ansible-playbook deploy/ansible/qa/qa-terminate/terminate-qa.yml
