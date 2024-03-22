@@ -92,7 +92,7 @@
 - name: Serve the model
   community.docker.docker_container:
     name: instruct-lab-serve
-    image: ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-serve:main
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
     pull: always
     state: started
     ports:
