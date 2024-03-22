@@ -1,0 +1,11 @@
+---
+# defaults file for redis-server
+
+# Docker image configuration
+# -----------------------------
+redis_docker_image_tag: "latest"
+
+# Docker container configuration
+# -----------------------------
+redis_container_name: "redis"
+redis_port: 6379
