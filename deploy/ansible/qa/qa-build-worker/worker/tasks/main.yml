@@ -12,7 +12,7 @@
       args:
         GITHUB_USER: "{{ qa_github_uid }}"
         GITHUB_TOKEN: "{{ qa_github_token }}"
-    name: "ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-serve"
+    name: "ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve"
     tag: "main"
     source: build
 
@@ -28,7 +28,7 @@
 
 - name: Start the worker
   ansible.builtin.command:
-    cmd: docker run --gpus all -it --entrypoint /bin/bash -d -v /home/fedora/instructlab:/data ghcr.io/redhat-et/instruct-lab-bot/instruct-lab-serve:main
+    cmd: docker run --gpus all -it --entrypoint /bin/bash -d -v /home/fedora/instructlab:/data ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
   changed_when: true
 
 - name: List all containers
