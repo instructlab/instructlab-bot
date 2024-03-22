@@ -1,0 +1,6 @@
+- name: Deploy Worker Node Script # noqa internal-error
+  hosts: labNodes
+  vars_files:
+    - ../../secrets.enc
+  roles:
+    - role: deploy_worker_script

@@ -1,9 +1,8 @@
 - name: Deploy Node Prereqs
   hosts: labNodes
+  vars:
+    ansible_become_timeout: 30
   roles:
-    - role: geerlingguy.docker
-      become: true
-    - role: "qa_nvidia_container_toolkit"
-      become: true
     - role: qa_packages
+    - role: "qa_nvidia_container_toolkit"
       become: true
