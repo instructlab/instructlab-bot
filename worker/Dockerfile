@@ -6,7 +6,7 @@ ARG GITHUB_TOKEN
 RUN dnf install -y python3 python3-pip python3-devel git gcc gcc-c++ unzip dnf-plugins-core yum-utils && dnf clean all
 
 # Install lab CLI
-RUN pip install -e git+https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli#egg=cli
+RUN pip install -e git+https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/instruct-lab/instruct-lab-cli#egg=cli
 
 # Install awscliv2
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
