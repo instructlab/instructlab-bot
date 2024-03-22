@@ -6,6 +6,11 @@
     password: "{{ github_token }}"
     reauthorize: true
 
+- name: Get container info
+  community.docker.docker_container_info:
+    name: redis
+  register: redis_info
+
 - name: Start the container
   community.docker.docker_container:
     name: instruct-lab-bot
@@ -16,5 +21,5 @@
       APP_ID: "{{ app_id }}"
       PRIVATE_KEY: "{{ private_key }}"
       WEBHOOK_SECRET: "{{ webhook_secret }}"
-      REDIS_URL: "redis://{{ redis_ip }}:6379"
+      REDIS_URL: "redis://{{ redis_info.container.NetworkSettings.IPAddress }}:6379"
       WEBHOOK_PROXY_URL: "{{ webhook_proxy_url }}"
