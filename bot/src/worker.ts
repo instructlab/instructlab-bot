@@ -15,8 +15,8 @@ export class Worker {
     })
       .on("error", (err) => this.app.log.error("Redis Client Error", err))
       .connect();
-    const foreverToMakeLiterHappy = true;
-    while (foreverToMakeLiterHappy) {
+    const foreverToMakeLinterHappy = true;
+    while (foreverToMakeLinterHappy) {
       const results = await client.rPop("results");
       if (results !== null) {
         const prNumber = await client.get(`jobs:${results}:pr_number`);

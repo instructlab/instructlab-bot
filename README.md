@@ -42,7 +42,7 @@ The current GitHub workflow in a PR is:
 
 If you have suggestions for how instruct-lab-bot could be improved, or want to report a bug, open an issue! We'd love all and any contributions.
 
-For more, check out the [Contributing Guide](CONTRIBUTING.md).
+For more, check out the [Instruct-Lab-Bot Contribution Guide](CONTRIBUTING.md) and [Instruct-Lab Community](https://github.com/instruct-lab/community/blob/main/CONTRIBUTING.md).
 
 ## License
 
