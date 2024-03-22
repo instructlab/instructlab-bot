@@ -1,0 +1,13 @@
+- name: Deploy bot stack (Bot app, Redis, Grafana on EC2 node)
+  hosts: labNodes
+  roles:
+    - role: geerlingguy.docker
+      become: true
+    - role: packages
+      become: true
+    - role: redis-docker
+      become: true
+    - role: grafana
+      become: true
+    - role: bot
+      become: true
