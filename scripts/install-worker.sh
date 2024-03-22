@@ -165,7 +165,7 @@ setup_workdir() {
     mkdir -p "${WORK_DIR}"
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if [ ! -d taxonomy ]; then
-        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/taxonomy.git"
+        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/taxonomy.git"
     fi
 }
 
@@ -197,7 +197,7 @@ EOF
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if ! command_exists "lab"; then
-        sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-cli#egg=cli"
+        sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/cli#egg=cli"
         if [ "${GPU_TYPE}" = "cuda" ]; then
             CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
         elif [ -n "${GPU_TYPE}" ]; then
@@ -215,7 +215,7 @@ install_lab() {
 install_bot_worker() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if [ ! -d bot-repo ]; then
-        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/redhat-et/instruct-lab-bot.git" bot-repo
+        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/instruct-lab-bot.git" bot-repo
     fi
     pushd bot-repo || (echo "Failed to change to bot-repo directory" && exit 1)
     git pull -r
