@@ -1,0 +1,30 @@
+---
+- name: Get Nexodus Tunnel IP (v4)
+  ansible.builtin.command: "nexctl nexd get tunnelip"
+  register: nexodus_tunnelip_v4
+  changed_when: false
+  become: true
+
+- name: Pull Redis image
+  community.docker.docker_image:
+    name: 'redis'
+    tag: '{{ redis_docker_image_tag }}'
+    source: pull
+
+- name: Setup Redis container
+  community.docker.docker_container:
+    name: "{{ redis_container_name }}"
+    image: "redis:{{ redis_docker_image_tag }}"
+    command: ["redis-server"]
+    state: started
+    ports:
+#      - "{{ redis_port }}:6379"
+      - "{{ nexodus_tunnelip_v4.stdout }}:{{ redis_port }}:6379"
+  register: redis_container
+
+- name: Wait until Redis is available
+  ansible.builtin.wait_for:
+    host: '{{ nexodus_tunnelip_v4.stdout }}'
+    port: '{{ redis_port }}'
+    delay: 2
+    timeout: 10

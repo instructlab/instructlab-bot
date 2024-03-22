@@ -1,12 +1,6 @@
 version: "3.4"
 
 services:
-  redis:
-    container_name: redis
-    image: redis:latest
-    ports:
-      - 6379:6379
-
   grafana:
     container_name: grafana
     image: ghcr.io/redisgrafana/redis-app:latest
@@ -20,4 +14,3 @@ services:
       - GF_USERS_DEFAULT_THEME=light
     volumes:
       - ./provisioning:/etc/grafana/provisioning
-      - ./dashboards:/etc/dashboards

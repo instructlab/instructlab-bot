@@ -1,0 +1,33 @@
+---
+- name: Copy provisioning and dashboard files
+  ansible.builtin.copy:
+    src: ../../../../grafana
+    dest: /home/fedora/
+    mode: preserve
+
+- name: Get container info
+  community.docker.docker_container_info:
+    name: redis
+  register: redis_info
+
+- name: Replace string
+  ansible.builtin.replace:
+    path: /home/fedora/grafana/provisioning/datasources/datasource.yaml
+    backup: true
+    regexp: 'redis://redis:6379'
+    replace: 'redis://{{ redis_info.container.NetworkSettings.IPAddress }}:6379'
+
+- name: Start Grafana container
+  community.docker.docker_container:
+    name: grafana
+    image: ghcr.io/redisgrafana/redis-app:latest
+    ports:
+      - "3333:3000"
+    env:
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_ENABLE_GZIP: "true"
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - "/home/fedora/grafana/provisioning:/etc/grafana/provisioning"
