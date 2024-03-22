@@ -51,3 +51,7 @@ png-lint: ## Lint the png files from excalidraw
 			exit 1 ; \
 		fi \
 	done
+
+bot-image: bot/Dockerfile ## Build docker image for the bot
+	$(ECHO_PREFIX) printf "  %-12s bot/Dockerfile\n" "[DOCKER]"
+	$(CMD_PREFIX) docker build -f bot/Dockerfile -t quay.io/instruct-lab-bot/bot:latest .
