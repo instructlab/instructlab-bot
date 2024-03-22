@@ -9,7 +9,7 @@ dotenv.config();
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
 export default (app: Probot) => {
-  app.on("pull_request.opened", async (context) => {
+  /*app.on("pull_request.opened", async (context) => {
     const issueComment = context.issue({
       body:
         `Beep, boop 🤖  Hi, I'm instruct-lab-bot and I'm going to help you` +
@@ -21,7 +21,7 @@ export default (app: Probot) => {
         ` and you can proceed with the review.`,
     });
     await context.octokit.issues.createComment(issueComment);
-  });
+  });*/
   app.on("issue_comment.created", async (context) => {
     const client = await createClient({
       url: REDIS_URL,
