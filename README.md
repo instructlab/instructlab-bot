@@ -1,8 +1,5 @@
 # instruct-lab-bot
 
-> [!NOTE]
-> This is a PoC done in collaboration between OpenShift AI and Emerging Technologies.
-
 A GitHub bot to increase contributor test and review velocity for
 [instruct-lab/taxonomy](https://github.com/instruct-lab/taxonomy).
 
