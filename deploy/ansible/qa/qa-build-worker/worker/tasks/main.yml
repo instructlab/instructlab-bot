@@ -2,7 +2,7 @@
 - name: Clone the bot repo # noqa latest[git]
   ansible.builtin.git:
     clone: true
-    repo: "https://{{ qa_github_token }}@github.com/redhat-et/instruct-lab-bot.git"
+    repo: "https://{{ qa_github_token }}@github.com/instruct-lab/instruct-lab-bot.git"
     dest: /home/{{ ansible_user }}/instruct-lab-bot
 
 - name: Build worker image

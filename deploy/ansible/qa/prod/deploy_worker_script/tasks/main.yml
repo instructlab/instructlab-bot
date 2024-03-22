@@ -7,7 +7,7 @@
 
 - name: Clone the repository # noqa latest[git]
   ansible.builtin.git:
-    repo: 'https://{{ github_token }}@github.com/redhat-et/instruct-lab-bot'
+    repo: 'https://{{ github_token }}@github.com/instruct-lab/instruct-lab-bot'
     dest: "~/instruct-lab-bot"
 
 - name: Run the install script in the background and log output # noqa no-changed-when
