@@ -5,10 +5,16 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      run_option:
+        description: 'Deployment option (default or containerized)'
+        required: false
+        default: 'default'
 
 jobs:
-  deploy-ec2:
+  deploy-ec2-default:
     name: deploy-ec2-e2e
+    if: ${{ github.event.inputs.run_option == 'default' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -30,7 +36,65 @@ jobs:
           python-version: '3.12'
 
       - name: Install Ansible and Dependencies
-        run: pip install boto boto3 ansible-vault ansible-core
+        run: pip install boto boto3 ansible-vault ansible
+
+      - name: Add .local/bin to PATH
+        run: echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+      - name: Install amazon.aws Ansible library
+        run: ansible-galaxy collection install amazon.aws
+
+      - name: SSH key setup
+        run: |
+          mkdir ~/.ssh/
+          echo "${{ secrets.QA_ANSIBLE_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 0400 ~/.ssh/id_rsa
+
+      - name: Run Playbook to initialize the EC2 instance
+        run: |
+          ansible-playbook -i deploy/ansible/inventory.txt \
+          deploy/ansible/deploy-ec2.yml
+
+      - name: Deploy the worker script
+        run: |
+          echo "${ANSIBLE_VAULT_PASSWORD}" > ansible_vault_password_file
+          ansible-playbook -i deploy/ansible/inventory.txt \
+          --vault-password-file ansible_vault_password_file \
+          deploy/ansible/qa/prod/deploy-worker-script.yml
+
+      - name: Terminate EC2 Instances
+        if: always()
+        run: |
+          ansible-playbook deploy/ansible/qa/qa-terminate/terminate-qa.yml
+
+  deploy-ec2-containerized:
+    name: deploy-ec2-e2e-containers
+    if: ${{ github.event.inputs.run_option == 'containerized' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      AWS_REGION: "us-east-1"
+      AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.QA_AWS_SECRET_ACCESS_KEY }}
+      ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+      BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+      QA_GITHUB_TOKEN: ${{ secrets.QA_GITHUB_TOKEN }}
+      ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/id_rsa
+      ANSIBLE_HOST_KEY_CHECKING: "false"
+      ANSIBLE_CONFIG: '${{ github.workspace }}/deploy/ansible/ansible.cfg'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ansible and Dependencies
+        run: pip install boto boto3 ansible-vault ansible
+
+      - name: Add .local/bin to PATH
+        run: echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
       - name: Install amazon.aws Ansible library
         run: ansible-galaxy collection install amazon.aws
