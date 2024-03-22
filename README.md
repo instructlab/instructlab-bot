@@ -32,23 +32,7 @@ The current GitHub workflow in a PR is:
 2. Bot replies, "Thanks for your contribution, Run `@instuct-lab-bot generate` to generate training data based on your seed questions for your approval."
 3. User runs `@instuct-lab-bot generate` in a comment on the PR.
 4. Bot generates data using `lab generate` and stores it in an object store (S3).
-5. Bot replies: "Here is the generated training data ..."
-
-### Future Work
-
-We desire to expand the bot workflow to include other features, including training, testing, and serving test models.
-
-1. Bot replies: "After reviewing the generated data, run `@instuct-lab-bot train` to train a model based on the generated data."
-2. Bot replies: "Model generation is complete. Download and run the model by ..."
-3. Bot replies: "To test the model, run `@instuct-lab-bot test` to test the model on your seed questions."
-4. Bot replies: "To chat with a hosted instance of your model, follow these instructions ..."
-
-We expect this to require adding more complex infrastructure, including:
-
-- an OpenShift cluster with OpenShift AI installed and GPU nodes available.
-- Make use of workflows in OpenShift AI (kubeflow) for doing training
-- Run our teacher model, as well as models built for PRs via kserve
-- Make use of serverless / knative capabilities here to allow for scaling down to zero for PR models not in use.
+5. Bot replies: "Here is the generated data ..."
 
 ## Components
 
