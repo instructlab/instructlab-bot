@@ -37,7 +37,7 @@ export class Worker {
           continue;
         }
         const issueComment = {
-          owner: "redhat-et",
+          owner: "instruct-lab",
           repo: "taxonomy",
           issue_number: parseInt(prNumber),
           body:
