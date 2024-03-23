@@ -14,10 +14,12 @@ import (
 var (
 	RedisHost string
 	Debug     bool
+	TestMode  bool
 )
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&RedisHost, "redis", "r", "localhost:6379", "The Redis instance to connect to")
+	rootCmd.PersistentFlags().BoolVarP(&TestMode, "test", "t", false, "Enable test mode - do not run generate or post to S3")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
 }
 

@@ -134,6 +134,13 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
+	// If in test mode, immediately post to the results queue
+	if TestMode {
+		postJobResults(job, conn, sugar, "https://example.com")
+		sugar.Info("Job done (test mode)")
+		return
+	}
+
 	sugar = sugar.With("pr_number", prNumber)
 
 	workDir, err := os.Getwd()
@@ -338,15 +345,19 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	if _, err = conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", job), indexResult.URL); err != nil {
-		sugar.Errorf("Could not set s3_url in redis: %v", err)
+	// Notify the "results" queue that the job is done
+	postJobResults(job, conn, sugar, indexResult.URL)
+	sugar.Infof("Job done")
+}
+
+func postJobResults(job string, conn redis.Conn, logger *zap.SugaredLogger, URL string) {
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", job), URL); err != nil {
+		logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
 
-	// Notify the "results" queue that the job is done
-	if _, err = conn.Do("LPUSH", "results", job); err != nil {
-		sugar.Errorf("Could not push to redis queue: %v", err)
+	if _, err := conn.Do("LPUSH", "results", job); err != nil {
+		logger.Errorf("Could not push to redis queue: %v", err)
 	}
-	sugar.Infof("Job done")
 }
 
 func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map[string]string) error {
