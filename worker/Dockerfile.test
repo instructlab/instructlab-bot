@@ -1,0 +1,22 @@
+FROM registry.access.redhat.com/ubi8/ubi as build
+
+RUN dnf update -qy && \
+    dnf install --setopt=install_weak_deps=False -qy \
+    go \
+    make \
+    && \
+    dnf clean all -y &&\
+    rm -rf /var/cache/yum
+
+WORKDIR /src
+COPY worker/go.mod .
+COPY worker/go.sum .
+RUN go mod download
+COPY worker/ .
+RUN NOISY_BUILD=y \
+    make worker
+
+FROM registry.access.redhat.com/ubi8/ubi
+
+COPY --from=build /src/worker /instruct-lab-bot-worker
+ENTRYPOINT [ "/instruct-lab-bot-worker", "--test", "generate", "-g", "" ]
