@@ -1,0 +1,153 @@
+package bot
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/go-redis/redis"
+	"github.com/google/go-github/v60/github"
+	"github.com/gregjones/httpcache"
+	"github.com/palantir/go-githubapp/githubapp"
+	"github.com/rcrowley/go-metrics"
+	"go.uber.org/zap"
+
+	"github.com/instruct-lab/instruct-lab-bot/gobot/config"
+	"github.com/instruct-lab/instruct-lab-bot/gobot/handlers"
+)
+
+func Run(zLogger *zap.Logger) error {
+	config, err := config.ReadConfig("config.yaml")
+	if err != nil {
+		return err
+	}
+
+	logger := zLogger.Sugar()
+
+	metricsRegistry := metrics.DefaultRegistry
+
+	cc, err := githubapp.NewDefaultCachingClientCreator(
+		config.Github,
+		githubapp.WithClientUserAgent("instruct-lab-bot/0.0.1"),
+		githubapp.WithClientTimeout(3*time.Second),
+		githubapp.WithClientCaching(false, func() httpcache.Cache { return httpcache.NewMemoryCache() }),
+		githubapp.WithClientMiddleware(
+			githubapp.ClientMetrics(metricsRegistry),
+		),
+	)
+	if err != nil {
+		return err
+	}
+
+	prCommentHandler := &handlers.PRCommentHandler{
+		ClientCreator: cc,
+		Logger:        logger,
+		RedisHostPort: config.AppConfig.RedisHostPort,
+	}
+
+	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler)
+
+	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
+
+	addr := fmt.Sprintf("%s:%d", config.Server.Address, config.Server.Port)
+	logger.Infof("Starting server on %s...", addr)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		http.ListenAndServe(addr, nil)
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		receiveResults(config, logger, cc)
+	}()
+	wg.Wait()
+
+	return nil
+}
+
+func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {
+	ctx := context.Background()
+
+	r := redis.NewClient(&redis.Options{
+		Addr:     config.AppConfig.RedisHostPort,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	for {
+		count, err := r.LLen("results").Result()
+		if err != nil {
+			logger.Errorf("Redis Client Error: %v", err)
+			continue
+		}
+		if count == 0 {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		result, err := r.RPop("results").Result()
+		if err != nil {
+			logger.Errorf("Redis Client Error: %v", err)
+		}
+
+		if result == "" {
+			continue
+		}
+
+		prNumber, err := r.Get("jobs:" + result + ":pr_number").Result()
+		if err != nil || prNumber == "" {
+			logger.Errorf("No PR number found for job %s", result)
+			continue
+		}
+		prNumInt, err := strconv.Atoi(prNumber)
+		if err != nil {
+			logger.Errorf("Error converting PR number to int: %v", err)
+			continue
+		}
+
+		s3Url, err := r.Get("jobs:" + result + ":s3_url").Result()
+		if err != nil || s3Url == "" {
+			logger.Errorf("No S3 URL found for job %s", result)
+			continue
+		}
+
+		installID, err := r.Get("jobs:" + result + ":installation_id").Result()
+		if err != nil || installID == "" {
+			logger.Errorf("No installation ID found for job %s", result)
+			continue
+		}
+		installIDInt, err := strconv.Atoi(installID)
+		if err != nil {
+			logger.Errorf("Error converting installation ID to int: %v", err)
+			continue
+		}
+
+		repoOwner, err := r.Get("jobs:" + result + ":repo_owner").Result()
+		if err != nil || repoOwner == "" {
+			logger.Errorf("No repo owner found for job %s", result)
+			continue
+		}
+
+		repoName, err := r.Get("jobs:" + result + ":repo_name").Result()
+		if err != nil || repoName == "" {
+			logger.Errorf("No repo name found for job %s", result)
+			continue
+		}
+
+		issueComment := github.IssueComment{
+			Body: github.String(
+				"Beep, boop 🤖  The test data has been generated!\n\n" +
+					"Find your results [here](" + s3Url + ").\n\n" +
+					"*This URL expires in 5 days.*"),
+		}
+		client, err := cc.NewInstallationClient(int64(installIDInt))
+		_, _, err = client.Issues.CreateComment(ctx, repoOwner, repoName, prNumInt, &issueComment)
+		if err != nil {
+			logger.Errorf("Error creating comment: %v", err)
+		}
+	}
+}
