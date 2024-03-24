@@ -3,17 +3,15 @@ FROM golang:1.22 as builder
 
 ARG GITHUB_TOKEN
 ENV WORK_DIR /app
-ENV GIT_CLONE_URL=github.com/instruct-lab/instruct-lab-bot.git
 
 WORKDIR ${WORK_DIR}
 
-# Clone the bot repository
-RUN git clone "https://${GITHUB_TOKEN}@${GIT_CLONE_URL}" instruct-lab-bot || (cd instruct-lab-bot && git pull -r)
+COPY . ${WORK_DIR}/instruct-lab-bot
 
-# build the worker binary
+# Build the worker binary
 WORKDIR ${WORK_DIR}/instruct-lab-bot/worker
-RUN go build -o worker main.go && \
-    chmod +x worker
+RUN go build -o instruct-lab-bot-worker main.go && \
+    chmod +x instruct-lab-bot-worker
 
 # Stage 2: Setup the base environment with CUDA and dependencies
 FROM nvcr.io/nvidia/cuda:12.3.2-devel-ubi9 as base
@@ -51,7 +49,7 @@ RUN --mount=type=ssh,id=default \
 FROM base as serve
 
 # Copy the Go binary from the builder stage
-COPY --from=builder /app/instruct-lab-bot/worker/worker /usr/local/bin/instruct-lab-bot-worker
+COPY --from=builder /app/instruct-lab-bot/worker/instruct-lab-bot-worker /usr/local/bin/instruct-lab-bot-worker
 
 VOLUME [ "/data" ]
 WORKDIR /data
