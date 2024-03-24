@@ -32,6 +32,8 @@ var (
 	NumInstructions int
 	Origin          string
 	GithubToken     string
+	S3Bucket        string
+	AWSRegion       string
 )
 
 func init() {
@@ -40,6 +42,8 @@ func init() {
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
+	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
+	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
@@ -63,7 +67,7 @@ var generateCmd = &cobra.Command{
 		// Using the SDK's default configuration, loading additional config
 		// and credentials values from the environment variables, shared
 		// credentials, and shared configuration files
-		cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion("us-east-2"))
+		cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(AWSRegion))
 		if err != nil {
 			log.Fatalf("unable to load SDK config, %v", err)
 		}
@@ -246,7 +250,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	sugar.Debug("Running lab generate")
 	// Run the command
 	if err := cmd.Run(); err != nil {
-		sugar.Errorf("Could not run lab generate: %v, %s", err)
+		sugar.Errorf("Could not run lab generate: %v", err)
 		return
 	}
 
@@ -272,7 +276,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		}
 		defer file.Close()
 		_, err = svc.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:      aws.String("instruct-lab-bot"),
+			Bucket:      aws.String(S3Bucket),
 			Key:         aws.String(fmt.Sprintf("%s/%s", outDirName, item.Name())),
 			Body:        file,
 			ContentType: aws.String("application/json-lines+json"),
@@ -283,7 +287,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		}
 
 		result, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String("instruct-lab-bot"),
+			Bucket: aws.String(S3Bucket),
 			Key:    aws.String(fmt.Sprintf("%s/%s", outDirName, item.Name())),
 		})
 
@@ -318,7 +322,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	}
 
 	_, err = svc.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String("instruct-lab-bot"),
+		Bucket:      aws.String(S3Bucket),
 		Key:         aws.String(fmt.Sprintf("%s/index.html", outDirName)),
 		Body:        indexFile,
 		ContentType: aws.String("text/html"),
@@ -329,7 +333,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	}
 
 	indexResult, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String("instruct-lab-bot"),
+		Bucket: aws.String(S3Bucket),
 		Key:    aws.String(fmt.Sprintf("%s/index.html", outDirName)),
 	})
 
