@@ -4,6 +4,9 @@ server:
 
 app_configuration:
   redis_hostport: "localhost:6379"
+  # Get an ID from https://smee.io/new
+  # Optional. If blank, the app will not use a webhook proxy.
+  webhook_proxy_url: "https://smee.io/your-smee-id"
 
 github:
   v3_api_url: "https://api.github.com/"

@@ -21,7 +21,8 @@ type HTTPConfig struct {
 }
 
 type MyApplicationConfig struct {
-	RedisHostPort string `yaml:"redis_hostport"`
+	RedisHostPort   string `yaml:"redis_hostport"`
+	WebhookProxyURL string `yaml:"webhook_proxy_url"`
 }
 
 func ReadConfig(path string) (*Config, error) {
