@@ -1,6 +1,6 @@
 module github.com/instruct-lab/instruct-lab-bot/gobot
 
-go 1.22.1
+go 1.21
 
 require (
 	github.com/chmouel/gosmee v0.21.0

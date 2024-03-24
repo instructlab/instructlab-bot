@@ -56,6 +56,10 @@ bot-image: bot/Dockerfile ## Build docker image for the bot
 	$(ECHO_PREFIX) printf "  %-12s bot/Dockerfile\n" "[DOCKER]"
 	$(CMD_PREFIX) docker build -f bot/Dockerfile -t quay.io/instruct-lab-bot/bot:latest .
 
+gobot-image: gobot/Dockerfile ## Build docker image for the Go bot
+	$(ECHO_PREFIX) printf "  %-12s gobot/Dockerfile\n" "[DOCKER]"
+	$(CMD_PREFIX) docker build -f gobot/Dockerfile -t quay.io/instruct-lab-bot/gobot:latest .
+
 .PHONY: gobot
 gobot: gobot/gobot ## Build gobot
 
