@@ -94,7 +94,7 @@ ansible-playbook -i inventory.txt  deploy-redis-docker.yml
 Install Grafana (Redis Dashboard) in docker container
 
 ```console
-ansible-playbook -i inventory.txt  deploy-grafana.yml
+ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-grafana.yml
 ```
 
 ## Install the Entire Bot stack that includes Redis, Grafana and the Bot
@@ -102,5 +102,5 @@ ansible-playbook -i inventory.txt  deploy-grafana.yml
 This playbook installs all the components in the containers.
 
 ```console
-ansible-playbook -i inventory.txt  deploy-bot-stack.yml
+ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-bot-stack.yml
 ```

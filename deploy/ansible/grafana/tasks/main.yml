@@ -5,11 +5,6 @@
     dest: /home/fedora/
     mode: preserve
 
-- name: Get container info
-  community.docker.docker_container_info:
-    name: redis
-  register: redis_info
-
 - name: Replace string
   ansible.builtin.replace:
     path: /home/fedora/grafana/provisioning/datasources/datasource.yaml
