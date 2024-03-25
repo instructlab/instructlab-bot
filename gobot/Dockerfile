@@ -16,7 +16,7 @@ COPY gobot/ .
 RUN NOISY_BUILD=y \
     make gobot
 
-FROM registry.access.redhat.com/ubi8/ubi
+FROM registry.access.redhat.com/ubi8/ubi as gobot
 
 COPY --from=build /src/gobot /instruct-lab-bot
 ENTRYPOINT [ "/instruct-lab-bot" ]
