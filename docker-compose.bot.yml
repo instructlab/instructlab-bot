@@ -9,14 +9,15 @@ services:
 
   bot:
     container_name: bot
-    image: quay.io/instruct-lab-bot/bot:latest
+    image: quay.io/instruct-lab-bot/gobot:latest
     depends_on:
       - redis
-    ports:
-      - 8000:3000
-    environment:
-      - APP_ID=${APP_ID}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - PRIVATE_KEY=${PRIVATE_KEY}
-      - REDIS_URL=redis://redis:6379
-      - WEBHOOK_PROXY_URL=${WEBHOOK_PROXY_URL}
+    volumes:
+      - ./config.yaml:/config.yaml
+
+  worker-test:
+    container_name: worker-test
+    image: quay.io/instruct-lab-bot/worker-test:latest
+    depends_on:
+      - redis
+    command: [ "/instruct-lab-bot-worker", "--test", "--redis", "redis:6379", "generate", "-g", "" ]
