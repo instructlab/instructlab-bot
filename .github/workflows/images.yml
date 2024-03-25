@@ -47,6 +47,28 @@ jobs:
           cache-to: type=gha,mode=max
           file: bot/Dockerfile
 
+      - name: Extract metadata (tags, labels) for gotbot image
+        id: gobot_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}/instruct-lab-gobot
+
+      - name: Build and push gobot image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: |
+            GITHUB_USER=instruct-lab-bot
+            GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
+          target: gobot
+          push: true
+          tags: ${{ steps.gobot_meta.outputs.tags }}
+          labels: ${{ steps.gobot_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          file: gobot/Dockerfile
+
   push_to_registries_serve:
     name: Push serve Docker image to GHCR
     runs-on: ubuntu-latest
