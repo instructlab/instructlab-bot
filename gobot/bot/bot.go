@@ -3,11 +3,13 @@ package bot
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	gosmee "github.com/chmouel/gosmee/gosmee"
 	"github.com/go-redis/redis"
 	"github.com/google/go-github/v60/github"
 	"github.com/gregjones/httpcache"
@@ -52,10 +54,22 @@ func Run(zLogger *zap.Logger) error {
 
 	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
 
-	addr := fmt.Sprintf("%s:%d", config.Server.Address, config.Server.Port)
+	addr := net.JoinHostPort(config.Server.Address, strconv.Itoa(config.Server.Port))
 	logger.Infof("Starting server on %s...", addr)
 
 	wg := sync.WaitGroup{}
+	if config.AppConfig.WebhookProxyURL != "" {
+		args := []string{
+			"gosmee",
+			"client",
+			config.AppConfig.WebhookProxyURL,
+			fmt.Sprintf("http://%s/api/github/hook", addr),
+		}
+		wg.Add(1)
+		go func() {
+			gosmee.Run(args)
+		}()
+	}
 	wg.Add(1)
 	go func() {
 		http.ListenAndServe(addr, nil)
