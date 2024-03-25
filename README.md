@@ -29,8 +29,8 @@ The current iteration is focused on automating the `lab generate` portion of the
 The current GitHub workflow in a PR is:
 
 1. PR is opened by the Contributor.
-2. Bot replies, "Thanks for your contribution, Run `@instuct-lab-bot generate` to generate training data based on your seed questions for your approval."
-3. User runs `@instuct-lab-bot generate` in a comment on the PR.
+2. Bot replies, "Thanks for your contribution, Run `@instruct-lab-bot generate` to generate training data based on your seed questions for your approval."
+3. User runs `@instruct-lab-bot generate` in a comment on the PR.
 4. Bot generates data using `lab generate` and stores it in an object store (S3).
 5. Bot replies: "Here is the generated data ..."
 

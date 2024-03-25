@@ -15,7 +15,6 @@ import (
 
 type PRCommentHandler struct {
 	githubapp.ClientCreator
-
 	Logger        *zap.SugaredLogger
 	RedisHostPort string
 }
