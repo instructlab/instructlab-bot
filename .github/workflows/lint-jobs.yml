@@ -23,19 +23,32 @@ jobs:
         working-directory: bot
       - run: npm run lint
         working-directory: bot
-  golangci-lint:
+  golangci-lint-worker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version-file: worker/go.mod
           cache: false
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.54
           working-directory: worker
+  golangci-lint-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: gobot/go.mod
+          cache: false
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.54
+          working-directory: gobot
   ansible:
     runs-on: ubuntu-latest
     steps:

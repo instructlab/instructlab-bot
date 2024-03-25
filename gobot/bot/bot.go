@@ -67,7 +67,11 @@ func Run(zLogger *zap.Logger) error {
 		}
 		wg.Add(1)
 		go func() {
-			gosmee.Run(args)
+			defer wg.Done()
+			err := gosmee.Run(args)
+			if err != nil {
+				logger.Errorf("Error running gosmee: %v", err)
+			}
 		}()
 	}
 	wg.Add(1)
