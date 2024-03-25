@@ -72,7 +72,9 @@ func Run(zLogger *zap.Logger) error {
 	}
 	wg.Add(1)
 	go func() {
-		http.ListenAndServe(addr, nil)
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			logger.Errorf("Failed to start server: %v", err)
+		}
 		wg.Done()
 	}()
 	wg.Add(1)
@@ -159,6 +161,10 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 					"*This URL expires in 5 days.*"),
 		}
 		client, err := cc.NewInstallationClient(int64(installIDInt))
+		if err != nil {
+			logger.Errorf("Error creating GitHub client: %v", err)
+			continue
+		}
 		_, _, err = client.Issues.CreateComment(ctx, repoOwner, repoName, prNumInt, &issueComment)
 		if err != nil {
 			logger.Errorf("Error creating comment: %v", err)
