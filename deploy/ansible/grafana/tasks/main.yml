@@ -15,7 +15,7 @@
     path: /home/fedora/grafana/provisioning/datasources/datasource.yaml
     backup: true
     regexp: 'redis://redis:6379'
-    replace: 'redis://{{ redis_info.container.NetworkSettings.IPAddress }}:6379'
+    replace: 'redis://{{ redis_ip }}:6379'
 
 - name: Start Grafana container
   community.docker.docker_container:
