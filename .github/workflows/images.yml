@@ -1,9 +1,13 @@
 name: Publish Docker image
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
+# Temporarily disable automated image push due to repo resource constraints until open sourced
+# on:
+#   push:
+#     branches:
+#       - main
 
 jobs:
   push_to_registries_bot:
