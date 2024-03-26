@@ -1,4 +1,4 @@
-name: Publish Docker image
+name: Publish container image
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   push_to_registries_bot:
-    name: Push bot Docker image to GHCR
+    name: Push bot container image to GHCR
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -49,7 +49,7 @@ jobs:
           labels: ${{ steps.bot_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: bot/Dockerfile
+          file: bot/Containerfile
 
       - name: Extract metadata (tags, labels) for gotbot image
         id: gobot_meta
@@ -71,10 +71,10 @@ jobs:
           labels: ${{ steps.gobot_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: gobot/Dockerfile
+          file: gobot/Containerfile
 
   push_to_registries_serve:
-    name: Push serve Docker image to GHCR
+    name: Push serve container image to GHCR
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -127,4 +127,4 @@ jobs:
           labels: ${{ steps.labserve_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: worker/Dockerfile
+          file: worker/Containerfile

@@ -17,7 +17,7 @@ endif
 .PHONY: md-lint
 md-lint: ## Lint markdown files
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[MD LINT]"
-	$(CMD_PREFIX) docker run --rm -v $(CURDIR):/workdir docker.io/davidanson/markdownlint-cli2:v0.6.0 > /dev/null
+	$(CMD_PREFIX) podman run --rm -v $(CURDIR):/workdir docker.io/davidanson/markdownlint-cli2:v0.6.0 > /dev/null
 
 .PHONY: shellcheck
 shellcheck: ## Run shellcheck on scripts/*.sh
@@ -52,17 +52,17 @@ png-lint: ## Lint the png files from excalidraw
 		fi \
 	done
 
-bot-image: bot/Dockerfile ## Build docker image for the bot
-	$(ECHO_PREFIX) printf "  %-12s bot/Dockerfile\n" "[DOCKER]"
-	$(CMD_PREFIX) docker build -f bot/Dockerfile -t quay.io/instruct-lab-bot/bot:latest .
+bot-image: bot/Containerfile ## Build container image for the bot
+	$(ECHO_PREFIX) printf "  %-12s bot/Containerfile\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build -f bot/Containerfile -t quay.io/instruct-lab-bot/bot:latest .
 
-gobot-image: gobot/Dockerfile ## Build docker image for the Go bot
-	$(ECHO_PREFIX) printf "  %-12s gobot/Dockerfile\n" "[DOCKER]"
-	$(CMD_PREFIX) docker build -f gobot/Dockerfile -t quay.io/instruct-lab-bot/gobot:latest .
+gobot-image: gobot/Containerfile ## Build continaer image for the Go bot
+	$(ECHO_PREFIX) printf "  %-12s gobot/Containerfile\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build -f gobot/Containerfile -t quay.io/instruct-lab-bot/gobot:latest .
 
-worker-test-image: worker/Dockerfile.test ## Build docker image for a test worker
-	$(ECHO_PREFIX) printf "  %-12s worker/Dockerfile.test\n" "[DOCKER]"
-	$(CMD_PREFIX) docker build -f worker/Dockerfile.test -t quay.io/instruct-lab-bot/worker-test:latest .
+worker-test-image: worker/Containerfile.test ## Build container image for a test worker
+	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.test\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build -f worker/Containerfile.test -t quay.io/instruct-lab-bot/worker-test:latest .
 
 .PHONY: gobot
 gobot: gobot/gobot ## Build gobot
