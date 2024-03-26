@@ -2,7 +2,8 @@
 
 ## Requirements
 
-- Docker
+- podman
+- podman-compose
 
 ## Setup
 
@@ -25,9 +26,9 @@ From the edit page of your GitHub Application, click `Install` on the left and i
 To run the bot:
 
 ```bash
-docker compose -f docker-compose.bot.yml up
+podman compose up
 ```
 
 ## Workers
 
-By default, the docker compose stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
+By default, the podman compose stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
