@@ -36,6 +36,11 @@ var (
 	AWSRegion       string
 )
 
+const (
+	gitMaxRetries = 3
+	gitRetryDelay = 2 * time.Second
+)
+
 func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
@@ -185,11 +190,27 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	}
 
 	sugar.Debug("Checking out main")
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/main", Origin)),
-	})
-	if err != nil {
-		sugar.Errorf("Could not checkout main: %v", err)
+	// Retry mechanism for checking out main branch
+	retryCheckout := func() error {
+		var lastErr error
+		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
+			err := w.Checkout(&git.CheckoutOptions{
+				Branch: plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/main", Origin)),
+			})
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+			if attempt < gitMaxRetries {
+				sugar.Infof("Retrying checkout of main, attempt %d/%d", attempt+1, gitMaxRetries)
+				time.Sleep(gitRetryDelay)
+			}
+		}
+		return lastErr
+	}
+
+	if err := retryCheckout(); err != nil {
+		sugar.Errorf("Could not checkout main after retries: %v", err)
 		return
 	}
 
