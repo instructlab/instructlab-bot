@@ -268,7 +268,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	}
 	presign := s3.NewPresignClient(svc, func(options *s3.PresignOptions) {
 		// Must be less than a week
-		options.Expires = 24 * time.Hour * 5
+		options.Expires = 24 * time.Hour * 7
 	})
 	presignedFiles := make([]map[string]string, 0)
 
