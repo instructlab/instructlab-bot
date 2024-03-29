@@ -9,5 +9,5 @@
       become: true
     - role: grafana
       become: true
-    - role: bot
+    - role: gobot
       become: true
