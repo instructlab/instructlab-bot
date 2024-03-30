@@ -9,7 +9,7 @@ services:
 
   bot:
     container_name: bot
-    image: quay.io/instruct-lab-bot/gobot:latest
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
     depends_on:
       - redis
     volumes:
@@ -17,7 +17,7 @@ services:
 
   worker-test:
     container_name: worker-test
-    image: quay.io/instruct-lab-bot/worker-test:latest
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
     depends_on:
       - redis
     command: [ "/instruct-lab-bot-worker", "--test", "--redis", "redis:6379", "generate", "-g", "" ]
