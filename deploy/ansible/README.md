@@ -64,7 +64,7 @@ ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-instru
 ## Run Playbook to Deploy the bot
 
 ```console
-ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-bot.yml
+ansible-playbook -i inventory.txt -e @secrets.enc --ask-vault-pass deploy-gobot.yml
 ```
 
 ## Install Nexodus Agent

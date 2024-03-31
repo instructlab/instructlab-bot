@@ -1,0 +1,25 @@
+---
+- name: Log into GHCR
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: instruct-lab-bot
+    password: "{{ github_token }}"
+    reauthorize: true
+
+- name: Generate config.yaml for gobot
+  ansible.builtin.template:
+    src: gobot/templates/config.yaml.j2
+    dest: /home/fedora/config.yaml
+    mode: '0640'
+    owner: fedora
+  become: true
+
+- name: Start the container
+  community.docker.docker_container:
+    name: instruct-lab-bot
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    state: started
+    pull: always
+    # Mount the config.yaml file
+    volumes:
+      - /home/fedora/config.yaml:/config.yaml
