@@ -15,16 +15,6 @@ updates:
       development-dependencies:
         dependency-type: "development"
 
-  - package-ecosystem: "npm"
-    directory: "/bot"
-    schedule:
-      interval: "weekly"
-    groups:
-      node-production-dependencies:
-        dependency-type: "production"
-      node-development-dependencies:
-        dependency-type: "development"
-
   - package-ecosystem: "gomod"
     directory: "/worker"
     schedule:

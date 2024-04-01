@@ -79,10 +79,6 @@ yaml-lint: ## Run Yaml linters
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[YAML LINT]"
 	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./ --strict
 
-bot-image: bot/Containerfile ## Build container image for the bot
-	$(ECHO_PREFIX) printf "  %-12s bot/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f bot/Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main .
-
 gobot-image: gobot/Containerfile ## Build continaer image for the Go bot
 	$(ECHO_PREFIX) printf "  %-12s gobot/Containerfile\n" "[PODMAN]"
 	$(CMD_PREFIX) podman build -f gobot/Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main .
