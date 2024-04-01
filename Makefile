@@ -54,15 +54,15 @@ png-lint: ## Lint the png files from excalidraw
 
 bot-image: bot/Containerfile ## Build container image for the bot
 	$(ECHO_PREFIX) printf "  %-12s bot/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f bot/Containerfile -t quay.io/instruct-lab-bot/bot:latest .
+	$(CMD_PREFIX) podman build -f bot/Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main .
 
 gobot-image: gobot/Containerfile ## Build continaer image for the Go bot
 	$(ECHO_PREFIX) printf "  %-12s gobot/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f gobot/Containerfile -t quay.io/instruct-lab-bot/gobot:latest .
+	$(CMD_PREFIX) podman build -f gobot/Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main .
 
 worker-test-image: worker/Containerfile.test ## Build container image for a test worker
 	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.test\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f worker/Containerfile.test -t quay.io/instruct-lab-bot/worker-test:latest .
+	$(CMD_PREFIX) podman build -f worker/Containerfile.test -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main .
 
 .PHONY: gobot
 gobot: gobot/gobot ## Build gobot
