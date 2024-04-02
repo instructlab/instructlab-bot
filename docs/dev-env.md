@@ -7,19 +7,49 @@
 
 ## Setup
 
+### Fork the repositories
+
+To setup this development environment, you will need to fork the following repositories:
+
+- [taxonomy](https://github.com/instruct-lab/taxonomy)
+- [instruct-lab-bot](https://github.com/instruct-lab/instruct-lab-bot)
+
+### Register the instruct-lab-bot GitHub App in your github account
+
+[Create a new GitHub application](https://github.com/settings/apps/new) in your personal GitHub account. Fill in the following details for the app:
+
+- GitHub App name: `instruct-lab-bot-<your-github-username>`
+- Homepage URL: `<URL to your local fork of instruct-lab-bot>`
+- Select Webhook Active flag and set the Webhook URL
+  - To generate the Webhook URL, visit <https://smee.io/new> and copy the URL that is generated
+- In the Permissions section, Select `Read & write` for the Pull Requests permission.
+- In the Subscribe to events section, select the Pull Request.
+
+Rest all keep it to default and click on Create GitHub App.
+
+It will take you to the newly created app page. Scroll down, and click on Generate a private key. Save the private key to your local machine.
+
+### Install the GitHub App in the `taxonomy` repository fork
+
+Go to [GitHub App Installation](https://github.com/settings/apps/instruct-lab-bot-anil/installations) and it should list your account.
+
+Click on Install button to install the app in your account. Installation will ask you to select the repositories where you want to install the app.
+
+Select the local fork of the `taxonomy` repository that you have created in your account.
+
+### Setup the instruct-lab-bot for deployment
+
 Create a `config.yaml` file in the root of the project:
 
 ```bash
 cp gobot/config.yaml.sample config.yaml
 ```
 
-There are several fields that need to be filled in. First, visit <https://smee.io/new> and copy the URL that is generated. Paste this URL into the `app_configuration.webhook_proxy_url` field in the `config.yaml` file.
+There are several fields that need to be filled in and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps). Fill the following fields in the `config.yaml` file:
 
-[Create a new GitHub application](https://github.com/settings/apps/new) in your personal GitHub account. Grab the App ID and put it in the `github.app.integration_id` field of `config.yaml`. Also, generate a new client private key and save it. Update `github.app.private_key` in `config.yaml` with the private key's contents.
-
-Make sure that whatever you put in `webhook_proxy_url` matches between the GitHub application and the `config.yaml` file.
-
-From the edit page of your GitHub Application, click `Install` on the left and install the app for your personal fork of the `taxonomy` repository.
+- `app_configuration.webhook_proxy_url` Set to the Webhook URL you generated from smee.io.
+- `github.app.integration_id` Set to the App ID from the GitHub App you just registered.
+- `github.app.private_key` Set to the private key you generated from the GitHub App you just registered and saved locally on your machine. Just `cat` the file and copy & paste the contents in the `config.yaml` file.
 
 ## Running the Bot
 
