@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,7 @@ type PRCommentHandler struct {
 	githubapp.ClientCreator
 	Logger        *zap.SugaredLogger
 	RedisHostPort string
+	RequiredLabel string
 }
 
 type PRComment struct {
@@ -97,6 +99,34 @@ func (h *PRCommentHandler) reportError(ctx context.Context, client *github.Clien
 func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
 	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	// Check if the required label is present if a required label is in the config file
+	if h.RequiredLabel != "" {
+		pr, _, err := client.PullRequests.Get(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum)
+		if err != nil {
+			return err
+		}
+
+		labelFound := false
+		for _, label := range pr.Labels {
+			if label.GetName() == h.RequiredLabel {
+				labelFound = true
+				break
+			}
+		}
+
+		if !labelFound {
+			h.Logger.Infof("Required label %s not found on PR %s/%s#%d by %s",
+				h.RequiredLabel, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+			missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have the '%s' label.", h.RequiredLabel)
+			botComment := github.IssueComment{Body: &missingLabelComment}
+			_, _, err = client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment)
+			if err != nil {
+				h.Logger.Errorf("Failed to comment on pull request about missing label: %v", err)
+			}
+			return nil
+		}
+	}
 
 	r := redis.NewClient(&redis.Options{
 		Addr:     h.RedisHostPort,

@@ -9,9 +9,8 @@ import (
 )
 
 type Config struct {
-	Server HTTPConfig       `yaml:"server"`
-	Github githubapp.Config `yaml:"github"`
-
+	Server    HTTPConfig          `yaml:"server"`
+	Github    githubapp.Config    `yaml:"github"`
 	AppConfig MyApplicationConfig `yaml:"app_configuration"`
 }
 
@@ -23,6 +22,7 @@ type HTTPConfig struct {
 type MyApplicationConfig struct {
 	RedisHostPort   string `yaml:"redis_hostport"`
 	WebhookProxyURL string `yaml:"webhook_proxy_url"`
+	RequiredLabel   string `yaml:"required_label,omitempty"`
 }
 
 func ReadConfig(path string) (*Config, error) {
