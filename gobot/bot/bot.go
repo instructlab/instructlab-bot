@@ -48,6 +48,7 @@ func Run(zLogger *zap.Logger) error {
 		ClientCreator: cc,
 		Logger:        logger,
 		RedisHostPort: config.AppConfig.RedisHostPort,
+		RequiredLabel: config.AppConfig.RequiredLabel,
 	}
 
 	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler)
