@@ -77,6 +77,12 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			h.reportError(ctx, client, &prComment, err)
 		}
 		return err
+	case "precheck":
+		err = h.precheckCommand(ctx, client, &prComment)
+		if err != nil {
+			h.reportError(ctx, client, &prComment, err)
+		}
+		return err
 	default:
 		return h.unknownCommand(ctx, client, &prComment)
 	}
@@ -204,6 +210,18 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "generate")
+}
+
+func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("Precheck command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	if !present || err != nil {
+		return err
+	}
+
+	return h.queueGenerateJob(ctx, client, prComment, "precheck")
 }
 
 func (h *PRCommentHandler) unknownCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
