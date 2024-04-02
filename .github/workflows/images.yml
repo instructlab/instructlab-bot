@@ -62,6 +62,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           build-args: |
             GITHUB_USER=instruct-lab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
@@ -118,6 +119,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           build-args: |
             GITHUB_USER=instruct-lab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
