@@ -1,6 +1,6 @@
 name: Publish container image
 
-on:  # yamllint disable-line rule:truthy
+on:
   workflow_dispatch:
 
 # Temporarily disable automated image push due to repo resource constraints until open sourced
@@ -84,7 +84,7 @@ jobs:
       - name: Free disk space
         run: |
           df -h
-          sudo docker rmi $(docker image ls -aq) >/dev/null 2>&1 || true
+          sudo docker rmi "$(docker image ls -aq)" >/dev/null 2>&1 || true
           sudo rm -rf \
             /usr/share/dotnet /usr/local/lib/android /opt/ghc \
             /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \

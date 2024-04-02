@@ -3,7 +3,7 @@ name: qa
 concurrency:
   group: qa
 
-on:  # yamllint disable-line rule:truthy
+on:
   workflow_dispatch:
     inputs:
       run_option:
@@ -39,7 +39,7 @@ jobs:
         run: pip install boto boto3 ansible-vault ansible
 
       - name: Add .local/bin to PATH
-        run: echo "${HOME}/.local/bin" >> $GITHUB_PATH
+        run: echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install amazon.aws Ansible library
         run: ansible-galaxy collection install amazon.aws
@@ -94,7 +94,7 @@ jobs:
         run: pip install boto boto3 ansible-vault ansible
 
       - name: Add .local/bin to PATH
-        run: echo "${HOME}/.local/bin" >> $GITHUB_PATH
+        run: echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install amazon.aws Ansible library
         run: ansible-galaxy collection install amazon.aws

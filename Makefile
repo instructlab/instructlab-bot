@@ -9,9 +9,11 @@ help:
 ifeq ($(NOISY_BUILD),)
     ECHO_PREFIX=@
     CMD_PREFIX=@
+    PIPE_DEV_NULL=> /dev/null 2> /dev/null
 else
     ECHO_PREFIX=@\#
     CMD_PREFIX=
+    PIPE_DEV_NULL=
 endif
 
 .PHONY: md-lint
@@ -22,6 +24,11 @@ md-lint: ## Lint markdown files
 .PHONY: shellcheck
 shellcheck: ## Run shellcheck on scripts/*.sh
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[SHELLCHECK] scripts/*.sh"
+	$(CMD_PREFIX) if ! which shellcheck $(PIPE_DEV_NULL) ; then \
+		echo "Please install shellcheck." ; \
+		echo "https://github.com/koalaman/shellcheck#user-content-installing" ; \
+		exit 1 ; \
+	fi
 	$(CMD_PREFIX) shellcheck scripts/*.sh
 
 .PHONY: ansible-lint
@@ -52,6 +59,16 @@ png-lint: ## Lint the png files from excalidraw
 		fi \
 	done
 
+.PHONY: action-lint
+action-lint:  ## Lint GitHub Action workflows
+	$(ECHO_PREFIX) printf "  %-12s .github/...\n" "[ACTION LINT]"
+	$(CMD_PREFIX) if ! which actionlint $(PIPE_DEV_NULL) ; then \
+		echo "Please install actionlint." ; \
+		echo "go install github.com/rhysd/actionlint/cmd/actionlint@latest" ; \
+		exit 1 ; \
+	fi
+	$(CMD_PREFIX) actionlint -color
+
 .PHONY: yaml-lint
 yaml-lint: ## Run Yaml linters
 	$(CMD_PREFIX) if ! which yamllint >/dev/null 2>&1; then \
@@ -61,7 +78,6 @@ yaml-lint: ## Run Yaml linters
 	fi
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[YAML LINT]"
 	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./ --strict
-	$(CMD_PREFIX) touch $@
 
 bot-image: bot/Containerfile ## Build container image for the bot
 	$(ECHO_PREFIX) printf "  %-12s bot/Containerfile\n" "[PODMAN]"
