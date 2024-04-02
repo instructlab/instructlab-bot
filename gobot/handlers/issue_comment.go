@@ -129,6 +129,10 @@ func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *githu
 	return true, nil
 }
 
+func setJobKey(r *redis.Client, jobNumber int64, key string, value interface{}) error {
+	return r.Set(context.Background(), "jobs:"+strconv.FormatInt(jobNumber, 10)+":"+key, value, 0).Err()
+}
+
 func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.Client, prComment *PRComment) error {
 	r := redis.NewClient(&redis.Options{
 		Addr:     h.RedisHostPort,
@@ -141,22 +145,27 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":pr_number", prComment.prNum, 0).Err()
+	err = setJobKey(r, jobNumber, "pr_number", prComment.prNum)
 	if err != nil {
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":installation_id", prComment.installID, 0).Err()
+	err = setJobKey(r, jobNumber, "author", prComment.author)
 	if err != nil {
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":repo_owner", prComment.repoOwner, 0).Err()
+	err = setJobKey(r, jobNumber, "installation_id", prComment.installID)
 	if err != nil {
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":repo_name", prComment.repoName, 0).Err()
+	err = setJobKey(r, jobNumber, "repo_owner", prComment.repoOwner)
+	if err != nil {
+		return err
+	}
+
+	err = setJobKey(r, jobNumber, "repo_name", prComment.repoName)
 	if err != nil {
 		return err
 	}
