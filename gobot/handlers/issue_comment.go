@@ -129,16 +129,7 @@ func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *githu
 	return true, nil
 }
 
-func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
-	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
-		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
-
-	// Check if the required label is present if a required label is in the config file
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
-	if !present || err != nil {
-		return err
-	}
-
+func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.Client, prComment *PRComment) error {
 	r := redis.NewClient(&redis.Options{
 		Addr:     h.RedisHostPort,
 		Password: "", // no password set
@@ -187,6 +178,18 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 	}
 
 	return nil
+}
+
+func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	if !present || err != nil {
+		return err
+	}
+
+	return h.queueGenerateJob(ctx, client, prComment)
 }
 
 func (h *PRCommentHandler) unknownCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
