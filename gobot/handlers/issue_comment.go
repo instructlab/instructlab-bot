@@ -133,7 +133,7 @@ func setJobKey(r *redis.Client, jobNumber int64, key string, value interface{}) 
 	return r.Set(context.Background(), "jobs:"+strconv.FormatInt(jobNumber, 10)+":"+key, value, 0).Err()
 }
 
-func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.Client, prComment *PRComment) error {
+func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.Client, prComment *PRComment, jobType string) error {
 	r := redis.NewClient(&redis.Options{
 		Addr:     h.RedisHostPort,
 		Password: "", // no password set
@@ -170,6 +170,11 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
+	err = setJobKey(r, jobNumber, "job_type", jobType)
+	if err != nil {
+		return err
+	}
+
 	err = r.LPush(ctx, "generate", strconv.FormatInt(jobNumber, 10)).Err()
 	if err != nil {
 		return err
@@ -198,7 +203,7 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		return err
 	}
 
-	return h.queueGenerateJob(ctx, client, prComment)
+	return h.queueGenerateJob(ctx, client, prComment, "generate")
 }
 
 func (h *PRCommentHandler) unknownCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {

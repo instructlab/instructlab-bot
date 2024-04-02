@@ -143,6 +143,18 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
+	jobType, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:job_type", job)))
+	if err != nil {
+		sugar.Errorf("Could not get job_type from redis: %v", err)
+		return
+	}
+	switch jobType {
+	case "generate":
+	default:
+		sugar.Errorf("Unknown job type: %s", jobType)
+		return
+	}
+
 	// If in test mode, immediately post to the results queue
 	if TestMode {
 		postJobResults(job, conn, sugar, "https://example.com")
@@ -254,7 +266,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	outDirName := fmt.Sprintf("generate-pr-%s-%s", prNumber, head.Hash())
+	outDirName := fmt.Sprintf("%s-pr-%s-%s", jobType, prNumber, head.Hash())
 	outputDir := path.Join(workDir, outDirName)
 
 	sugar = sugar.With("out_dir", outputDir)
@@ -265,7 +277,14 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		lab = path.Join(VenvDir, "bin", "ilab")
 	}
 
-	cmd := exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir)
+	var cmd *exec.Cmd
+	switch jobType {
+	case "generate":
+		cmd = exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir)
+	default:
+		sugar.Errorf("Unknown job type: %s", jobType)
+		return
+	}
 
 	if WorkDir != "" {
 		cmd.Dir = WorkDir
@@ -275,10 +294,10 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	sugar.Debug("Running lab generate")
+	sugar.Debug(fmt.Sprintf("Running %s job", jobType))
 	// Run the command
 	if err := cmd.Run(); err != nil {
-		sugar.Errorf("Could not run lab generate: %v", err)
+		sugar.Errorf("Could not run command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
 		return
 	}
 
