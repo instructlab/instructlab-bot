@@ -3,7 +3,7 @@ name: qa
 concurrency:
   group: qa
 
-on:
+on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       run_option:

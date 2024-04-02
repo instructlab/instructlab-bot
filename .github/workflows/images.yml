@@ -1,6 +1,6 @@
 name: Publish container image
 
-on:
+on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
 
 # Temporarily disable automated image push due to repo resource constraints until open sourced

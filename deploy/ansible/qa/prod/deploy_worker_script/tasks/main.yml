@@ -5,12 +5,12 @@
     state: present
   become: true
 
-- name: Clone the repository # noqa latest[git]
+- name: Clone the repository  # noqa latest[git]
   ansible.builtin.git:
     repo: 'https://{{ github_token }}@github.com/instruct-lab/instruct-lab-bot'
     dest: "~/instruct-lab-bot"
 
-- name: Run the install script in the background and log output # noqa no-changed-when
+- name: Run the install script in the background and log output  # noqa no-changed-when
   ansible.builtin.shell: |
     cd ~/instruct-lab-bot/scripts
     nohup ./install-worker.sh install --gpu-type cuda \
@@ -22,7 +22,7 @@
   ansible.builtin.pause:
     minutes: 35
 
-- name: Print the output of the install script log # noqa no-changed-when
+- name: Print the output of the install script log  # noqa no-changed-when
   ansible.builtin.command: cat /home/{{ ansible_user }}/instruct-lab-bot/scripts/install-worker.log
   register: log_content
 
@@ -39,7 +39,7 @@
     delay: 60
     timeout: 500
 
-- name: Run the install script again after reboot # noqa no-changed-when
+- name: Run the install script again after reboot  # noqa no-changed-when
   ansible.builtin.shell: |
     cd ~/instruct-lab-bot/scripts
     ./install-worker.sh install \

@@ -25,7 +25,7 @@
   register: taxonomy_dir
 
 - name: Clone the taxonomy repository
-  ansible.builtin.git: # noqa latest[git]
+  ansible.builtin.git:  # noqa latest[git]
     repo: https://github.com/instruct-lab/taxonomy
     dest: "{{ taxonomy_directory }}"
     clone: true
@@ -47,7 +47,7 @@
     path: "{{ models_directory }}/mistral-7b-instruct-v0.1.Q4_K_M.gguf"
   register: model
 
-- name: Download model from Hugging Face # noqa no-changed-when
+- name: Download model from Hugging Face  # noqa no-changed-when
   when: not model.stat.exists
   ansible.builtin.shell: |
     huggingface-cli download \
@@ -59,7 +59,7 @@
     executable: /bin/bash
     chdir: "{{ models_directory }}"
 
-- name: Initialize lab # noqa no-changed-when
+- name: Initialize lab  # noqa no-changed-when
   ansible.builtin.copy:
     dest: "{{ app_directory }}/config.yaml"
     mode: preserve

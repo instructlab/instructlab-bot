@@ -52,6 +52,17 @@ png-lint: ## Lint the png files from excalidraw
 		fi \
 	done
 
+.PHONY: yaml-lint
+yaml-lint: ## Run Yaml linters
+	$(CMD_PREFIX) if ! which yamllint >/dev/null 2>&1; then \
+		echo "Please install yamllint." ; \
+		echo "See: https://yamllint.readthedocs.io/en/stable/quickstart.html" ; \
+		exit 1 ; \
+	fi
+	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[YAML LINT]"
+	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./ --strict
+	$(CMD_PREFIX) touch $@
+
 bot-image: bot/Containerfile ## Build container image for the bot
 	$(ECHO_PREFIX) printf "  %-12s bot/Containerfile\n" "[PODMAN]"
 	$(CMD_PREFIX) podman build -f bot/Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main .
@@ -96,3 +107,15 @@ push-worker-test-images: ## Build worker (test) multi platform container images 
 
 .PHONY: push-images
 push-images: push-gobot-images push-worker-test-images ## Build gobot and worker (test) multi platform container images and push it to ghcr.io
+
+.PHONY: run-dev
+run-dev: ## Deploy the bot development stack.
+	$(ECHO_PREFIX) printf "  %-12s \n" "[RUN DEV STACK]"
+	$(CMD_PREFIX) if [ ! -f config.yaml ]; then \
+		echo "config.yaml not found. Copy config.yaml.example to config.yaml and configure it." ; \
+		exit 1 ; \
+	fi
+	$(ECHO_PREFIX) printf "Linting config.yaml file\n"
+	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./config.yaml
+	$(ECHO_PREFIX) printf "Deploy the development stack\n"
+	$(CMD_PREFIX) podman compose up

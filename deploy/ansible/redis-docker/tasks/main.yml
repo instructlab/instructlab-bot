@@ -18,7 +18,7 @@
     command: ["redis-server"]
     state: started
     ports:
-#      - "{{ redis_port }}:6379"
+      # - "{{ redis_port }}:6379"
       - "{{ nexodus_tunnelip_v4.stdout }}:{{ redis_port }}:6379"
   register: redis_container
 
