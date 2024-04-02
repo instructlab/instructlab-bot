@@ -182,7 +182,7 @@ Restart=always
 RestartSec=1
 User=fedora
 Group=fedora
-ExecStart=lab serve
+ExecStart=ilab serve
 WorkingDirectory=/home/fedora/instruct-lab-bot
 
 [Install]
@@ -196,7 +196,7 @@ EOF
 
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
-    if ! command_exists "lab"; then
+    if ! command_exists "ilab"; then
         sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/cli#egg=cli"
         if [ "${GPU_TYPE}" = "cuda" ]; then
             CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
@@ -206,9 +206,9 @@ install_lab() {
         fi
     fi
     if [ ! -f config.yaml ]; then
-        lab init --non-interactive
+        ilab init --non-interactive
     fi
-    lab download
+    ilab download
     config_lab_systemd
 }
 

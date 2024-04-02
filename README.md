@@ -22,7 +22,7 @@ Our goal is to implement a GitHub bot that will:
 
 ### Current Status
 
-The current iteration is focused on automating the `lab generate` portion of the workflow. The following diagram shows the architecture of the bot and its supporting infrastructure. It supports scaling a pool of workers to run `lab generate` jobs. The workers can be located anywhere and will be connect to Redis over a private mesh network managed by [Nexodus](https://nexodus.io).
+The current iteration is focused on automating the `ilab generate` portion of the workflow. The following diagram shows the architecture of the bot and its supporting infrastructure. It supports scaling a pool of workers to run `ilab generate` jobs. The workers can be located anywhere and will be connect to Redis over a private mesh network managed by [Nexodus](https://nexodus.io).
 
 [![Instruct Lab Bot Architecture](./docs/bot-arch.png)](./docs/bot-arch.png)
 
@@ -30,7 +30,7 @@ The current GitHub workflow in a PR is:
 
 1. PR is opened by the Contributor.
 2. User runs `@instruct-lab-bot generate` in a comment on the PR.
-3. Bot generates data using `lab generate` and stores it in an object store (S3).
+3. Bot generates data using `ilab generate` and stores it in an object store (S3).
 4. Bot replies: "Here is the generated data ..."
 
 ## Components
