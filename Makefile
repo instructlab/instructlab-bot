@@ -75,3 +75,24 @@ worker: worker/worker ## Build worker
 
 worker/worker: $(wildcard worker/*.go) $(wildcard worker/cmd/*.go)
 	$(CMD_PREFIX) $(MAKE) -C worker worker
+
+.PHONY: push-gobot-images
+push-gobot-images: ## Build gobot multi platform container images and push it to ghcr.io
+	$(ECHO_PREFIX) printf "  %-12s gobot/Containerfile\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build --platform linux/amd64,linux/arm64 --manifest instruct-lab-gobot -f gobot/Containerfile .
+	$(CMD_PREFIX) podman tag localhost/instruct-lab-gobot ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+	$(CMD_PREFIX) podman manifest rm localhost/instruct-lab-gobot
+	$(CMD_PREFIX) podman manifest push --all ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+	$(CMD_PREFIX) podman manifest rm ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+
+.PHONY: push-worker-test-images
+push-worker-test-images: ## Build worker (test) multi platform container images and push it to ghcr.io
+	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.test\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build --platform linux/amd64,linux/arm64 --manifest instruct-lab-worker -f worker/Containerfile.test .
+	$(CMD_PREFIX) podman tag localhost/instruct-lab-worker ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+	$(CMD_PREFIX) podman manifest rm localhost/instruct-lab-worker
+	$(CMD_PREFIX) podman manifest push --all ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+	$(CMD_PREFIX) podman manifest rm ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+
+.PHONY: push-images
+push-images: push-gobot-images push-worker-test-images ## Build gobot and worker (test) multi platform container images and push it to ghcr.io
