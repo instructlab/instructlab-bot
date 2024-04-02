@@ -260,9 +260,9 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	sugar = sugar.With("out_dir", outputDir)
 	_ = os.MkdirAll(outputDir, 0755)
 
-	lab := "lab"
+	lab := "ilab"
 	if VenvDir != "" {
-		lab = path.Join(VenvDir, "bin", "lab")
+		lab = path.Join(VenvDir, "bin", "ilab")
 	}
 
 	cmd := exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir)

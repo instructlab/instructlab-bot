@@ -53,5 +53,5 @@ COPY --from=builder /app/instruct-lab-bot/worker/instruct-lab-bot-worker /usr/lo
 
 VOLUME [ "/data" ]
 WORKDIR /data
-ENTRYPOINT [ "lab", "serve" ]
+ENTRYPOINT [ "ilab", "serve" ]
 CMD ["/bin/bash"]
