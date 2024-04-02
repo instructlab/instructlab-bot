@@ -3,6 +3,9 @@
 A GitHub bot to increase contributor test and review velocity for
 [instruct-lab/taxonomy](https://github.com/instruct-lab/taxonomy).
 
+More detail on how this bot fits into the overall architecture is being
+captured in this [enhancement document](https://github.com/instruct-lab/enhancements/pull/1).
+
 ## Overview
 
 Personas:
