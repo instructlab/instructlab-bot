@@ -64,3 +64,5 @@ This will check if the config.yaml exist and if it is a valid yaml file it will 
 ## Workers
 
 By default, the podman compose stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
+
+Please refer to the [troubleshooting guide](troubleshooting.md) if you encounter any issues. It lists some of the issues that we encountered while setting up the development environment and how we resolved them, so it might be helpful to you as well.
