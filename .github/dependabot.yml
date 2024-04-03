@@ -5,22 +5,52 @@
 
 version: 2
 updates:
-- package-ecosystem: "github-actions"
-  directory: "/"
-  schedule:
-    interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
 
-- package-ecosystem: "npm"
-  directory: "/bot"
-  schedule:
-    interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/bot"
+    schedule:
+      interval: "weekly"
+    groups:
+      node-production-dependencies:
+        dependency-type: "production"
+      node-development-dependencies:
+        dependency-type: "development"
 
-- package-ecosystem: "gomod"
-  directory: "/worker"
-  schedule:
-    interval: "weekly"
+  - package-ecosystem: "gomod"
+    directory: "/worker"
+    schedule:
+      interval: "weekly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
 
-- package-ecosystem: "gomod"
-  directory: "/gobot"
-  schedule:
-    interval: "weekly"
+  - package-ecosystem: "gomod"
+    directory: "/gobot"
+    schedule:
+      interval: "weekly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+
+  - package-ecosystem: "docker"
+    directory: "/deploy"
+    schedule:
+      interval: "weekly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
