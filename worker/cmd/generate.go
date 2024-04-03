@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -24,6 +25,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -132,6 +134,112 @@ var generateCmd = &cobra.Command{
 	},
 }
 
+func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir string) error {
+	workDir := "."
+	if WorkDir != "" {
+		workDir = WorkDir
+	}
+	chatlogDir := path.Join(workDir, "data", "chatlogs")
+
+	defer func() {
+		// Move everything from chatlogDir to outputDir
+		chatlogFiles, err := os.ReadDir(chatlogDir)
+		if err != nil {
+			sugar.Errorf("Could not read chatlog directory: %v", err)
+			return
+		}
+
+		for _, file := range chatlogFiles {
+			if err := os.Rename(path.Join(chatlogDir, file.Name()), path.Join(outputDir, file.Name())); err != nil {
+				sugar.Errorf("Could not move file: %v", err)
+				return
+			}
+		}
+	}()
+
+	cmd := exec.CommandContext(ctx, lab, "diff")
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+	cmd.Stderr = os.Stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		sugar.Errorf("Could not get stdout pipe: %v", err)
+		return err
+	}
+
+	sugar.Debug("Running ilab diff")
+	if err := cmd.Start(); err != nil {
+		sugar.Errorf("Could not start command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
+		return err
+	}
+
+	// Get an array of lines from the output
+	output, err := io.ReadAll(stdout)
+	if err != nil {
+		sugar.Errorf("Could not read stdout: %v", err)
+		return err
+	}
+	outputStr := string(output)
+	sugar.Debugf("Output: %s", outputStr)
+	labDiffOutput := strings.Split(outputStr, "\n")
+
+	for _, file := range labDiffOutput {
+		if !strings.HasSuffix(file, ".yaml") {
+			continue
+		}
+		filePath := path.Join(WorkDir, "taxonomy", file)
+
+		f, err := os.Open(filePath)
+		if err != nil {
+			sugar.Errorf("Could not open taxonomy file: %v", err)
+			return err
+		}
+		defer f.Close()
+
+		content, err := io.ReadAll(f)
+		if err != nil {
+			sugar.Error(err)
+			return err
+		}
+
+		var data map[string]interface{}
+		err = yaml.Unmarshal(content, &data)
+		if err != nil {
+			sugar.Error(err)
+			return err
+		}
+
+		// Check if "seed_examples" exists and is a list
+		seedExamples, ok := data["seed_examples"].([]interface{})
+		if !ok {
+			err = fmt.Errorf("seed_examples not found or not a list")
+			sugar.Error(err)
+			return err
+		}
+
+		for _, item := range seedExamples {
+			question, ok := item.(map[interface{}]interface{})["question"].(string)
+			if !ok {
+				err = fmt.Errorf("question not found or not a string")
+				sugar.Error(err)
+				return err
+			}
+
+			cmd := exec.Command(lab, "chat", "--quick-question", question)
+			cmd.Dir = workDir
+			cmd.Env = os.Environ()
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stdout
+			err = cmd.Run()
+			if err != nil {
+				sugar.Error(err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *zap.SugaredLogger, job string) {
 	// Process the job
 	sugar := logger.With("job", job)
@@ -140,6 +248,19 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	prNumber, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:pr_number", job)))
 	if err != nil {
 		sugar.Errorf("Could not get pr_number from redis: %v", err)
+		return
+	}
+
+	jobType, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:job_type", job)))
+	if err != nil {
+		sugar.Errorf("Could not get job_type from redis: %v", err)
+		return
+	}
+	switch jobType {
+	case "generate":
+	case "precheck":
+	default:
+		sugar.Errorf("Unknown job type: %s", jobType)
 		return
 	}
 
@@ -254,7 +375,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	outDirName := fmt.Sprintf("generate-pr-%s-%s", prNumber, head.Hash())
+	outDirName := fmt.Sprintf("%s-pr-%s-%s", jobType, prNumber, head.Hash())
 	outputDir := path.Join(workDir, outDirName)
 
 	sugar = sugar.With("out_dir", outputDir)
@@ -265,20 +386,32 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		lab = path.Join(VenvDir, "bin", "ilab")
 	}
 
-	cmd := exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir)
+	var cmd *exec.Cmd
+	switch jobType {
+	case "generate":
+		cmd = exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir)
+		if WorkDir != "" {
+			cmd.Dir = WorkDir
+		}
 
-	if WorkDir != "" {
-		cmd.Dir = WorkDir
-	}
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
 
-	cmd.Env = os.Environ()
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-
-	sugar.Debug("Running lab generate")
-	// Run the command
-	if err := cmd.Run(); err != nil {
-		sugar.Errorf("Could not run lab generate: %v", err)
+		sugar.Debug(fmt.Sprintf("Running %s job", jobType))
+		// Run the command
+		if err := cmd.Run(); err != nil {
+			sugar.Errorf("Could not run command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
+			return
+		}
+	case "precheck":
+		err = runPrecheck(ctx, sugar, lab, outputDir)
+		if err != nil {
+			sugar.Errorf("Could not run precheck: %v", err)
+			return
+		}
+	default:
+		sugar.Errorf("Unknown job type: %s", jobType)
 		return
 	}
 

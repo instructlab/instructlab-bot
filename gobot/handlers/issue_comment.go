@@ -77,6 +77,12 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 			h.reportError(ctx, client, &prComment, err)
 		}
 		return err
+	case "precheck":
+		err = h.precheckCommand(ctx, client, &prComment)
+		if err != nil {
+			h.reportError(ctx, client, &prComment, err)
+		}
+		return err
 	default:
 		return h.unknownCommand(ctx, client, &prComment)
 	}
@@ -96,38 +102,44 @@ func (h *PRCommentHandler) reportError(ctx context.Context, client *github.Clien
 	}
 }
 
-func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
-	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
-		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *github.Client, prComment *PRComment, requiredLabel string) (bool, error) {
+	if requiredLabel == "" {
+		return true, nil
+	}
 
-	// Check if the required label is present if a required label is in the config file
-	if h.RequiredLabel != "" {
-		pr, _, err := client.PullRequests.Get(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum)
-		if err != nil {
-			return err
-		}
+	pr, _, err := client.PullRequests.Get(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum)
+	if err != nil {
+		return false, err
+	}
 
-		labelFound := false
-		for _, label := range pr.Labels {
-			if label.GetName() == h.RequiredLabel {
-				labelFound = true
-				break
-			}
-		}
-
-		if !labelFound {
-			h.Logger.Infof("Required label %s not found on PR %s/%s#%d by %s",
-				h.RequiredLabel, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
-			missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have the '%s' label.", h.RequiredLabel)
-			botComment := github.IssueComment{Body: &missingLabelComment}
-			_, _, err = client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment)
-			if err != nil {
-				h.Logger.Errorf("Failed to comment on pull request about missing label: %v", err)
-			}
-			return nil
+	labelFound := false
+	for _, label := range pr.Labels {
+		if label.GetName() == requiredLabel {
+			labelFound = true
+			break
 		}
 	}
 
+	if !labelFound {
+		h.Logger.Infof("Required label %s not found on PR %s/%s#%d by %s",
+			requiredLabel, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+		missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have the '%s' label.", requiredLabel)
+		botComment := github.IssueComment{Body: &missingLabelComment}
+		_, _, err = client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment)
+		if err != nil {
+			h.Logger.Errorf("Failed to comment on pull request about missing label: %v", err)
+		}
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func setJobKey(r *redis.Client, jobNumber int64, key string, value interface{}) error {
+	return r.Set(context.Background(), "jobs:"+strconv.FormatInt(jobNumber, 10)+":"+key, value, 0).Err()
+}
+
+func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.Client, prComment *PRComment, jobType string) error {
 	r := redis.NewClient(&redis.Options{
 		Addr:     h.RedisHostPort,
 		Password: "", // no password set
@@ -139,22 +151,32 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":pr_number", prComment.prNum, 0).Err()
+	err = setJobKey(r, jobNumber, "pr_number", prComment.prNum)
 	if err != nil {
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":installation_id", prComment.installID, 0).Err()
+	err = setJobKey(r, jobNumber, "author", prComment.author)
 	if err != nil {
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":repo_owner", prComment.repoOwner, 0).Err()
+	err = setJobKey(r, jobNumber, "installation_id", prComment.installID)
 	if err != nil {
 		return err
 	}
 
-	err = r.Set(ctx, "jobs:"+strconv.FormatInt(jobNumber, 10)+":repo_name", prComment.repoName, 0).Err()
+	err = setJobKey(r, jobNumber, "repo_owner", prComment.repoOwner)
+	if err != nil {
+		return err
+	}
+
+	err = setJobKey(r, jobNumber, "repo_name", prComment.repoName)
+	if err != nil {
+		return err
+	}
+
+	err = setJobKey(r, jobNumber, "job_type", jobType)
 	if err != nil {
 		return err
 	}
@@ -176,6 +198,30 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 	}
 
 	return nil
+}
+
+func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	if !present || err != nil {
+		return err
+	}
+
+	return h.queueGenerateJob(ctx, client, prComment, "generate")
+}
+
+func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("Precheck command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	if !present || err != nil {
+		return err
+	}
+
+	return h.queueGenerateJob(ctx, client, prComment, "precheck")
 }
 
 func (h *PRCommentHandler) unknownCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {

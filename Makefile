@@ -131,3 +131,8 @@ run-dev: ## Deploy the bot development stack.
 	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./config.yaml
 	$(ECHO_PREFIX) printf "Deploy the development stack\n"
 	$(CMD_PREFIX) podman compose up
+
+.PHONY: redis-stack
+redis-stack: ## Run a redis-stack container
+	$(ECHO_PREFIX) printf "  %-12s redis/redis-stack:latest\n" "[PODMAN]"
+	$(CMD_PREFIX) podman run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
