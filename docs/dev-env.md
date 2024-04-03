@@ -22,8 +22,8 @@ To setup this development environment, you will need to fork the following repos
 - Homepage URL: `<URL to your local fork of instruct-lab-bot>`
 - Select Webhook Active flag and set the Webhook URL
   - To generate the Webhook URL, visit <https://smee.io/new> and copy the URL that is generated
-- In the Permissions section, Select `Read & write` for the Pull Requests permission.
-- In the Subscribe to events section, select the Pull Request.
+- In the Permissions section, Select `Read & write` permission for the `Pull Requests` and `Issues`
+- In the Subscribe to events section, select the `Pull Request` and `Issue comment` events.
 
 Rest all keep it to default and click on Create GitHub App.
 
