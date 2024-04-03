@@ -4,14 +4,15 @@ A GitHub bot to increase contributor test and review velocity for
 [instruct-lab/taxonomy](https://github.com/instruct-lab/taxonomy).
 
 More detail on how this bot fits into the overall architecture is being
-captured in this [enhancement document](https://github.com/instruct-lab/enhancements/pull/1).
+captured in this [enhancement
+document](https://github.com/instruct-lab/enhancements/blob/main/docs/github-taxonomy-automation.md).
 
 ## Overview
 
 Personas:
 
 - Taxonomy **Contributor**
-- Taxonomy **Reviewer**
+- Taxonomy **Triager**
 - Bot **Admin**
 
 Our goal is to implement a GitHub bot that will:
@@ -20,7 +21,7 @@ Our goal is to implement a GitHub bot that will:
 - Stash the generated data and trained models and make them available for download.
 - Have the capacity to serve these models for testing purposes.
 - Have a way to monitor the system's state -- what builds are available for each PR, what jobs are in progress, etc …
-  - Contributor / Reviewer - status via GitHub PR comments from the bot
+  - Contributor / Triager - status via GitHub PR comments from the bot
   - Admin - OTEL, Grafana, etc …
 
 ### Current Status
