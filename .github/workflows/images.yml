@@ -29,28 +29,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata (tags, labels) for bot image
-        id: bot_meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ github.repository }}/instruct-lab-bot
-
-      - name: Build and push bot image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          build-args: |
-            GITHUB_USER=instruct-lab-bot
-            GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
-          target: bot
-          push: true
-          tags: ${{ steps.bot_meta.outputs.tags }}
-          labels: ${{ steps.bot_meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: bot/Containerfile
-
       - name: Extract metadata (tags, labels) for gotbot image
         id: gobot_meta
         uses: docker/metadata-action@v5

@@ -37,10 +37,6 @@ The current GitHub workflow in a PR is:
 3. Bot generates data using `ilab generate` and stores it in an object store (S3).
 4. Bot replies: "Here is the generated data ..."
 
-## Components
-
-> GitHub bot interface built with [Probot](https://github.com/probot/probot)
-
 ## Contributing
 
 If you have suggestions for how instruct-lab-bot could be improved, or want to report a bug, open an issue! We'd love all and any contributions.
