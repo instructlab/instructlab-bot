@@ -56,8 +56,10 @@ There are several fields that need to be filled in and all the details are avail
 To run the bot:
 
 ```bash
-podman compose up
+make run-dev
 ```
+
+This will check if the config.yaml exist and if it is a valid yaml file it will deploy the dev stack.
 
 ## Workers
 

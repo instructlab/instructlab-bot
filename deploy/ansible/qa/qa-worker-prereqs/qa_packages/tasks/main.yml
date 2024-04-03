@@ -7,7 +7,7 @@
     state: present
   become: true
 
-- name: Setup repo # noqa command-instead-of-shell no-changed-when
+- name: Setup repo  # noqa command-instead-of-shell no-changed-when
   ansible.builtin.shell:
     dnf config-manager \
     --add-repo \

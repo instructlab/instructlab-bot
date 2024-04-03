@@ -1,5 +1,5 @@
 ---
-- name: Clone the bot repo # noqa latest[git]
+- name: Clone the bot repo  # noqa latest[git]
   ansible.builtin.git:
     clone: true
     repo: "https://{{ qa_github_token }}@github.com/instruct-lab/instruct-lab-bot.git"

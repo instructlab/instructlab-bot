@@ -20,4 +20,4 @@ services:
     image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
     depends_on:
       - redis
-    command: [ "/instruct-lab-bot-worker", "--test", "--redis", "redis:6379", "generate", "-g", "" ]
+    command: ["/instruct-lab-bot-worker", "--test", "--redis", "redis:6379", "generate", "-g", ""]

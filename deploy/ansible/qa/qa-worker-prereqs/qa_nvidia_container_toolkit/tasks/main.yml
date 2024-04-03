@@ -20,7 +20,7 @@
     owner: root
     group: root
 
-- name: Create installation script on remote host # noqa no-changed-when
+- name: Create installation script on remote host  # noqa no-changed-when
   ansible.builtin.shell: |
     cat <<'EOF' > /tmp/install_nvidia_cuda.sh
     #!/bin/bash
@@ -50,7 +50,7 @@
   args:
     executable: /bin/bash
 
-- name: Installation script on remote host asynchronously (hack due to runner/ec2 ssh breakage) # noqa no-changed-when
+- name: Installation script on remote host asynchronously (hack due to runner/ec2 ssh breakage)  # noqa no-changed-when
   ansible.builtin.shell: /tmp/install_nvidia_cuda.sh > /tmp/install_script_output.log 2>&1
   async: 3600
   poll: 0
@@ -60,7 +60,7 @@
   ansible.builtin.pause:
     minutes: 15
 
-- name: Display the contents of the installation log # noqa no-changed-when
+- name: Display the contents of the installation log  # noqa no-changed-when
   ansible.builtin.command:
     cmd: cat /tmp/install_script_output.log
   register: log_content
