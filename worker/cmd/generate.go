@@ -291,15 +291,29 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	sugar.Debug("Fetching from origin")
-	err = r.Fetch(&git.FetchOptions{
-		RemoteName: Origin,
-		Auth: &http.BasicAuth{
-			Username: "instruct-lab-bot",
-			Password: GithubToken,
-		},
-	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
+	retryFetch := func() error {
+		var lastErr error
+		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
+			sugar.Debug("Fetching from origin")
+			err = r.Fetch(&git.FetchOptions{
+				RemoteName: Origin,
+				Auth: &http.BasicAuth{
+					Username: "instruct-lab-bot",
+					Password: GithubToken,
+				},
+			})
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+			if attempt < gitMaxRetries {
+				sugar.Infof("Retrying fetching updates, attempt %d/%d", attempt+1, gitMaxRetries)
+				time.Sleep(gitRetryDelay)
+			}
+		}
+		return lastErr
+	}
+	if err := retryFetch(); err != nil && err != git.NoErrAlreadyUpToDate {
 		sugar.Errorf("Could not fetch from origin: %v", err)
 		return
 	}
