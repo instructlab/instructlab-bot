@@ -39,9 +39,16 @@ var (
 )
 
 const (
-	gitMaxRetries = 3
-	gitRetryDelay = 2 * time.Second
+	gitMaxRetries  = 3
+	gitRetryDelay  = 2 * time.Second
+	ilabConfigPath = "config.yaml"
 )
+
+type IlabConfig struct {
+	Generate struct {
+		Model string `yaml:"model"`
+	} `yaml:"generate"`
+}
 
 func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
@@ -506,6 +513,12 @@ func postJobResults(job string, conn redis.Conn, logger *zap.SugaredLogger, URL 
 		logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
 
+	modelName := getModelNameFromConfig()
+
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:model_name", job), modelName); err != nil {
+		logger.Errorf("Could not set model name in redis: %v", err)
+	}
+
 	if _, err := conn.Do("LPUSH", "results", job); err != nil {
 		logger.Errorf("Could not push to redis queue: %v", err)
 	}
@@ -593,4 +606,19 @@ func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map
 	}
 
 	return tmpl.Execute(indexFile, data)
+}
+
+func getModelNameFromConfig() string {
+	cfgData, err := os.ReadFile(ilabConfigPath)
+	if err != nil {
+		return "unknown"
+	}
+
+	var cfg IlabConfig
+	err = yaml.Unmarshal(cfgData, &cfg)
+	if err != nil || cfg.Generate.Model == "" {
+		return "unknown"
+	}
+
+	return cfg.Generate.Model
 }
