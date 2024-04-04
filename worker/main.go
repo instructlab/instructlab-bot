@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	// Initlaize global logger
+	// Initialize global logger
 	logLevel := zap.InfoLevel
 	loggerConfig := zap.Config{
 		Level:            zap.NewAtomicLevelAt(logLevel),

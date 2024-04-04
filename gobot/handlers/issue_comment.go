@@ -92,7 +92,7 @@ func (h *PRCommentHandler) reportError(ctx context.Context, client *github.Clien
 	h.Logger.Errorf("Error processing command on %s/%s#%d by %s: %v",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author, err)
 
-	msg := "Beep, boop 🤖  Sorry, An error has occurred."
+	msg := fmt.Sprintf("Beep, boop 🤖  Sorry, An error has occurred : %v", err)
 	botComment := github.IssueComment{
 		Body: &msg,
 	}
