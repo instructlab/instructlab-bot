@@ -3,6 +3,7 @@ collections:
   - name: community.general
   - name: community.docker
   - name: amazon.aws
+  - name: containers.podman
 
 roles:
   - name: geerlingguy.docker
