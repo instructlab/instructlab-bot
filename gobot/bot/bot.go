@@ -159,11 +159,25 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			continue
 		}
 
-		issueComment := github.IssueComment{
-			Body: github.String(
-				"Beep, boop 🤖  The test data has been generated!\n\n" +
-					"Find your results [here](" + s3Url + ")."),
+		modelName, err := r.Get("jobs:" + result + ":model_name").Result()
+		if err != nil || modelName == "" || modelName == "unknown" {
+			logger.Infof("No specific model name found for job %s, using generic message.", result)
+			modelName = ""
+		} else {
+			modelName = "using the model " + modelName
 		}
+
+		// Add the model name only if it's not empty
+		commentBody := "Beep, boop 🤖  The test data has been generated"
+		if modelName != "" {
+			commentBody += " " + modelName
+		}
+		commentBody += fmt.Sprintf("!\n\nFind your results [here](%s).", s3Url)
+
+		issueComment := github.IssueComment{
+			Body: github.String(commentBody),
+		}
+
 		client, err := cc.NewInstallationClient(int64(installIDInt))
 		if err != nil {
 			logger.Errorf("Error creating GitHub client: %v", err)
