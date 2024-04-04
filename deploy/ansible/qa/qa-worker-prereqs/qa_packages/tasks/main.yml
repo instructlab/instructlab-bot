@@ -1,46 +1,19 @@
 ---
-- name: Install dependencies
-  ansible.builtin.dnf:
-    name:
-      - dnf-plugins-core
-    update_cache: true
-    state: present
-  become: true
-
-- name: Setup repo  # noqa command-instead-of-shell no-changed-when
-  ansible.builtin.shell:
-    dnf config-manager \
-    --add-repo \
-    https://download.docker.com/linux/fedora/docker-ce.repo
-  become: true
-
-- name: Install docker engine and containerd
-  ansible.builtin.dnf:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-    update_cache: true
-    state: present
-  become: true
-
-- name: Pause for 20 seconds for container runtime to initialize
-  ansible.builtin.pause:
-    seconds: 20
-
 - name: Install base required packages
   ansible.builtin.dnf:
     name:
+      - dnf-plugins-core
+      - podman
       - git
       - g++
       - python3
       - python3-devel
+    update_cache: true
     state: present
   become: true
 
-- name: Add user to the Docker group
-  ansible.builtin.user:
-    name: "{{ ansible_user }}"
-    groups: docker
-    append: true
+- name: Installing podman
+  ansible.builtin.package:
+    name: "podman"
+    state: present
   become: true

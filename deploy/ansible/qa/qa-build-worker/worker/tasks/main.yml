@@ -6,10 +6,10 @@
     dest: /home/{{ ansible_user }}/instruct-lab-bot
 
 - name: Build worker image
-  community.docker.docker_image:
+  containers.podman.podman_image:
     build:
       path: "/home/{{ ansible_user }}/instruct-lab-bot/worker"
-      args:
+      buildargs:
         GITHUB_USER: "{{ qa_github_uid }}"
         GITHUB_TOKEN: "{{ qa_github_token }}"
     name: "ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve"
@@ -18,7 +18,7 @@
 
 - name: List container images
   ansible.builtin.command:
-    cmd: docker image ls
+    cmd: podman image ls
   register: ls_images
   changed_when: false
 
@@ -27,13 +27,20 @@
     var: ls_images.stdout_lines
 
 - name: Start the worker
-  ansible.builtin.command:
-    cmd: docker run --gpus all -it --entrypoint /bin/bash -d -v /home/fedora/instructlab:/data ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
-  changed_when: true
+  containers.podman.podman_container:
+    name: instruct_lab_worker
+    image: "ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main"
+    command: /bin/bash
+    tty: true
+    detach: true
+    volumes:
+      - "/home/fedora/instructlab:/data:Z"
+    gpu_devices:
+      - all
 
 - name: List all containers
   ansible.builtin.command:
-    cmd: docker ps -a
+    cmd: podman ps -a
   register: ps_output
   changed_when: false
 
