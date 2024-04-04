@@ -162,8 +162,7 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		issueComment := github.IssueComment{
 			Body: github.String(
 				"Beep, boop 🤖  The test data has been generated!\n\n" +
-					"Find your results [here](" + s3Url + ").\n\n" +
-					"*This URL expires in 7 days.*"),
+					"Find your results [here](" + s3Url + ")."),
 		}
 		client, err := cc.NewInstallationClient(int64(installIDInt))
 		if err != nil {

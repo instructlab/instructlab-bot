@@ -420,25 +420,20 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		sugar.Errorf("Could not read output directory: %v", err)
 		return
 	}
-	presign := s3.NewPresignClient(svc, func(options *s3.PresignOptions) {
-		// Must be less than a week
-		options.Expires = 24 * time.Hour * 7
-	})
-	presignedFiles := make([]map[string]string, 0)
+
+	publicFiles := make([]map[string]string, 0)
 
 	for _, item := range items {
-		if strings.HasSuffix(item.Name(), "index.html") {
-			continue
-		}
 		file, err := os.Open(path.Join(outputDir, item.Name()))
 		if err != nil {
 			sugar.Errorf("Could not open file: %v", err)
 			return
 		}
 		defer file.Close()
+		upKey := fmt.Sprintf("%s/%s", outDirName, item.Name())
 		_, err = svc.PutObject(ctx, &s3.PutObjectInput{
 			Bucket:      aws.String(S3Bucket),
-			Key:         aws.String(fmt.Sprintf("%s/%s", outDirName, item.Name())),
+			Key:         aws.String(upKey),
 			Body:        file,
 			ContentType: aws.String("application/json-lines+json"),
 		})
@@ -447,19 +442,10 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 			return
 		}
 
-		result, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String(S3Bucket),
-			Key:    aws.String(fmt.Sprintf("%s/%s", outDirName, item.Name())),
-		})
-
-		if err != nil {
-			sugar.Errorf("Could not generate presign get URL for object: %v", err)
-			return
-		}
-
-		presignedFiles = append(presignedFiles, map[string]string{
+		publicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
+		publicFiles = append(publicFiles, map[string]string{
 			"name": item.Name(),
-			"url":  result.URL,
+			"url":  publicURL,
 		})
 	}
 
@@ -468,23 +454,24 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		sugar.Errorf("Could not create index.html: %v", err)
 		return
 	}
-
-	if err := generateIndexHTML(indexFile, prNumber, presignedFiles); err != nil {
+	if err := generateIndexHTML(indexFile, prNumber, publicFiles); err != nil {
 		sugar.Errorf("Could not generate index.html: %v", err)
 		indexFile.Close()
 		return
 	}
+	indexFile.Close()
 
 	indexFile, err = os.Open(indexFile.Name())
 	if err != nil {
-		sugar.Errorf("Could not re-read index.html: %v", err)
-		indexFile.Close()
+		sugar.Errorf("Could not re-open index.html: %v", err)
 		return
 	}
+	defer indexFile.Close()
 
+	upKey := fmt.Sprintf("%s/index.html", outDirName)
 	_, err = svc.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(S3Bucket),
-		Key:         aws.String(fmt.Sprintf("%s/index.html", outDirName)),
+		Key:         aws.String(upKey),
 		Body:        indexFile,
 		ContentType: aws.String("text/html"),
 	})
@@ -493,18 +480,10 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	indexResult, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(S3Bucket),
-		Key:    aws.String(fmt.Sprintf("%s/index.html", outDirName)),
-	})
+	indexPublicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
 
-	if err != nil {
-		sugar.Errorf("Could not presign index.html: %v", err)
-		return
-	}
-
-	// Notify the "results" queue that the job is done
-	postJobResults(job, conn, sugar, indexResult.URL)
+	// Notify the "results" queue that the job is done with the public URL
+	postJobResults(job, conn, sugar, indexPublicURL)
 	sugar.Infof("Job done")
 }
 
