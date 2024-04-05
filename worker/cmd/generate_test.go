@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -101,4 +105,93 @@ func TestGenerateIndexHTML(t *testing.T) {
 </html>`
 
 	assert.Equal(t, expected, string(contents))
+}
+
+// TestFetchModelName verify the model name is extracted from the id key.
+func TestFetchModelName(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, `{
+            "object": "list",
+            "data": [
+                {
+                    "id": "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec",
+                    "object": "model",
+                    "created": 1712329535,
+                    "owned_by": "vllm",
+                    "root": "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec",
+                    "parent": null,
+                    "permission": [
+                        {
+                            "id": "modelperm-2d4deca190134cd9b6bab49f1c769d91",
+                            "object": "model_permission",
+                            "created": 1712329535,
+                            "allow_create_engine": false,
+                            "allow_sampling": true,
+                            "allow_logprobs": true,
+                            "allow_search_indices": false,
+                            "allow_view": true,
+                            "allow_fine_tuning": false,
+                            "organization": "*",
+                            "group": null,
+                            "is_blocking": false
+                        }
+                    ]
+                }
+            ]
+        }`)
+	}))
+	defer mockServer.Close()
+
+	modelName, err := fetchModelName(context.Background(), mockServer.URL, false)
+	assert.NoError(t, err, "fetchModelName should not return an error")
+	expectedModelName := "Mixtral-8x7B-Instruct-v0.1"
+	assert.Equal(t, expectedModelName, modelName, "The model name should be extracted correctly")
+
+	modelName, err = fetchModelName(context.Background(), mockServer.URL, true)
+	assert.NoError(t, err, "fetchModelName should not return an error")
+	expectedModelName = "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec"
+	assert.Equal(t, expectedModelName, modelName, "The model name should be extracted correctly")
+}
+
+// TestFetchModelNameWithInvalidObject negative test if the returned object is not a model
+func TestFetchModelNameWithInvalidObject(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Respond with a payload where the "object" field within the data array is not "model"
+		fmt.Fprintln(w, `{
+			"object": "list",
+			"data": [
+				{
+					"id": "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec",
+					"object": "foo",  // bogus value here
+					"created": 1712329535,
+					"owned_by": "vllm",
+					"root": "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec",
+					"parent": null,
+					"permission": [
+						{
+							"id": "modelperm-2d4deca190134cd9b6bab49f1c769d91",
+							"object": "model_permission",
+							"created": 1712329535,
+							"allow_create_engine": false,
+							"allow_sampling": true,
+							"allow_logprobs": true,
+							"allow_search_indices": false,
+							"allow_view": true,
+							"allow_fine_tuning": false,
+							"organization": "*",
+							"group": null,
+							"is_blocking": false
+						}
+					]
+				}
+			]
+		}`)
+	}))
+	defer mockServer.Close()
+
+	modelName, err := fetchModelName(context.Background(), mockServer.URL, false)
+
+	// Verify that an error was returned due to the invalid "object" field
+	assert.Error(t, err, "fetchModelName should return an error for invalid object field")
+	assert.Empty(t, modelName, "The model name should be empty for invalid object field")
 }
