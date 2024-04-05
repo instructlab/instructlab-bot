@@ -12,6 +12,8 @@ app_configuration:
   # bot commands will always be allowed by anyone able to comment
   # on PRs.
   required_label: "triage-ok-to-test"
+  # Optional. If left commented, the default bot account is @instruct-lab-bot
+  # bot_username: "@instruct-lab-bot"
 
 github:
   v3_api_url: "https://api.github.com/"

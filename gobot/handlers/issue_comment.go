@@ -19,6 +19,7 @@ type PRCommentHandler struct {
 	Logger        *zap.SugaredLogger
 	RedisHostPort string
 	RequiredLabel string
+	BotUsername   string
 }
 
 type PRComment struct {
@@ -67,7 +68,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	if len(words) < 2 {
 		return nil
 	}
-	if words[0] != "@instruct-lab-bot" {
+	if words[0] != h.BotUsername {
 		return nil
 	}
 	switch words[1] {
