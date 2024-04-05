@@ -64,7 +64,6 @@ func init() {
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
 	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
 	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
-	generateCmd.Flags().StringVarP(&EndpointURL, "endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
