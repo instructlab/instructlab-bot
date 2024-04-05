@@ -717,10 +717,7 @@ func fetchModelName(ctx context.Context, endpoint string, fullName bool) (string
 	// Extract the model name or the full ID based on the fullName flag
 	for _, item := range responseData.Data {
 		if item.Object == "model" {
-			if fullName {
-				// Return the full ID value if fullName is true
-				return item.ID, nil
-			} else {
+			if !fullName {
 				// Otherwise, parse and return the name after the last "--"
 				parts := strings.Split(item.ID, "/")
 				for _, part := range parts {
@@ -732,6 +729,7 @@ func fetchModelName(ctx context.Context, endpoint string, fullName bool) (string
 					}
 				}
 			}
+			return item.ID, nil
 		}
 	}
 
