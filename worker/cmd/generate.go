@@ -436,10 +436,11 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	switch jobType {
 	case "generate":
 		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
-		if EndpointURL != "" && modelName != "unknown" {
-			// Append the endpoint URL and model name as arguments if they are defined
-			generateArgs = append(generateArgs, "--endpoint-url", EndpointURL, "--model", modelName)
-		}
+		// TODO -- add a separate config option
+		//if EndpointURL != "" && modelName != "unknown" {
+		//	// Append the endpoint URL and model name as arguments if they are defined
+		//	generateArgs = append(generateArgs, "--endpoint-url", EndpointURL, "--model", modelName)
+		//}
 
 		cmd = exec.CommandContext(ctx, lab, generateArgs...)
 		if WorkDir != "" {
