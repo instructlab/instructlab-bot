@@ -23,6 +23,7 @@ type MyApplicationConfig struct {
 	RedisHostPort   string `yaml:"redis_hostport"`
 	WebhookProxyURL string `yaml:"webhook_proxy_url"`
 	RequiredLabel   string `yaml:"required_label,omitempty"`
+	BotUsername     string `yaml:"bot_username,omitempty"`
 }
 
 func ReadConfig(path string) (*Config, error) {
@@ -38,4 +39,11 @@ func ReadConfig(path string) (*Config, error) {
 	}
 
 	return &c, nil
+}
+
+func (c *Config) GetBotUsername() string {
+	if c.AppConfig.BotUsername == "" {
+		return "@instruct-lab-bot"
+	}
+	return c.AppConfig.BotUsername
 }
