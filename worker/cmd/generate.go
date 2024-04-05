@@ -31,6 +31,7 @@ import (
 var (
 	WorkDir         string
 	VenvDir         string
+	EndpointURL     string
 	NumInstructions int
 	Origin          string
 	GithubToken     string
@@ -53,6 +54,7 @@ type IlabConfig struct {
 func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
+	generateCmd.Flags().StringVarP(&EndpointURL, "endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
@@ -410,7 +412,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	var cmd *exec.Cmd
 	switch jobType {
 	case "generate":
-		cmd = exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir)
+		cmd = exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir, "--endpoint-url", EndpointURL)
 		if WorkDir != "" {
 			cmd.Dir = WorkDir
 		}
