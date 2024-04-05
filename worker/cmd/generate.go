@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -21,7 +24,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/gomodule/redigo/redis"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -43,6 +46,7 @@ const (
 	gitMaxRetries  = 3
 	gitRetryDelay  = 2 * time.Second
 	ilabConfigPath = "config.yaml"
+	localEndpoint  = "http://localhost:8000/v1"
 )
 
 type IlabConfig struct {
@@ -60,6 +64,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
 	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
 	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
+	generateCmd.Flags().StringVarP(&EndpointURL, "endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
@@ -143,7 +148,7 @@ var generateCmd = &cobra.Command{
 	},
 }
 
-func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir string) error {
+func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, modelName string) error {
 	workDir := "."
 	if WorkDir != "" {
 		workDir = WorkDir
@@ -234,7 +239,13 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir s
 				return err
 			}
 
-			cmd := exec.Command(lab, "chat", "--quick-question", question)
+			chatArgs := []string{"chat", "--quick-question", question}
+			if EndpointURL != localEndpoint && modelName != "unknown" {
+				chatArgs = append(chatArgs, "--endpoint-url", EndpointURL, "--model", modelName)
+			}
+
+			cmd := exec.Command(lab, chatArgs...)
+			sugar.Infof("Running the precheck command: %s", cmd.String())
 			cmd.Dir = workDir
 			cmd.Env = os.Environ()
 			cmd.Stderr = os.Stderr
@@ -275,7 +286,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 
 	// If in test mode, immediately post to the results queue
 	if TestMode {
-		postJobResults(job, conn, sugar, "https://example.com")
+		postJobResults(ctx, job, conn, sugar, "https://example.com")
 		sugar.Info("Job done (test mode)")
 		return
 	}
@@ -306,7 +317,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 			sugar.Debug("Fetching from origin")
 			err = r.Fetch(&git.FetchOptions{
 				RemoteName: Origin,
-				Auth: &http.BasicAuth{
+				Auth: &githttp.BasicAuth{
 					Username: "instruct-lab-bot",
 					Password: GithubToken,
 				},
@@ -373,7 +384,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	err = r.Fetch(&git.FetchOptions{
 		RemoteName: Origin,
 		RefSpecs:   []gitconfig.RefSpec{refspec},
-		Auth: &http.BasicAuth{
+		Auth: &githttp.BasicAuth{
 			Username: "instruct-lab-bot",
 			Password: GithubToken,
 		},
@@ -409,10 +420,28 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		lab = path.Join(VenvDir, "bin", "ilab")
 	}
 
+	var modelName string
+	if EndpointURL != localEndpoint {
+		var err error
+		modelName, err = fetchModelName(ctx, EndpointURL, true)
+		if err != nil {
+			logger.Errorf("Failed to fetch model name: %v", err)
+			modelName = "unknown"
+		}
+	} else {
+		modelName = getModelNameFromConfig()
+	}
+
 	var cmd *exec.Cmd
 	switch jobType {
 	case "generate":
-		cmd = exec.CommandContext(ctx, lab, "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir, "--endpoint-url", EndpointURL)
+		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
+		if EndpointURL != "" && modelName != "unknown" {
+			// Append the endpoint URL and model name as arguments if they are defined
+			generateArgs = append(generateArgs, "--endpoint-url", EndpointURL, "--model", modelName)
+		}
+
+		cmd = exec.CommandContext(ctx, lab, generateArgs...)
 		if WorkDir != "" {
 			cmd.Dir = WorkDir
 		}
@@ -423,12 +452,13 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 
 		sugar.Debug(fmt.Sprintf("Running %s job", jobType))
 		// Run the command
+		sugar.Infof("Running the generate command: %s", cmd.String())
 		if err := cmd.Run(); err != nil {
-			sugar.Errorf("Could not run command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
+			sugar.Errorf("Could not run command(%s %s): %v", cmd.Path, strings.Join(generateArgs, " "), err)
 			return
 		}
 	case "precheck":
-		err = runPrecheck(ctx, sugar, lab, outputDir)
+		err = runPrecheck(ctx, sugar, lab, outputDir, modelName)
 		if err != nil {
 			sugar.Errorf("Could not run precheck: %v", err)
 			return
@@ -506,16 +536,28 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	indexPublicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
 
 	// Notify the "results" queue that the job is done with the public URL
-	postJobResults(job, conn, sugar, indexPublicURL)
+	postJobResults(ctx, job, conn, sugar, indexPublicURL)
 	sugar.Infof("Job done")
 }
 
-func postJobResults(job string, conn redis.Conn, logger *zap.SugaredLogger, URL string) {
+func postJobResults(ctx context.Context, job string, conn redis.Conn, logger *zap.SugaredLogger, URL string) {
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", job), URL); err != nil {
 		logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
 
-	modelName := getModelNameFromConfig()
+	var modelName string
+	if EndpointURL != localEndpoint {
+		var err error
+		// Only get the short model name, not the entire ID value
+		// TODO: DRY all of the fetch model calls and function
+		modelName, err = fetchModelName(ctx, EndpointURL, false)
+		if err != nil {
+			logger.Errorf("Failed to fetch model name: %v", err)
+			modelName = "unknown"
+		}
+	} else {
+		modelName = getModelNameFromConfig()
+	}
 
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:model_name", job), modelName); err != nil {
 		logger.Errorf("Could not set model name in redis: %v", err)
@@ -623,4 +665,75 @@ func getModelNameFromConfig() string {
 	}
 
 	return cfg.Generate.Model
+}
+
+// fetchModelName hits the defined endpoint with "/models" appended to extract the model name.
+// If fullName is true, it returns the entire ID value; if false, it returns the parsed out name after the double hyphens.
+func fetchModelName(ctx context.Context, endpoint string, fullName bool) (string, error) {
+	// Ensure the endpoint URL ends with "/models"
+	if !strings.HasSuffix(endpoint, "/") {
+		endpoint += "/"
+	}
+	endpoint += "models"
+
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch model details: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var responseData struct {
+		Object string `json:"object"`
+		Data   []struct {
+			ID     string `json:"id"`
+			Object string `json:"object"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &responseData); err != nil {
+		return "", fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	if responseData.Object != "list" {
+		return "", fmt.Errorf("expected object type 'list', got '%s'", responseData.Object)
+	}
+
+	// Extract the model name or the full ID based on the fullName flag
+	for _, item := range responseData.Data {
+		if item.Object == "model" {
+			if fullName {
+				// Return the full ID value if fullName is true
+				return item.ID, nil
+			} else {
+				// Otherwise, parse and return the name after the last "--"
+				parts := strings.Split(item.ID, "/")
+				for _, part := range parts {
+					if strings.Contains(part, "--") {
+						nameParts := strings.Split(part, "--")
+						if len(nameParts) > 1 {
+							return nameParts[len(nameParts)-1], nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("model name not found in response")
 }
