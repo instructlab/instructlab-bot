@@ -22,6 +22,7 @@ To setup this development environment, you will need to fork the following repos
 - Homepage URL: `<URL to your local fork of instruct-lab-bot>`
 - Select Webhook Active flag and set the Webhook URL
   - To generate the Webhook URL, visit <https://smee.io/new> and copy the URL that is generated
+  - Set the webhook secret
 - In the Permissions section, Select `Read & write` permission for the `Pull Requests` and `Issues`
 - In the Subscribe to events section, select the `Pull Request` and `Issue comment` events.
 
@@ -37,7 +38,9 @@ Click on Install button to install the app in your account. Installation will as
 
 Select the local fork of the `taxonomy` repository that you have created in your account.
 
-### Setup the instruct-lab-bot for deployment
+## Setup local development deployment
+
+This setup deploys a podman compose stack. By default, the stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
 
 Create a `config.yaml` file in the root of the project:
 
@@ -50,8 +53,7 @@ There are several fields that need to be filled in and all the details are avail
 - `app_configuration.webhook_proxy_url` Set to the Webhook URL you generated from smee.io.
 - `github.app.integration_id` Set to the App ID from the GitHub App you just registered.
 - `github.app.private_key` Set to the private key you generated from the GitHub App you just registered and saved locally on your machine. Just `cat` the file and copy & paste the contents in the `config.yaml` file.
-
-## Running the Bot
+- `github.app.webhook_secret` Set to the Webhook Secret you set for the app.
 
 To run the bot:
 
@@ -61,8 +63,35 @@ make run-dev
 
 This will check if the config.yaml exist and if it is a valid yaml file it will deploy the dev stack.
 
-## Workers
+## Setup testing deployment
 
-By default, the podman compose stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
+We use ansible for deploying this setup on the AWS cloud. To deploy this setup, you will need the following to be present on your local machine:
+
+- Ansible
+- Python
+- SSH Access to the target server
+
+Make sure you copy your aws .pem key in the `deploy/ansible` directory and rename it to instruct-bot.pem
+
+Then run the playbook with the following:
+
+```bash
+ansible-playbook ./deploy-ec2-bot.yml
+```
+
+This will deploy an EC2 instance and update the local `./inventory.txt` file with the public IP of the EC2 instance under botNode section.
+
+To deploy the bot stack on the EC2 instance, fill the same details that you fill in `config.yaml` to `./vars.yml` file and run the following command:
+
+```bash
+ansible-playbook -i inventory.txt ./deploy-bot-stack.yml
+```
+
+Once the bot stack is deployed, you can verify the deployment by running the following command:
+
+- Hit the following URL in your browser: `http://<node-ip>:333/`, that should take you to the grafana dashboard.
+- Create a PR on your local taxonomy repository fork and add comment `@instruct-lab-bot precheck` to trigger the bot.
+
+## Troubleshooting
 
 Please refer to the [troubleshooting guide](troubleshooting.md) if you encounter any issues. It lists some of the issues that we encountered while setting up the development environment and how we resolved them, so it might be helpful to you as well.

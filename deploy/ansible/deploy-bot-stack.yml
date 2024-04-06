@@ -1,9 +1,11 @@
 - name: Deploy bot stack (Bot app, Redis, Grafana on EC2 node)
-  hosts: labNodes
+  hosts: botNode
   roles:
     - role: geerlingguy.docker
       become: true
     - role: packages
+      become: true
+    - role: nexodus
       become: true
     - role: redis-docker
       become: true
@@ -11,3 +13,5 @@
       become: true
     - role: gobot
       become: true
+  vars_files:
+    - vars.yml

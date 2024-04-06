@@ -1,4 +1,0 @@
-- name: Deploy EC2 Nodes
-  hosts: localhost
-  roles:
-    - role: ec2

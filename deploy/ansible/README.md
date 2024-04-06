@@ -31,10 +31,22 @@ aws_access_key_id=<YOUR_AWS_ACCESS_KEY>
 aws_secret_access_key=<YOUR_SECRET_ACCESS_KEY>
 ```
 
-Once your aws credentials are set up, you can run the following command to deploy the EC2 instance:
+Once your aws credentials are set up, you can run the following command to deploy the required EC2 instance.
+
+## Deploy EC2 bot node for InstructLab
+
+It creates t2x.large instance that can be used to deploy the bot stack (bot, redis and grafana)
 
 ```console
-ansible-playbook ./deploy-ec2.yml
+ansible-playbook ./deploy-ec2-bot.yml
+```
+
+## Deploy EC2 worker node for InstructLab
+
+It creates g4dn.xlarge instance that can be used to deploy the worker stack.
+
+```console
+ansible-playbook ./deploy-ec2-worker.yml
 ```
 
 ## Install Pre-requisites

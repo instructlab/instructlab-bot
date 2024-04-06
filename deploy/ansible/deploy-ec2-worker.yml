@@ -1,0 +1,10 @@
+- name: Deploy EC2 Nodes
+  hosts: localhost
+  roles:
+    - role: ec2
+      vars:
+        ec2_aws_instance_type: g4dn.xlarge
+        ec2_aws_nodetype_tag: "instruct-lab-worker-node"
+        ec2_aws_key_path: "./instruct-bot.pem"
+        ec2_count: 1
+        ec2_wait: true
