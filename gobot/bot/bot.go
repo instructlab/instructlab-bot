@@ -121,6 +121,7 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		result, err := r.RPop("results").Result()
 		if err != nil {
 			logger.Errorf("Redis Client Error: %v", err)
+			continue
 		}
 
 		if result == "" {
@@ -135,12 +136,6 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		prNumInt, err := strconv.Atoi(prNumber)
 		if err != nil {
 			logger.Errorf("Error converting PR number to int: %v", err)
-			continue
-		}
-
-		s3Url, err := r.Get("jobs:" + result + ":s3_url").Result()
-		if err != nil || s3Url == "" {
-			logger.Errorf("No S3 URL found for job %s", result)
 			continue
 		}
 
@@ -167,6 +162,22 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			continue
 		}
 
+		// check for errors prior to checking for an S3 url and models since that will not get produced on a failure
+		prErrors, _ := r.Get("jobs:" + result + ":errors").Result()
+		if prErrors != "" {
+			errCommentBody := fmt.Sprintf("Beep, boop 🤖 an error occurred while processing your request, please review the following log:\n```\n%s\n```", prErrors)
+			if err := PostComment(ctx, cc, logger, installIDInt, repoOwner, repoName, prNumInt, errCommentBody); err != nil {
+				logger.Errorf("Failed to send issue comment: %v", err)
+			}
+			continue
+		}
+
+		s3Url, err := r.Get("jobs:" + result + ":s3_url").Result()
+		if err != nil || s3Url == "" {
+			logger.Errorf("No S3 URL found for job %s", result)
+			continue
+		}
+
 		modelName, err := r.Get("jobs:" + result + ":model_name").Result()
 		if err != nil || modelName == "" || modelName == "unknown" {
 			logger.Infof("No specific model name found for job %s, using generic message.", result)
@@ -182,18 +193,29 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		}
 		commentBody += fmt.Sprintf("!\n\nFind your results [here](%s).", s3Url)
 
-		issueComment := github.IssueComment{
-			Body: github.String(commentBody),
-		}
-
-		client, err := cc.NewInstallationClient(int64(installIDInt))
+		err = PostComment(ctx, cc, logger, installIDInt, repoOwner, repoName, prNumInt, commentBody)
 		if err != nil {
-			logger.Errorf("Error creating GitHub client: %v", err)
-			continue
-		}
-		_, _, err = client.Issues.CreateComment(ctx, repoOwner, repoName, prNumInt, &issueComment)
-		if err != nil {
-			logger.Errorf("Error creating comment: %v", err)
+			logger.Errorf("Failed to send issue comment: %v", err)
 		}
 	}
+}
+
+// PostComment sends a comment to the GH pull request.
+func PostComment(ctx context.Context, cc githubapp.ClientCreator, logger *zap.SugaredLogger, installIDInt int, repoOwner, repoName string, prNumInt int, commentBody string) error {
+	issueComment := github.IssueComment{
+		Body: github.String(commentBody),
+	}
+
+	client, err := cc.NewInstallationClient(int64(installIDInt))
+	if err != nil {
+		logger.Errorf("Error creating GitHub client: %v", err)
+		return err
+	}
+	_, _, err = client.Issues.CreateComment(ctx, repoOwner, repoName, prNumInt, &issueComment)
+	if err != nil {
+		logger.Errorf("Error posting comment to GitHub PR: %v", err)
+		return err
+	}
+
+	return nil
 }

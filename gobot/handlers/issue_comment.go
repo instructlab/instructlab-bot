@@ -183,6 +183,11 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
+	err = setJobKey(r, jobNumber, "errors", "")
+	if err != nil {
+		return err
+	}
+
 	err = r.LPush(ctx, "generate", strconv.FormatInt(jobNumber, 10)).Err()
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -446,15 +447,19 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 			cmd.Dir = WorkDir
 		}
 
+		var stderr bytes.Buffer
+		// Capture both the ilab err buffer and the os.Stderr
+		cmd.Stderr = io.MultiWriter(&stderr, os.Stderr)
 		cmd.Env = os.Environ()
-		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
 
 		sugar.Debug(fmt.Sprintf("Running %s job", jobType))
 		// Run the command
 		sugar.Infof("Running the generate command: %s", cmd.String())
 		if err := cmd.Run(); err != nil {
-			sugar.Errorf("Could not run command(%s %s): %v", cmd.Path, strings.Join(generateArgs, " "), err)
+			detailedErr := fmt.Errorf("Error running command (%s %s): %v. \nDetails: %s", cmd.Path, strings.Join(generateArgs, " "), err, stderr.String())
+			sugar.Errorf(detailedErr.Error())
+			reportJobError(sugar, conn, job, detailedErr)
 			return
 		}
 	case "precheck":
@@ -734,4 +739,18 @@ func fetchModelName(ctx context.Context, endpoint string, fullName bool) (string
 	}
 
 	return "", fmt.Errorf("model name not found in response")
+}
+
+// reportJobError push app errors into the redis job 'errors' key
+func reportJobError(sugar *zap.SugaredLogger, conn redis.Conn, jobID string, err error) {
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:errors", jobID), err.Error()); err != nil {
+		sugar.Errorf("Failed to set the error for job %s: %v", jobID, err)
+		return
+
+	}
+	if _, err := conn.Do("LPUSH", "results", jobID); err != nil {
+		sugar.Errorf("Could not push error results to redis queue: %v", err)
+		return
+	}
+
 }
