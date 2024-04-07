@@ -52,7 +52,14 @@ func Run(zLogger *zap.Logger) error {
 		BotUsername:   config.GetBotUsername(),
 	}
 
-	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler)
+	prHandler := &handlers.PullRequestHandler{
+		ClientCreator: cc,
+		Logger:        logger,
+		RequiredLabel: config.AppConfig.RequiredLabel,
+		BotUsername:   config.GetBotUsername(),
+	}
+
+	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler, prHandler)
 
 	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
 

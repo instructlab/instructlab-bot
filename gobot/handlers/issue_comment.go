@@ -32,6 +32,7 @@ type PRComment struct {
 }
 
 func (h *PRCommentHandler) Handles() []string {
+	// PR comments come in as issue comments, not an independent event type.
 	return []string{"issue_comment"}
 }
 
