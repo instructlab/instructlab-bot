@@ -19,6 +19,10 @@ jobs:
         with:
           go-version: "1.21"
           cache: false
+      - name: Unit Tests
+        run: |
+          go test -v -coverprofile=profile.cov ./...
+        working-directory: ./worker
       - id: build
         run: |
           go build -o "worker_$(go env GOOS)_${GOARCH}" main.go
