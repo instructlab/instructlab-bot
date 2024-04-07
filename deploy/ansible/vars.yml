@@ -1,0 +1,10 @@
+## Global Variables
+nexd_args: "--reg-key <nexodus-reg-key-url>"
+redis_port: 6379
+github_token:
+webhook_proxy_url: "<smee-proxy-url>"
+app_id:
+webhook_secret: ""
+private_key: |
+      -----BEGIN RSA PRIVATE KEY-----
+      -----END RSA PRIVATE KEY-----

@@ -22,6 +22,12 @@
       - "{{ nexodus_tunnelip_v4.stdout }}:{{ redis_port }}:6379"
   register: redis_container
 
+- name: Set Redis binding IP address
+  ansible.builtin.set_fact:
+    redis_ip: "{{ nexodus_tunnelip_v4.stdout }}"
+    cacheable: true
+  when: redis_ip is not defined
+
 - name: Wait until Redis is available
   ansible.builtin.wait_for:
     host: '{{ nexodus_tunnelip_v4.stdout }}'

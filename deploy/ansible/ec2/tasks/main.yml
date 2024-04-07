@@ -61,6 +61,15 @@
     regexp: "labNodes"
     line: "[labNodes]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file=~/.ssh/id_rsa"
   loop: "{{ ec2_jobs_with_index }}"
+  when: aws_instance_type == "g4dn.xlarge"
+
+- name: Updating the node's public ip in inventory
+  ansible.builtin.lineinfile:
+    path: "{{ inventory_location }}"
+    regexp: "botNode"
+    line: "[botNode]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file={{ aws_key_path }}"
+  loop: "{{ ec2_jobs_with_index }}"
+  when: aws_instance_type != "g4dn.xlarge"
 
 - name: Parse the first host from the inventory
   ansible.builtin.set_fact:
