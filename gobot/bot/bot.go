@@ -162,10 +162,12 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			continue
 		}
 
+		logger.Infof("Processing result for %s/%s#%s, job ID: %s", repoOwner, repoName, prNumber, result)
+
 		// check for errors prior to checking for an S3 url and models since that will not get produced on a failure
 		prErrors, _ := r.Get("jobs:" + result + ":errors").Result()
 		if prErrors != "" {
-			errCommentBody := fmt.Sprintf("Beep, boop 🤖 an error occurred while processing your request, please review the following log:\n```\n%s\n```", prErrors)
+			errCommentBody := fmt.Sprintf("Beep, boop 🤖 an error occurred while processing your request, please review the following log for job id %s :\n```\n%s\n```", result, prErrors)
 			if err := PostComment(ctx, cc, logger, installIDInt, repoOwner, repoName, prNumInt, errCommentBody); err != nil {
 				logger.Errorf("Failed to send issue comment: %v", err)
 			}
@@ -187,7 +189,7 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		}
 
 		// Add the model name only if it's not empty
-		commentBody := "Beep, boop 🤖  The test data has been generated"
+		commentBody := fmt.Sprintf("Beep, boop 🤖  The test data has been generated for job ID: %s", result)
 		if modelName != "" {
 			commentBody += " " + modelName
 		}

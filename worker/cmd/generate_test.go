@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func TestGenerateIndexHTML(t *testing.T) {
@@ -142,12 +143,14 @@ func TestFetchModelName(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	modelName, err := fetchModelName(context.Background(), mockServer.URL, false)
+	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL)
+
+	modelName, err := w.fetchModelName(false)
 	assert.NoError(t, err, "fetchModelName should not return an error")
 	expectedModelName := "Mixtral-8x7B-Instruct-v0.1"
 	assert.Equal(t, expectedModelName, modelName, "The model name should be extracted correctly")
 
-	modelName, err = fetchModelName(context.Background(), mockServer.URL, true)
+	modelName, err = w.fetchModelName(true)
 	assert.NoError(t, err, "fetchModelName should not return an error")
 	expectedModelName = "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec"
 	assert.Equal(t, expectedModelName, modelName, "The model name should be extracted correctly")
@@ -189,7 +192,9 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	modelName, err := fetchModelName(context.Background(), mockServer.URL, false)
+	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL)
+
+	modelName, err := w.fetchModelName(false)
 
 	// Verify that an error was returned due to the invalid "object" field
 	assert.Error(t, err, "fetchModelName should return an error for invalid object field")

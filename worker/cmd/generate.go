@@ -50,6 +50,28 @@ const (
 	localEndpoint  = "http://localhost:8000/v1"
 )
 
+// Worker encapsulates dependencies and methods to process jobs
+type Worker struct {
+	ctx context.Context
+	//conn     redis.Conn
+	pool     *redis.Pool
+	svc      *s3.Client
+	logger   *zap.SugaredLogger
+	job      string
+	endpoint string
+}
+
+func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, endpoint string) *Worker {
+	return &Worker{
+		ctx:      ctx,
+		pool:     pool,
+		svc:      svc,
+		logger:   logger,
+		job:      job,
+		endpoint: endpoint,
+	}
+}
+
 type IlabConfig struct {
 	Generate struct {
 		Model string `yaml:"model"`
@@ -78,22 +100,21 @@ var generateCmd = &cobra.Command{
 		ctx := cmd.Context()
 
 		sugar.Info("Starting generate worker")
-		// Connect to Redis
-		conn, err := redis.DialContext(ctx, "tcp", RedisHost)
-		if err != nil {
-			sugar.Fatal("Could not connect to Redis")
-		}
-		defer conn.Close()
 
-		// Using the SDK's default configuration, loading additional config
-		// and credentials values from the environment variables, shared
-		// credentials, and shared configuration files
+		// Initialize Redis connection pool
+		pool := &redis.Pool{
+			MaxIdle: 3,
+			Dial: func() (redis.Conn, error) {
+				return redis.DialContext(ctx, "tcp", RedisHost)
+			},
+		}
+		defer pool.Close()
+
 		cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(AWSRegion))
 		if err != nil {
 			log.Fatalf("unable to load SDK config, %v", err)
 		}
 
-		// Using the Config value, create the S3 client
 		svc := s3.NewFromConfig(cfg)
 
 		sigChan := make(chan os.Signal, 1)
@@ -114,10 +135,10 @@ var generateCmd = &cobra.Command{
 					close(jobChan)
 					return
 				case <-timer.C:
-					// Wait for a job on the "generate" Redis queue
+					conn := pool.Get()
 					job, err := redis.String(conn.Do("RPOP", "generate"))
+					conn.Close()
 					if err == redis.ErrNil {
-						// No job available
 						continue
 					} else if err != nil {
 						sugar.Errorf("Could not pop from redis queue: %v", err)
@@ -139,8 +160,9 @@ var generateCmd = &cobra.Command{
 		wg.Add(1)
 		go func(ch <-chan string) {
 			defer wg.Done()
-			for job := range jobChan {
-				processJob(ctx, conn, svc, sugar, job)
+			for job := range ch {
+				jp := NewJobProcessor(ctx, pool, svc, sugar, job, EndpointURL)
+				jp.processJob()
 			}
 		}(jobChan)
 
@@ -148,7 +170,8 @@ var generateCmd = &cobra.Command{
 	},
 }
 
-func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, modelName string) error {
+// runPrecheck runs lab chat against git diffed yaml files
+func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 	workDir := "."
 	if WorkDir != "" {
 		workDir = WorkDir
@@ -159,44 +182,61 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, 
 		// Move everything from chatlogDir to outputDir
 		chatlogFiles, err := os.ReadDir(chatlogDir)
 		if err != nil {
-			sugar.Errorf("Could not read chatlog directory: %v", err)
+			w.logger.Errorf("Could not read chatlog directory: %v", err)
 			return
 		}
 
 		for _, file := range chatlogFiles {
 			if err := os.Rename(path.Join(chatlogDir, file.Name()), path.Join(outputDir, file.Name())); err != nil {
-				sugar.Errorf("Could not move file: %v", err)
+				w.logger.Errorf("Could not move file: %v", err)
 				return
 			}
 		}
 	}()
 
-	cmd := exec.CommandContext(ctx, lab, "diff")
+	cmd := exec.CommandContext(w.ctx, lab, "diff")
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		sugar.Errorf("Could not get stdout pipe: %v", err)
+		w.logger.Errorf("Could not get stdout pipe: %v", err)
 		return err
 	}
 
-	sugar.Debug("Running ilab diff")
+	w.logger.Debug("Running ilab diff")
 	if err := cmd.Start(); err != nil {
-		sugar.Errorf("Could not start command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
+		w.logger.Errorf("Could not start command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
 		return err
 	}
 
 	// Get an array of lines from the output
 	output, err := io.ReadAll(stdout)
 	if err != nil {
-		sugar.Errorf("Could not read stdout: %v", err)
+		w.logger.Errorf("Could not read stdout: %v", err)
 		return err
 	}
 	outputStr := string(output)
-	sugar.Debugf("Output: %s", outputStr)
+	w.logger.Debugf("Output: %s", outputStr)
+
+	yamlFileCount := 0
 	labDiffOutput := strings.Split(outputStr, "\n")
 
+	// Early check for YAML file presence before further processing
+	for _, file := range labDiffOutput {
+		if strings.HasSuffix(file, ".yaml") {
+			yamlFileCount++
+		}
+	}
+
+	if yamlFileCount == 0 {
+		errMsg := "No modified YAML files detected in the PR for precheck"
+		w.logger.Error(errMsg)
+		//w.reportJobError(fmt.Errorf(errMsg))
+		return fmt.Errorf(errMsg)
+	}
+
+	// Proceed with YAML files processing if they exist
 	for _, file := range labDiffOutput {
 		if !strings.HasSuffix(file, ".yaml") {
 			continue
@@ -205,21 +245,21 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, 
 
 		f, err := os.Open(filePath)
 		if err != nil {
-			sugar.Errorf("Could not open taxonomy file: %v", err)
+			w.logger.Errorf("Could not open taxonomy file: %v", err)
 			return err
 		}
 		defer f.Close()
 
 		content, err := io.ReadAll(f)
 		if err != nil {
-			sugar.Error(err)
+			w.logger.Error(err)
 			return err
 		}
 
 		var data map[string]interface{}
 		err = yaml.Unmarshal(content, &data)
 		if err != nil {
-			sugar.Error(err)
+			w.logger.Error(err)
 			return err
 		}
 
@@ -227,7 +267,7 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, 
 		seedExamples, ok := data["seed_examples"].([]interface{})
 		if !ok {
 			err = fmt.Errorf("seed_examples not found or not a list")
-			sugar.Error(err)
+			w.logger.Error(err)
 			return err
 		}
 
@@ -235,7 +275,7 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, 
 			question, ok := item.(map[interface{}]interface{})["question"].(string)
 			if !ok {
 				err = fmt.Errorf("question not found or not a string")
-				sugar.Error(err)
+				w.logger.Error(err)
 				return err
 			}
 
@@ -245,14 +285,14 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, 
 			}
 
 			cmd := exec.Command(lab, chatArgs...)
-			sugar.Infof("Running the precheck command: %s", cmd.String())
+			w.logger.Infof("Running the precheck command: %s", cmd.String())
 			cmd.Dir = workDir
 			cmd.Env = os.Environ()
 			cmd.Stderr = os.Stderr
 			cmd.Stdout = os.Stdout
 			err = cmd.Run()
 			if err != nil {
-				sugar.Error(err)
+				w.logger.Error(err)
 				return err
 			}
 		}
@@ -260,18 +300,22 @@ func runPrecheck(ctx context.Context, sugar *zap.SugaredLogger, lab, outputDir, 
 	return nil
 }
 
-func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *zap.SugaredLogger, job string) {
-	// Process the job
-	sugar := logger.With("job", job)
+// processJob processes a given job, all jobs start here
+func (w *Worker) processJob() {
+	sugar := w.logger.With("job", w.job)
 	sugar.Info("Processing job")
 
-	prNumber, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:pr_number", job)))
+	// Get a new Redis connection from the pool for this operation
+	conn := w.pool.Get()
+	defer conn.Close()
+
+	prNumber, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:pr_number", w.job)))
 	if err != nil {
 		sugar.Errorf("Could not get pr_number from redis: %v", err)
 		return
 	}
 
-	jobType, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:job_type", job)))
+	jobType, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:job_type", w.job)))
 	if err != nil {
 		sugar.Errorf("Could not get job_type from redis: %v", err)
 		return
@@ -286,7 +330,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 
 	// If in test mode, immediately post to the results queue
 	if TestMode {
-		postJobResults(ctx, job, conn, sugar, "https://example.com")
+		w.postJobResults("https://example.com")
 		sugar.Info("Job done (test mode)")
 		return
 	}
@@ -338,7 +382,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		return
 	}
 
-	w, err := r.Worktree()
+	wt, err := r.Worktree()
 	if err != nil {
 		sugar.Errorf("Could not get worktree: %v", err)
 		return
@@ -349,7 +393,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	retryCheckout := func() error {
 		var lastErr error
 		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
-			err := w.Checkout(&git.CheckoutOptions{
+			err := wt.Checkout(&git.CheckoutOptions{
 				Branch: plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/main", Origin)),
 			})
 			if err == nil {
@@ -395,7 +439,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	}
 
 	sugar.Debug("Checking out PR branch")
-	err = w.Checkout(&git.CheckoutOptions{
+	err = wt.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(prBranchName),
 	})
 	if err != nil {
@@ -423,13 +467,13 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	var modelName string
 	if EndpointURL != localEndpoint {
 		var err error
-		modelName, err = fetchModelName(ctx, EndpointURL, true)
+		modelName, err = w.fetchModelName(true)
 		if err != nil {
-			logger.Errorf("Failed to fetch model name: %v", err)
+			w.logger.Errorf("Failed to fetch model name: %v", err)
 			modelName = "unknown"
 		}
 	} else {
-		modelName = getModelNameFromConfig()
+		modelName = w.getModelNameFromConfig()
 	}
 
 	var cmd *exec.Cmd
@@ -442,7 +486,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		//	generateArgs = append(generateArgs, "--endpoint-url", EndpointURL, "--model", modelName)
 		//}
 
-		cmd = exec.CommandContext(ctx, lab, generateArgs...)
+		cmd = exec.CommandContext(w.ctx, lab, generateArgs...)
 		if WorkDir != "" {
 			cmd.Dir = WorkDir
 		}
@@ -459,13 +503,14 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		if err := cmd.Run(); err != nil {
 			detailedErr := fmt.Errorf("Error running command (%s %s): %v. \nDetails: %s", cmd.Path, strings.Join(generateArgs, " "), err, stderr.String())
 			sugar.Errorf(detailedErr.Error())
-			reportJobError(sugar, conn, job, detailedErr)
+			w.reportJobError(detailedErr)
 			return
 		}
 	case "precheck":
-		err = runPrecheck(ctx, sugar, lab, outputDir, modelName)
+		err = w.runPrecheck(lab, outputDir, modelName)
 		if err != nil {
 			sugar.Errorf("Could not run precheck: %v", err)
+			w.reportJobError(err)
 			return
 		}
 	default:
@@ -489,7 +534,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 		}
 		defer file.Close()
 		upKey := fmt.Sprintf("%s/%s", outDirName, item.Name())
-		_, err = svc.PutObject(ctx, &s3.PutObjectInput{
+		_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
 			Bucket:      aws.String(S3Bucket),
 			Key:         aws.String(upKey),
 			Body:        file,
@@ -527,7 +572,7 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	defer indexFile.Close()
 
 	upKey := fmt.Sprintf("%s/index.html", outDirName)
-	_, err = svc.PutObject(ctx, &s3.PutObjectInput{
+	_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(S3Bucket),
 		Key:         aws.String(upKey),
 		Body:        indexFile,
@@ -541,13 +586,17 @@ func processJob(ctx context.Context, conn redis.Conn, svc *s3.Client, logger *za
 	indexPublicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
 
 	// Notify the "results" queue that the job is done with the public URL
-	postJobResults(ctx, job, conn, sugar, indexPublicURL)
+	w.postJobResults(indexPublicURL)
 	sugar.Infof("Job done")
 }
 
-func postJobResults(ctx context.Context, job string, conn redis.Conn, logger *zap.SugaredLogger, URL string) {
-	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", job), URL); err != nil {
-		logger.Errorf("Could not set s3_url in redis: %v", err)
+// postJobResults posts the results of a job to a Redis queue
+func (w *Worker) postJobResults(URL string) {
+	conn := w.pool.Get()
+	defer conn.Close()
+
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", w.job), URL); err != nil {
+		w.logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
 
 	var modelName string
@@ -555,21 +604,21 @@ func postJobResults(ctx context.Context, job string, conn redis.Conn, logger *za
 		var err error
 		// Only get the short model name, not the entire ID value
 		// TODO: DRY all of the fetch model calls and function
-		modelName, err = fetchModelName(ctx, EndpointURL, false)
+		modelName, err = w.fetchModelName(false)
 		if err != nil {
-			logger.Errorf("Failed to fetch model name: %v", err)
+			w.logger.Errorf("Failed to fetch model name: %v", err)
 			modelName = "unknown"
 		}
 	} else {
-		modelName = getModelNameFromConfig()
+		modelName = w.getModelNameFromConfig()
 	}
 
-	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:model_name", job), modelName); err != nil {
-		logger.Errorf("Could not set model name in redis: %v", err)
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:model_name", w.job), modelName); err != nil {
+		w.logger.Errorf("Could not set model name in redis: %v", err)
 	}
 
-	if _, err := conn.Do("LPUSH", "results", job); err != nil {
-		logger.Errorf("Could not push to redis queue: %v", err)
+	if _, err := conn.Do("LPUSH", "results", w.job); err != nil {
+		w.logger.Errorf("Could not push to redis queue: %v", err)
 	}
 }
 
@@ -657,7 +706,8 @@ func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map
 	return tmpl.Execute(indexFile, data)
 }
 
-func getModelNameFromConfig() string {
+// getModelNameFromConfig retrieves the model name from the config file or endpoint
+func (w *Worker) getModelNameFromConfig() string {
 	cfgData, err := os.ReadFile(ilabConfigPath)
 	if err != nil {
 		return "unknown"
@@ -674,16 +724,16 @@ func getModelNameFromConfig() string {
 
 // fetchModelName hits the defined endpoint with "/models" appended to extract the model name.
 // If fullName is true, it returns the entire ID value; if false, it returns the parsed out name after the double hyphens.
-func fetchModelName(ctx context.Context, endpoint string, fullName bool) (string, error) {
+func (w *Worker) fetchModelName(fullName bool) (string, error) {
 	// Ensure the endpoint URL ends with "/models"
-	if !strings.HasSuffix(endpoint, "/") {
-		endpoint += "/"
+	if !strings.HasSuffix(w.endpoint, "/") {
+		w.endpoint += "/"
 	}
-	endpoint += "models"
+	w.endpoint += "models"
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(w.ctx, "GET", w.endpoint, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -742,14 +792,17 @@ func fetchModelName(ctx context.Context, endpoint string, fullName bool) (string
 }
 
 // reportJobError push app errors into the redis job 'errors' key
-func reportJobError(sugar *zap.SugaredLogger, conn redis.Conn, jobID string, err error) {
-	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:errors", jobID), err.Error()); err != nil {
-		sugar.Errorf("Failed to set the error for job %s: %v", jobID, err)
+func (w *Worker) reportJobError(err error) {
+	conn := w.pool.Get()
+	defer conn.Close()
+
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:errors", w.job), err.Error()); err != nil {
+		w.logger.Errorf("Failed to set the error for job %s: %v", w.job, err)
 		return
 
 	}
-	if _, err := conn.Do("LPUSH", "results", jobID); err != nil {
-		sugar.Errorf("Could not push error results to redis queue: %v", err)
+	if _, err := conn.Do("LPUSH", "results", w.job); err != nil {
+		w.logger.Errorf("Could not push error results to redis queue: %v", err)
 		return
 	}
 
