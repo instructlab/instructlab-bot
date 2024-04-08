@@ -143,7 +143,7 @@ func TestFetchModelName(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL)
+	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL, "")
 
 	modelName, err := w.fetchModelName(false)
 	assert.NoError(t, err, "fetchModelName should not return an error")
@@ -192,7 +192,7 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL)
+	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL, "")
 
 	modelName, err := w.fetchModelName(false)
 

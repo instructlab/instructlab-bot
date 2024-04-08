@@ -73,7 +73,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return nil
 	}
 	switch words[1] {
-	case "generate":
+	case "generate-local":
 		err = h.generateCommand(ctx, client, &prComment)
 		if err != nil {
 			h.reportError(ctx, client, &prComment, err)
@@ -81,6 +81,12 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return err
 	case "precheck":
 		err = h.precheckCommand(ctx, client, &prComment)
+		if err != nil {
+			h.reportError(ctx, client, &prComment, err)
+		}
+		return err
+	case "generate":
+		err = h.sdgSvcCommand(ctx, client, &prComment)
 		if err != nil {
 			h.reportError(ctx, client, &prComment, err)
 		}
@@ -229,6 +235,18 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "precheck")
+}
+
+func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("SDG svc command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	if !present || err != nil {
+		return err
+	}
+
+	return h.queueGenerateJob(ctx, client, prComment, "sdg-svc")
 }
 
 func (h *PRCommentHandler) unknownCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
