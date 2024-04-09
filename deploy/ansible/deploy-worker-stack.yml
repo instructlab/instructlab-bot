@@ -1,0 +1,11 @@
+# Collect the facts from botNode so we can extract the redis ip address
+- name: Gather facts from botNode
+  hosts: botNode
+  tasks: []
+
+- name: Deploy Worker Node Script  # noqa internal-error
+  hosts: labNodes
+  vars_files:
+    - vars.yml
+  roles:
+    - role: worker

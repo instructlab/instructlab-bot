@@ -3,4 +3,5 @@
   vars_files:
     - ../../secrets.enc
   roles:
-    - role: deploy_worker_script
+    - role: worker
+      become: true

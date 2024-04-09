@@ -71,17 +71,29 @@ We use ansible for deploying this setup on the AWS cloud. To deploy this setup, 
 - Python
 - SSH Access to the target server
 
-Make sure you copy your aws .pem key in the `deploy/ansible` directory and rename it to instruct-bot.pem
+Make sure you copy your aws .pem key in the `deploy/ansible` directory and rename it to `instruct-bot.pem`
 
-Then run the playbook with the following:
+To deploy the bot stack and worker stack on this EC2 instance, fill the same details that you fill in `config.yaml` to `./vars.yml` file, with your aws credentials.
+
+Run the following command to deploy the entire stack (bot and worker):
+
+```bash
+make deploy-aws-stack
+```
+
+This installs the bot stack on the EC2 instance (t2x.large instance) and the worker stack on the EC2 instance with GPU.
+
+If you want to make your own local configuration changes (such as redis_ip, repos etc), you can follow the below manual steps to deploy both the stack.
+
+### Deploy the bot stack
 
 ```bash
 ansible-playbook ./deploy-ec2-bot.yml
 ```
 
-This will deploy an EC2 instance and update the local `./inventory.txt` file with the public IP of the EC2 instance under botNode section.
+This will deploy an EC2 instance and update the local `./inventory.txt` file with the public IP of the EC2 instance under `botNode` section.
 
-To deploy the bot stack on the EC2 instance, fill the same details that you fill in `config.yaml` to `./vars.yml` file and run the following command:
+To deploy the bot stack on this EC2 instance, fill the same details that you fill in `config.yaml` to `./vars.yml` file and run the following command:
 
 ```bash
 ansible-playbook -i inventory.txt ./deploy-bot-stack.yml
@@ -91,6 +103,29 @@ Once the bot stack is deployed, you can verify the deployment by running the fol
 
 - Hit the following URL in your browser: `http://<node-ip>:333/`, that should take you to the grafana dashboard.
 - Create a PR on your local taxonomy repository fork and add comment `@instruct-lab-bot precheck` to trigger the bot.
+
+### Deploy the worker stack
+
+```bash
+ansible-playbook ./deploy-ec2-worker.yml
+```
+
+This will deploy an EC2 instance (with GPU) and update the local `./inventory.txt` file with the public IP of the EC2 instance under `labNodes` section.
+
+To configure this worker node with the required dependencies and run the worker stack, run the following command:
+
+```bash
+ansible-playbook -i inventory.txt ./deploy-worker-stack.yml
+```
+
+Worker node talks to the bot stack through redis. Above playbook determines the redis ip from the bot stack playbook run and uses it to configure the worker node.
+
+> [!NOTE]
+> If you already have a bot stack running on any VM, set redis_ip in `./vars.yml` file to the wireguard IP of the machine where the bot stack is running.
+
+### Testing the setup
+
+Create a PR on your local taxonomy repository fork and add comment `@instruct-lab-bot precheck` to trigger the bot. The bot should post a comment on the PR with the results.
 
 ## Troubleshooting
 
