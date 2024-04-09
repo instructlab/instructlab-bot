@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -22,7 +23,7 @@ import (
 )
 
 func Run(zLogger *zap.Logger) error {
-	config, err := config.ReadConfig("config.yaml")
+	cfg, err := getConfig()
 	if err != nil {
 		return err
 	}
@@ -32,7 +33,7 @@ func Run(zLogger *zap.Logger) error {
 	metricsRegistry := metrics.DefaultRegistry
 
 	cc, err := githubapp.NewDefaultCachingClientCreator(
-		config.Github,
+		cfg.Github,
 		githubapp.WithClientUserAgent("instruct-lab-bot/0.0.1"),
 		githubapp.WithClientTimeout(3*time.Second),
 		githubapp.WithClientCaching(false, func() httpcache.Cache { return httpcache.NewMemoryCache() }),
@@ -47,31 +48,31 @@ func Run(zLogger *zap.Logger) error {
 	prCommentHandler := &handlers.PRCommentHandler{
 		ClientCreator: cc,
 		Logger:        logger,
-		RedisHostPort: config.AppConfig.RedisHostPort,
-		RequiredLabel: config.AppConfig.RequiredLabel,
-		BotUsername:   config.GetBotUsername(),
+		RedisHostPort: cfg.AppConfig.RedisHostPort,
+		RequiredLabel: cfg.AppConfig.RequiredLabel,
+		BotUsername:   cfg.GetBotUsername(),
 	}
 
 	prHandler := &handlers.PullRequestHandler{
 		ClientCreator: cc,
 		Logger:        logger,
-		RequiredLabel: config.AppConfig.RequiredLabel,
-		BotUsername:   config.GetBotUsername(),
+		RequiredLabel: cfg.AppConfig.RequiredLabel,
+		BotUsername:   cfg.GetBotUsername(),
 	}
 
-	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler, prHandler)
+	webhookHandler := githubapp.NewDefaultEventDispatcher(cfg.Github, prCommentHandler, prHandler)
 
 	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
 
-	addr := net.JoinHostPort(config.Server.Address, strconv.Itoa(config.Server.Port))
+	addr := net.JoinHostPort(cfg.Server.Address, strconv.Itoa(cfg.Server.Port))
 	logger.Infof("Starting server on %s...", addr)
 
 	wg := sync.WaitGroup{}
-	if config.AppConfig.WebhookProxyURL != "" {
+	if cfg.AppConfig.WebhookProxyURL != "" {
 		args := []string{
 			"gosmee",
 			"client",
-			config.AppConfig.WebhookProxyURL,
+			cfg.AppConfig.WebhookProxyURL,
 			fmt.Sprintf("http://%s/api/github/hook", addr),
 		}
 		wg.Add(1)
@@ -92,18 +93,18 @@ func Run(zLogger *zap.Logger) error {
 	}()
 	wg.Add(1)
 	go func() {
-		receiveResults(config, logger, cc)
+		receiveResults(cfg, logger, cc)
 	}()
 	wg.Wait()
 
 	return nil
 }
 
-func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {
+func receiveResults(cfg *config.Config, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {
 	ctx := context.Background()
 
 	r := redis.NewClient(&redis.Options{
-		Addr:     config.AppConfig.RedisHostPort,
+		Addr:     cfg.AppConfig.RedisHostPort,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -220,4 +221,19 @@ func PostComment(ctx context.Context, cc githubapp.ClientCreator, logger *zap.Su
 	}
 
 	return nil
+}
+
+func getConfig() (*config.Config, error) {
+	var cfg *config.Config
+	var err error
+	for _, path := range []string{"./config.yaml", "$HOME/.config/instruct-lab-bot/config.yaml", "/etc/instruct-lab-bot/config.yaml"} {
+		cfg, err = config.ReadConfig(path)
+		if err == nil {
+			break
+		}
+	}
+	if cfg == nil {
+		return nil, errors.New("failed to read config file from any of the expected locations")
+	}
+	return cfg, nil
 }
