@@ -100,7 +100,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&TlsClientCertPath, "tls-client-cert", "", "client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
 	generateCmd.Flags().StringVarP(&TlsClientKeyPath, "tls-client-key", "", "client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
 	generateCmd.Flags().StringVarP(&TlsServerCaCertPath, "tls-server-ca-cert", "", "server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
-	generateCmd.Flags().BoolVarP(&TlsInsecure, "tls-insecure", "t", false, "Whether to skip TLS verification")
+	generateCmd.Flags().BoolVarP(&TlsInsecure, "tls-insecure", "", false, "Whether to skip TLS verification")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
