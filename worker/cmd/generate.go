@@ -498,9 +498,9 @@ func (w *Worker) processJob() {
 	switch jobType {
 	case jobGenerate:
 		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
-		if TlsInsecure {
-			generateArgs = append(generateArgs, "--tls-insecure")
-		}
+		//if TlsInsecure {
+		//	generateArgs = append(generateArgs, "--tls-insecure")
+		//}
 		// TODO -- add a separate config option
 		//if EndpointURL != "" && modelName != "unknown" {
 		//	// Append the endpoint URL and model name as arguments if they are defined
@@ -853,7 +853,8 @@ func (w *Worker) determineModelName(jobType string) string {
 		return "sdg service backend"
 	}
 
-	if EndpointURL != localEndpoint {
+	// precheck is the only case we use a remote OpenAI endpoint right now
+	if EndpointURL != localEndpoint && jobType == jobPreCheck {
 		modelName, err := w.fetchModelName(false)
 		if err != nil {
 			w.logger.Errorf("Failed to fetch model name: %v", err)
