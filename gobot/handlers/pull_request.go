@@ -51,8 +51,9 @@ func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID s
 	}
 	msg += fmt.Sprintf("I support the following commands:\n\n"+
 		"* `%s precheck` -- Check existing model behavior using the questions in this proposed change.\n"+
-		"* `%s generate` -- Generate a sample of synthetic data.\n",
-		h.BotUsername, h.BotUsername)
+		"* `%s generate` -- Generate a sample of synthetic data using the synthetic data generation backend infrastructure.\n"+
+		"* `%s generate-local` -- Generate a sample of synthetic data using a local model.\n",
+		h.BotUsername, h.BotUsername, h.BotUsername)
 	botComment := github.IssueComment{
 		Body: &msg,
 	}

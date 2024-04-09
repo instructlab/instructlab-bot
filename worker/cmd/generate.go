@@ -33,14 +33,18 @@ import (
 )
 
 var (
-	WorkDir         string
-	VenvDir         string
-	EndpointURL     string
-	NumInstructions int
-	Origin          string
-	GithubToken     string
-	S3Bucket        string
-	AWSRegion       string
+	WorkDir             string
+	VenvDir             string
+	EndpointURL         string
+	SdgEndpointURL      string
+	NumInstructions     int
+	Origin              string
+	GithubToken         string
+	S3Bucket            string
+	AWSRegion           string
+	TlsClientCertPath   string
+	TlsClientKeyPath    string
+	TlsServerCaCertPath string
 )
 
 const (
@@ -48,27 +52,31 @@ const (
 	gitRetryDelay  = 2 * time.Second
 	ilabConfigPath = "config.yaml"
 	localEndpoint  = "http://localhost:8000/v1"
+	jobSDG         = "sdg-svc"
+	jobGenerate    = "generate"
+	jobPreCheck    = "precheck"
 )
 
 // Worker encapsulates dependencies and methods to process jobs
 type Worker struct {
-	ctx context.Context
-	//conn     redis.Conn
-	pool     *redis.Pool
-	svc      *s3.Client
-	logger   *zap.SugaredLogger
-	job      string
-	endpoint string
+	ctx         context.Context
+	pool        *redis.Pool
+	svc         *s3.Client
+	logger      *zap.SugaredLogger
+	job         string
+	endpoint    string
+	sdgEndpoint string
 }
 
-func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, endpoint string) *Worker {
+func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, endpoint, sdgEndpoint string) *Worker {
 	return &Worker{
-		ctx:      ctx,
-		pool:     pool,
-		svc:      svc,
-		logger:   logger,
-		job:      job,
-		endpoint: endpoint,
+		ctx:         ctx,
+		pool:        pool,
+		svc:         svc,
+		logger:      logger,
+		job:         job,
+		endpoint:    endpoint,
+		sdgEndpoint: sdgEndpoint,
 	}
 }
 
@@ -82,11 +90,15 @@ func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
 	generateCmd.Flags().StringVarP(&EndpointURL, "endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
+	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
 	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
 	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
+	generateCmd.Flags().StringVarP(&TlsClientCertPath, "tls-client-cert", "", "client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
+	generateCmd.Flags().StringVarP(&TlsClientKeyPath, "tls-client-key", "", "client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
+	generateCmd.Flags().StringVarP(&TlsServerCaCertPath, "tls-server-ca-cert", "", "server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
@@ -161,7 +173,7 @@ var generateCmd = &cobra.Command{
 		go func(ch <-chan string) {
 			defer wg.Done()
 			for job := range ch {
-				jp := NewJobProcessor(ctx, pool, svc, sugar, job, EndpointURL)
+				jp := NewJobProcessor(ctx, pool, svc, sugar, job, EndpointURL, SdgEndpointURL)
 				jp.processJob()
 			}
 		}(jobChan)
@@ -321,8 +333,9 @@ func (w *Worker) processJob() {
 		return
 	}
 	switch jobType {
-	case "generate":
-	case "precheck":
+	case jobGenerate:
+	case jobPreCheck:
+	case jobSDG:
 	default:
 		sugar.Errorf("Unknown job type: %s", jobType)
 		return
@@ -330,7 +343,7 @@ func (w *Worker) processJob() {
 
 	// If in test mode, immediately post to the results queue
 	if TestMode {
-		w.postJobResults("https://example.com")
+		w.postJobResults("https://example.com", jobType)
 		sugar.Info("Job done (test mode)")
 		return
 	}
@@ -478,7 +491,7 @@ func (w *Worker) processJob() {
 
 	var cmd *exec.Cmd
 	switch jobType {
-	case "generate":
+	case jobGenerate:
 		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
 		// TODO -- add a separate config option
 		//if EndpointURL != "" && modelName != "unknown" {
@@ -506,11 +519,42 @@ func (w *Worker) processJob() {
 			w.reportJobError(detailedErr)
 			return
 		}
-	case "precheck":
+	case jobPreCheck:
 		err = w.runPrecheck(lab, outputDir, modelName)
 		if err != nil {
 			sugar.Errorf("Could not run precheck: %v", err)
 			w.reportJobError(err)
+			return
+		}
+	case jobSDG:
+		generateArgs := []string{
+			jobSDG,
+			"--num-instructions", fmt.Sprintf("%d", NumInstructions),
+			"--output-dir", outputDir,
+			"--tls-client-cert", TlsClientCertPath,
+			"--tls-client-key", TlsClientKeyPath,
+			"--tls-server-ca-cert", TlsServerCaCertPath,
+			"--endpoint-url", SdgEndpointURL,
+		}
+
+		cmd = exec.CommandContext(w.ctx, lab, generateArgs...)
+		if WorkDir != "" {
+			cmd.Dir = WorkDir
+		}
+
+		var stderr bytes.Buffer
+		// Capture both the ilab err buffer and the os.Stderr
+		cmd.Stderr = io.MultiWriter(&stderr, os.Stderr)
+		cmd.Env = os.Environ()
+		cmd.Stdout = os.Stdout
+
+		sugar.Debug(fmt.Sprintf("Running %s job", jobType))
+		// Run the command
+		sugar.Infof("Running the ilab sdg-svc command: %s", cmd.String())
+		if err := cmd.Run(); err != nil {
+			detailedErr := fmt.Errorf("Error running command (%s %s): %v. \nDetails: %s", cmd.Path, strings.Join(generateArgs, " "), err, stderr.String())
+			sugar.Errorf(detailedErr.Error())
+			w.reportJobError(detailedErr)
 			return
 		}
 	default:
@@ -586,12 +630,12 @@ func (w *Worker) processJob() {
 	indexPublicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
 
 	// Notify the "results" queue that the job is done with the public URL
-	w.postJobResults(indexPublicURL)
+	w.postJobResults(indexPublicURL, jobType)
 	sugar.Infof("Job done")
 }
 
 // postJobResults posts the results of a job to a Redis queue
-func (w *Worker) postJobResults(URL string) {
+func (w *Worker) postJobResults(URL, jobType string) {
 	conn := w.pool.Get()
 	defer conn.Close()
 
@@ -599,19 +643,7 @@ func (w *Worker) postJobResults(URL string) {
 		w.logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
 
-	var modelName string
-	if EndpointURL != localEndpoint {
-		var err error
-		// Only get the short model name, not the entire ID value
-		// TODO: DRY all of the fetch model calls and function
-		modelName, err = w.fetchModelName(false)
-		if err != nil {
-			w.logger.Errorf("Failed to fetch model name: %v", err)
-			modelName = "unknown"
-		}
-	} else {
-		modelName = w.getModelNameFromConfig()
-	}
+	modelName := w.determineModelName(jobType)
 
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:model_name", w.job), modelName); err != nil {
 		w.logger.Errorf("Could not set model name in redis: %v", err)
@@ -805,5 +837,22 @@ func (w *Worker) reportJobError(err error) {
 		w.logger.Errorf("Could not push error results to redis queue: %v", err)
 		return
 	}
+}
 
+// determineModelName decides the model name based on jobType and configuration.
+func (w *Worker) determineModelName(jobType string) string {
+	if jobType == jobSDG {
+		return "sdg service backend"
+	}
+
+	if EndpointURL != localEndpoint {
+		modelName, err := w.fetchModelName(false)
+		if err != nil {
+			w.logger.Errorf("Failed to fetch model name: %v", err)
+			return "unknown"
+		}
+		return modelName
+	}
+
+	return w.getModelNameFromConfig()
 }
