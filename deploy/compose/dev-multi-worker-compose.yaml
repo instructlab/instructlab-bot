@@ -1,0 +1,73 @@
+# Multi-Worker Compose File
+# For gobot config.yaml see: https://github.com/instruct-lab/instruct-lab-bot/blob/main/gobot/config.yaml.sample
+# Each worker needs its own volume to mount with a clone of the taxonomy repo, example uses /home/fedora/instructlab-worker(n).
+# Example local generation:
+# Once the worker starts, exec in and start 'ilab serve'
+# Next, start instruct-lab-bot-worker with the following:
+# export AWS_ACCESS_KEY_ID=x
+# export AWS_SECRET_ACCESS_KEY=x
+# export AWS_DEFAULT_REGION=x
+# git config --global --add safe.directory /data/taxonomy
+# instruct-lab-bot-worker generate --github-token <YOUR_GITHUB_TOKEN_FOR_THE_TAXONOMY_REPO> \
+# --redis redis:6379  \
+# --s3-bucket some-bucket-name \
+# --aws-region us-east-1
+services:
+  redis:
+    container_name: redis
+    image: redis:latest
+    ports:
+      - 6379:6379
+
+  bot:
+    container_name: bot
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    depends_on:
+      - redis
+    volumes:
+      - ./config.yaml:/config.yaml
+
+  worker1:
+    container_name: worker1
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+    volumes:
+      - /home/fedora/instructlab-worker1:/data
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+
+  worker2:
+    container_name: worker2
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+    volumes:
+      - /home/fedora/instructlab-worker2:/data
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+
+  worker3:
+    container_name: worker3
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+    volumes:
+      - /home/fedora/instructlab-worker3:/data
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
