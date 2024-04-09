@@ -45,6 +45,7 @@ var (
 	TlsClientCertPath   string
 	TlsClientKeyPath    string
 	TlsServerCaCertPath string
+	TlsInsecure         bool
 )
 
 const (
@@ -99,6 +100,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&TlsClientCertPath, "tls-client-cert", "", "client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
 	generateCmd.Flags().StringVarP(&TlsClientKeyPath, "tls-client-key", "", "client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
 	generateCmd.Flags().StringVarP(&TlsServerCaCertPath, "tls-server-ca-cert", "", "server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
+	generateCmd.Flags().BoolVarP(&TlsInsecure, "tls-insecure", "t", false, "Whether to skip TLS verification")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
@@ -292,6 +294,9 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			}
 
 			chatArgs := []string{"chat", "--quick-question", question}
+			if TlsInsecure {
+				chatArgs = append(chatArgs, "--tls-insecure")
+			}
 			if EndpointURL != localEndpoint && modelName != "unknown" {
 				chatArgs = append(chatArgs, "--endpoint-url", EndpointURL, "--model", modelName)
 			}
@@ -493,6 +498,9 @@ func (w *Worker) processJob() {
 	switch jobType {
 	case jobGenerate:
 		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
+		if TlsInsecure {
+			generateArgs = append(generateArgs, "--tls-insecure")
+		}
 		// TODO -- add a separate config option
 		//if EndpointURL != "" && modelName != "unknown" {
 		//	// Append the endpoint URL and model name as arguments if they are defined
