@@ -10,6 +10,18 @@ OS=""
 REDIS_IP=${REDIS_IP:-"127.0.0.1"}
 WORK_DIR=${WORK_DIR:-"${HOME}/instruct-lab-bot"}
 
+ENDPOINT_URL=${ENDPOINT_URL:-"http://localhost:8000/v1"}
+SDG_ENDPOINT_URL=${SDG_ENDPOINT_URL:-""}
+
+TLS_CLIENT_KEY=${TLS_CLIENT_KEY:-""}
+TLS_CLIENT_CERT=${TLS_CLIENT_CERT:-""}
+TLS_SERVER_CA_CERT=${TLS_SERVER_CA_CERT:-""}
+
+TLS_SECRETS_DIR=${TLS_SECRETS_DIR:-"/home/fedora/instruct-lab-bot"}
+TLS_SECRETS_EXISTS=0
+
+EXTRA_ARGS=""
+
 # Export CUDA environment variables
 export CUDA_HOME=/usr/local/cuda
 export PATH="/usr/local/cuda/bin:${PATH}"
@@ -36,6 +48,12 @@ usage() {
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
     echo "  --redis-ip IP: Optionally the IP address of the Redis server. Default: ${REDIS_IP}"
     echo "  --work-dir DIR: Optionally the directory to use for the worker. Default: ${WORK_DIR}"
+    echo "  --endpoint-url URL: The endpoint URL for the icli precheck. Default: http://localhost:8000/v1"
+    echo "  --sdg-endpoint-url URL: The endpoint URL for the icli sdg-svc. Default: "
+    echo "  --tls-client-key KEY: The TLS client key for icli sdg-svc"
+    echo "  --tls-client-cert CERT: The TLS client certificate for icli sdg-svc"
+    echo "  --tls-server-ca-cert CERT: The TLS server CA cert for icli sdg-svc"
+    echo "  --tls-secrets-dir DIR: Directory to store TLS secrets. Default: ${TLS_SECRETS_DIR}"
     echo
     supported_envs
 }
@@ -161,6 +179,21 @@ install_nexodus() {
     fi
 }
 
+install_tls_secrets() {
+    if [ -n "${TLS_CLIENT_KEY}" ] && [ -n "${TLS_CLIENT_CERT}" ] && [ -n "${TLS_SERVER_CA_CERT}" ]; then
+        sudo mkdir -p ${TLS_SECRETS_DIR}
+        sudo install -m 0644 "${TLS_CLIENT_KEY}" ${TLS_SECRETS_DIR}/tls-client.key
+        sudo install -m 0644 "${TLS_CLIENT_CERT}" ${TLS_SECRETS_DIR}/tls-cert.key
+        sudo install -m 0644 "${TLS_SERVER_CA_CERT}" ${TLS_SECRETS_DIR}/tls-server-ca.crt
+        TLS_SECRETS_EXISTS=1
+    elif
+      // check if the secrets are already installed
+      [ -f "${TLS_SECRETS_DIR}/tls-client.key" ] && [ -f "${TLS_SECRETS_DIR}/tls-cert.key" ] && [ -f "${TLS_SECRETS_DIR}/tls-server-ca.crt" ]; then
+        echo "TLS secrets already exist in ${TLS_SECRETS_DIR}"
+        TLS_SECRETS_EXISTS=1
+    fi
+}
+
 setup_workdir() {
     mkdir -p "${WORK_DIR}"
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
@@ -233,6 +266,16 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
+    # Check if ENDPOINT_URL is set
+    if [ -n "${ENDPOINT_URL}" ]; then
+        EXTRA_ARGS="--endpoint-url ${ENDPOINT_URL}"
+    fi
+
+    # Check if SDG_ENDPOINT_URL is set and TLS_SECRETS_EXISTS is true
+    if [ -n "${SDG_ENDPOINT_URL}" ] && [ "${TLS_SECRETS_EXISTS}" -eq 1 ]; then
+        EXTRA_ARGS="--sdg-endpoint-url ${SDG_ENDPOINT_URL} --tls-client-key ${TLS_SECRETS_DIR}/tls-client.key --tls-client-cert ${TLS_SECRETS_DIR}/tls-cert.key --tls-server-ca-cert ${TLS_SECRETS_DIR}/tls-server-ca.crt"
+    fi
+
     cat << EOF > labbotworker.service
 [Unit]
 Description=Instruct Lab GitHub Bot Worker
@@ -247,7 +290,7 @@ User=fedora
 Group=fedora
 EnvironmentFile=/etc/sysconfig/labbotworker
 WorkingDirectory=/home/fedora/instruct-lab-bot
-ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379
+ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379 ${EXTRA_ARGS}
 
 [Install]
 WantedBy=multi-user.target
@@ -262,6 +305,7 @@ command_install() {
     check_install_prereqs
     install_prereqs
     install_nexodus
+    install_tls_secrets
     setup_workdir
     install_lab
     install_bot_worker
@@ -319,6 +363,30 @@ while [ $# -gt 0 ]; do
             ;;
         --work-dir)
             WORK_DIR="$2"
+            shift
+            ;;
+        --endpoint-url)
+            ENDPOINT_URL="$2"
+            shift
+            ;;
+        --sdg-endpoint-url)
+            SDG_ENDPOINT_URL="$2"
+            shift
+            ;;
+        --tls-client-key)
+            TLS_CLIENT_KEY="$2"
+            shift
+            ;;
+        --tls-client-cert)
+            TLS_CLIENT_CERT="$2"
+            shift
+            ;;
+        --tls-server-ca-cert)
+            TLS_SERVER_CA_CERT="$2"
+            shift
+            ;;
+        --tls-secrets-dir)
+            TLS_SECRETS_DIR="$2"
             shift
             ;;
         *)
