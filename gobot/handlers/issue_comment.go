@@ -133,7 +133,7 @@ func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *githu
 	if !labelFound {
 		h.Logger.Infof("Required label %s not found on PR %v/%s#%d by %s",
 			requiredLabels, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
-		missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have the '%v' labels.", requiredLabels)
+		missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", requiredLabels)
 		botComment := github.IssueComment{Body: &missingLabelComment}
 		_, _, err = client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment)
 		if err != nil {
