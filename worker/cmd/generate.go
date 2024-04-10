@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -37,7 +38,7 @@ import (
 var (
 	WorkDir             string
 	VenvDir             string
-	EndpointURL         string
+	PreCheckEndpointURL string
 	SdgEndpointURL      string
 	NumInstructions     int
 	Origin              string
@@ -52,14 +53,14 @@ var (
 )
 
 const (
-	gitMaxRetries  = 3
-	gitRetryDelay  = 2 * time.Second
-	ilabConfigPath = "config.yaml"
-	localEndpoint  = "http://localhost:8000/v1"
-	jobSDG         = "sdg-svc"
-	jobGenerate    = "generate"
-	jobPreCheck    = "precheck"
-	sdgModel       = "mistralai/mixtral-8x7b-instruct-v0-1"
+	gitMaxRetries    = 3
+	gitRetryDelay    = 2 * time.Second
+	ilabConfigPath   = "config.yaml"
+	localEndpoint    = "http://localhost:8000/v1"
+	jobSDG           = "sdg-svc"
+	jobGenerateLocal = "generate"
+	jobPreCheck      = "precheck"
+	sdgModel         = "mistralai/mixtral-8x7b-instruct-v0-1"
 )
 
 // Worker encapsulates dependencies and methods to process jobs
@@ -69,7 +70,7 @@ type Worker struct {
 	svc                 *s3.Client
 	logger              *zap.SugaredLogger
 	job                 string
-	endpoint            string
+	precheckEndpoint    string
 	sdgEndpoint         string
 	jobStart            time.Time
 	tlsClientCertPath   string
@@ -77,15 +78,16 @@ type Worker struct {
 	tlsServerCaCertPath string
 }
 
-func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, endpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string) *Worker {
+func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string) *Worker {
 	return &Worker{
 		ctx:                 ctx,
 		pool:                pool,
 		svc:                 svc,
 		logger:              logger,
 		job:                 job,
-		endpoint:            endpoint,
+		precheckEndpoint:    precheckEndpoint,
 		sdgEndpoint:         sdgEndpoint,
+		jobStart:            time.Now(),
 		tlsClientCertPath:   tlsClientCertPath,
 		tlsClientKeyPath:    tlsClientKeyPath,
 		tlsServerCaCertPath: tlsServerCaCertPath,
@@ -101,7 +103,7 @@ type IlabConfig struct {
 func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
-	generateCmd.Flags().StringVarP(&EndpointURL, "endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
+	generateCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
@@ -186,7 +188,7 @@ var generateCmd = &cobra.Command{
 		go func(ch <-chan string) {
 			defer wg.Done()
 			for job := range ch {
-				jp := NewJobProcessor(ctx, pool, svc, sugar, job, EndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath)
+				jp := NewJobProcessor(ctx, pool, svc, sugar, job, PreCheckEndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath)
 				jp.processJob()
 			}
 		}(jobChan)
@@ -307,8 +309,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			if TlsInsecure {
 				chatArgs = append(chatArgs, "--tls-insecure")
 			}
-			if EndpointURL != localEndpoint && modelName != "unknown" {
-				chatArgs = append(chatArgs, "--endpoint-url", EndpointURL, "--model", modelName)
+			if PreCheckEndpointURL != localEndpoint && modelName != "unknown" {
+				chatArgs = append(chatArgs, "--endpoint-url", PreCheckEndpointURL, "--model", modelName)
 			}
 
 			cmd := exec.Command(lab, chatArgs...)
@@ -348,7 +350,7 @@ func (w *Worker) processJob() {
 		return
 	}
 	switch jobType {
-	case jobGenerate:
+	case jobGenerateLocal:
 	case jobPreCheck:
 	case jobSDG:
 	default:
@@ -493,7 +495,8 @@ func (w *Worker) processJob() {
 	}
 
 	var modelName string
-	if EndpointURL != localEndpoint {
+	// sdg-svc does not have a models endpoint as yet
+	if jobType != jobSDG && PreCheckEndpointURL != localEndpoint {
 		var err error
 		modelName, err = w.fetchModelName(true)
 		if err != nil {
@@ -506,16 +509,10 @@ func (w *Worker) processJob() {
 
 	var cmd *exec.Cmd
 	switch jobType {
-	case jobGenerate:
+	case jobGenerateLocal:
+		// @instruct-lab-bot generate-local
+		// Runs generate on the local worker node
 		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
-		//if TlsInsecure {
-		//	generateArgs = append(generateArgs, "--tls-insecure")
-		//}
-		// TODO -- add a separate config option
-		//if EndpointURL != "" && modelName != "unknown" {
-		//	// Append the endpoint URL and model name as arguments if they are defined
-		//	generateArgs = append(generateArgs, "--endpoint-url", EndpointURL, "--model", modelName)
-		//}
 
 		cmd = exec.CommandContext(w.ctx, lab, generateArgs...)
 		if WorkDir != "" {
@@ -538,6 +535,8 @@ func (w *Worker) processJob() {
 			return
 		}
 	case jobPreCheck:
+		// @instruct-lab-bot precheck
+		// Runs precheck on a backend node
 		err = w.runPrecheck(lab, outputDir, modelName)
 		if err != nil {
 			sugar.Errorf("Could not run precheck: %v", err)
@@ -545,9 +544,9 @@ func (w *Worker) processJob() {
 			return
 		}
 	case jobSDG:
-		// TODO: temporarily disabling ilab diff since most taxonomy files fail this check and its hard
-		// to try and validate this when most fail (especially small quick ones)
-		// Execute 'ilab diff' and capture its output
+		// @instruct-lab-bot generate
+		// Runs generate on the SDG backend
+		// ilab diff is run since the sdg generation is not part of upstream cli
 		cmdDiff := exec.Command("ilab", "diff")
 		var stderr bytes.Buffer
 		cmdDiff.Stderr = &stderr
@@ -562,11 +561,12 @@ func (w *Worker) processJob() {
 
 		diffOutputLines := strings.Split(string(diffOutput), "\n")
 
-		// Filter taxonomy files ending in .yaml
+		// Filter taxonomy files ending in .yaml and prepare them relative to workDir
 		var taxonomyFiles []string
 		for _, line := range diffOutputLines {
 			if strings.HasSuffix(line, ".yaml") {
-				taxonomyFiles = append(taxonomyFiles, path.Join(workDir, "taxonomy", line))
+				relativePath := filepath.Join("taxonomy", line)
+				taxonomyFiles = append(taxonomyFiles, relativePath)
 			}
 		}
 
@@ -672,9 +672,12 @@ func (w *Worker) postJobResults(URL, jobType string) {
 	conn := w.pool.Get()
 	defer conn.Close()
 
+	// Calculate the job duration and round it up
 	jobDuration := time.Since(w.jobStart).Seconds()
-	w.logger.Infof("Job took %f s to run", jobDuration)
-	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:duration", w.job), jobDuration); err != nil {
+	roundedDuration := math.Ceil(jobDuration)
+	w.logger.Infof("Job took %.0fs to run", roundedDuration)
+
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:duration", w.job), roundedDuration); err != nil {
 		w.logger.Errorf("Could not set job duration in redis: %v", err)
 	}
 
@@ -777,7 +780,7 @@ func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map
 	return tmpl.Execute(indexFile, data)
 }
 
-// getModelNameFromConfig retrieves the model name from the config file or endpoint
+// getModelNameFromConfig retrieves the model name from the config file or precheckEndpoint
 func (w *Worker) getModelNameFromConfig() string {
 	cfgData, err := os.ReadFile(ilabConfigPath)
 	if err != nil {
@@ -793,18 +796,19 @@ func (w *Worker) getModelNameFromConfig() string {
 	return cfg.Generate.Model
 }
 
-// fetchModelName hits the defined endpoint with "/models" appended to extract the model name.
+// fetchModelName hits the defined precheckEndpoint with "/models" appended to extract the model name.
 // If fullName is true, it returns the entire ID value; if false, it returns the parsed out name after the double hyphens.
 func (w *Worker) fetchModelName(fullName bool) (string, error) {
 	// Ensure the endpoint URL ends with "/models"
-	if !strings.HasSuffix(w.endpoint, "/") {
-		w.endpoint += "/"
+	endpoint := w.precheckEndpoint
+	if !strings.HasSuffix(endpoint, "/") {
+		endpoint += "/"
 	}
-	w.endpoint += "models"
+	endpoint += "models"
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	req, err := http.NewRequestWithContext(w.ctx, "GET", w.endpoint, nil)
+	req, err := http.NewRequestWithContext(w.ctx, "GET", endpoint, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -885,7 +889,7 @@ func (w *Worker) determineModelName(jobType string) string {
 	}
 
 	// precheck is the only case we use a remote OpenAI endpoint right now
-	if EndpointURL != localEndpoint && jobType == jobPreCheck {
+	if PreCheckEndpointURL != localEndpoint && jobType == jobPreCheck {
 		modelName, err := w.fetchModelName(false)
 		if err != nil {
 			w.logger.Errorf("Failed to fetch model name: %v", err)
@@ -900,50 +904,45 @@ func (w *Worker) determineModelName(jobType string) string {
 // datagenSvc generates data for the given taxonomy files and writes the results to the specified output directory.
 func (w *Worker) datagenSvc(taxonomyFiles []string, outputDir string, numSamples int) ([]string, error) {
 	var outputFiles []string
-
-	certs, err := tls.LoadX509KeyPair(w.tlsClientCertPath, w.tlsClientKeyPath)
+	httpClient, err := w.createTLSHttpClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load client certificate/key: %w", err)
-	}
-	caCert, err := os.ReadFile(w.tlsServerCaCertPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{certs},
-		RootCAs:            caCertPool,
-		InsecureSkipVerify: true,
-	}
-	httpClient := &http.Client{
-		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		return nil, err
 	}
 
-	// Iterate over taxonomy files and make HTTP requests for each
 	for _, tf := range taxonomyFiles {
 		tfData, err := os.ReadFile(tf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read taxonomy file '%s': %w", tf, err)
 		}
 
-		// Convert interface maps to string maps for JSON marshaling
-		var tfMapInterface map[interface{}]interface{}
-		if err := yaml.Unmarshal(tfData, &tfMapInterface); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
-		}
-		tfMap := interfaceMapToStringMap(tfMapInterface).(map[string]interface{})
+		var jsonData []byte
+		var requestURL string
 
-		tfMap["mm_model_id"] = sdgModel
-		tfMap["num_samples"] = numSamples
-
-		jsonData, err := json.Marshal(tfMap)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal JSON: %w", err)
+		if strings.Contains(tf, "taxonomy/knowledge") {
+			tfMap, err := w.createKnowledgePostJSON(tfData, numSamples)
+			if err != nil {
+				return nil, err
+			}
+			jsonData, err = json.Marshal(tfMap)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal knowledge JSON post: %w", err)
+			}
+			// Adjust endpoint for knowledge
+			requestURL = strings.Replace(w.sdgEndpoint, "skill", "knowledge", -1)
+		} else {
+			tfMap, err := w.createSkillsPostJSON(tfData, numSamples)
+			if err != nil {
+				return nil, err
+			}
+			jsonData, err = json.Marshal(tfMap)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal skills JSON post: %w", err)
+			}
+			// Use the existing endpoint for skills
+			requestURL = w.sdgEndpoint
 		}
 
 		// Modify the endpoint URL if the filepath includes "taxonomy/knowledge"
-		requestURL := w.sdgEndpoint
 		if strings.Contains(tf, "taxonomy/knowledge") {
 			requestURL = strings.Replace(requestURL, "skill", "knowledge", -1)
 		}
@@ -983,6 +982,78 @@ func (w *Worker) datagenSvc(taxonomyFiles []string, outputDir string, numSamples
 	return outputFiles, nil
 }
 
+func (w *Worker) createTLSHttpClient() (*http.Client, error) {
+	certs, err := tls.LoadX509KeyPair(w.tlsClientCertPath, w.tlsClientKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load client certificate/key: %w", err)
+	}
+	caCert, err := os.ReadFile(w.tlsServerCaCertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{certs},
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: true,
+	}
+	httpClient := &http.Client{
+		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+	}
+	return httpClient, nil
+}
+
+// createKnowledgePostJSON convert a skills taxonomy file from YAML to json
+func (w *Worker) createSkillsPostJSON(tfData []byte, numSamples int) (map[string]interface{}, error) {
+	var tfMapInterface map[interface{}]interface{}
+	if err := yaml.Unmarshal(tfData, &tfMapInterface); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+	tfMap := interfaceMapToStringMap(tfMapInterface).(map[string]interface{})
+
+	tfMap["mm_model_id"] = sdgModel
+	tfMap["num_samples"] = numSamples
+	return tfMap, nil
+}
+
+// createKnowledgePostJSON convert a knowledge taxonomy file from YAML to json
+func (w *Worker) createKnowledgePostJSON(tfData []byte, numSamples int) (map[string]interface{}, error) {
+	var tfMapInterface map[interface{}]interface{}
+	if err := yaml.Unmarshal(tfData, &tfMapInterface); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+	tfMap := interfaceMapToStringMap(tfMapInterface).(map[string]interface{})
+
+	tfMap["mm_model_id"] = sdgModel
+	tfMap["num_samples"] = numSamples
+
+	// Handle the 'document' field if it exists
+	if doc, ok := tfMap["document"].(map[string]interface{}); ok {
+		docMap := make(map[string]interface{})
+		if repo, repoOk := doc["repo"].(string); repoOk {
+			docMap["repo"] = repo
+		}
+		if commit, commitOk := doc["commit"].(string); commitOk {
+			docMap["commit"] = commit
+		}
+		if patterns, patternsOk := doc["patterns"].([]interface{}); patternsOk {
+			// Ensure patterns are in the correct format (slice of strings)
+			stringPatterns := make([]string, 0)
+			for _, pattern := range patterns {
+				if strPattern, isStr := pattern.(string); isStr {
+					stringPatterns = append(stringPatterns, strPattern)
+				}
+			}
+			docMap["patterns"] = stringPatterns
+		}
+		// Add the parsed 'document' map back to the main tfMap
+		tfMap["document"] = docMap
+	}
+
+	return tfMap, nil
+}
+
 func interfaceMapToStringMap(in interface{}) interface{} {
 	switch x := in.(type) {
 	case map[interface{}]interface{}:
@@ -999,7 +1070,7 @@ func interfaceMapToStringMap(in interface{}) interface{} {
 	return in
 }
 
-/* Uncomment to bypass ilab diff
+/* Uncomment to bypass ilab diff (temporary until upstream files are validated prior to merge)
 // discoverGitTaxonomyFiles discovers new or modified YAML taxonomy files in the specified Git repository.
 // This temporarily replaces ilab diff since that fails on most files because it's hard to validate when most taxonomies
 // to test with fail when using ilab diff.
