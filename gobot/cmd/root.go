@@ -1,11 +1,13 @@
-package bot
+package cmd
 
 import (
 	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,31 +15,82 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/google/go-github/v60/github"
 	"github.com/gregjones/httpcache"
-	"github.com/palantir/go-githubapp/githubapp"
-	"github.com/rcrowley/go-metrics"
-	"go.uber.org/zap"
-
-	"github.com/instruct-lab/instruct-lab-bot/gobot/config"
 	"github.com/instruct-lab/instruct-lab-bot/gobot/handlers"
 	"github.com/instruct-lab/instruct-lab-bot/gobot/util"
+	"github.com/palantir/go-githubapp/githubapp"
+	"github.com/rcrowley/go-metrics"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 const (
 	JobFailed = "Command execution failed. Check details."
 )
 
-func Run(zLogger *zap.Logger) error {
-	config, err := config.ReadConfig("config.yaml")
-	if err != nil {
-		return err
-	}
+var (
+	RedisHost           string
+	HTTPAddress         string
+	HTTPPort            int
+	GithubIntegrationID int
+	GithubURL           string
+	GithubWebhookSecret string
+	GithubAppPrivateKey string
+	WebhookProxyURL     string
+	RequiredLabels      []string
+	Maintainers         []string
+	BotUsername         string
+	Debug               bool
+)
 
-	logger := zLogger.Sugar()
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&RedisHost, "redis", "", "redis:6379", "The Redis instance to connect to")
+	rootCmd.PersistentFlags().StringVarP(&HTTPAddress, "http-address", "", "0.0.0.0", "HTTP Address to bind to")
+	rootCmd.PersistentFlags().IntVarP(&HTTPPort, "http-port", "", 8080, "HTTP Port to bind to")
+	rootCmd.PersistentFlags().IntVarP(&GithubIntegrationID, "integration-id", "", 0, "The GitHub App Integration ID")
+	rootCmd.PersistentFlags().StringVarP(&GithubURL, "github-url", "", "https://api.github.com/", "The URL of the GitHub instance")
+	rootCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
+	rootCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
+	rootCmd.PersistentFlags().StringVarP(&WebhookProxyURL, "webhook-proxy-url", "", "", "Get an ID from https://smee.io/new. If blank, the app will not use a webhook proxy")
+	rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{"triage-ok-to-test"}, "Label(s) required before a PR can be tested")
+	rootCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
+	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
+	rootCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instruct-lab-bot", "The username of the bot")
+}
 
+var rootCmd = &cobra.Command{
+	Use:   "bot",
+	Short: "Bot receives events from GitHub and processes them",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return initializeConfig(cmd)
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		zlogger := initLogger(Debug)
+		logger := zlogger.Sugar()
+		return run(logger)
+	},
+}
+
+func run(logger *zap.SugaredLogger) error {
+	logger.Info("Starting bot...")
 	metricsRegistry := metrics.DefaultRegistry
 
+	ghConfig := githubapp.Config{
+		V3APIURL: GithubURL,
+		App: struct {
+			IntegrationID int64  `yaml:"integration_id" json:"integrationId"`
+			WebhookSecret string `yaml:"webhook_secret" json:"webhookSecret"`
+			PrivateKey    string `yaml:"private_key" json:"privateKey"`
+		}{
+			IntegrationID: int64(GithubIntegrationID),
+			WebhookSecret: GithubWebhookSecret,
+			PrivateKey:    GithubAppPrivateKey,
+		},
+	}
+
 	cc, err := githubapp.NewDefaultCachingClientCreator(
-		config.Github,
+		ghConfig,
 		githubapp.WithClientUserAgent("instruct-lab-bot/0.0.1"),
 		githubapp.WithClientTimeout(3*time.Second),
 		githubapp.WithClientCaching(false, func() httpcache.Cache { return httpcache.NewMemoryCache() }),
@@ -52,32 +105,32 @@ func Run(zLogger *zap.Logger) error {
 	prCommentHandler := &handlers.PRCommentHandler{
 		ClientCreator:  cc,
 		Logger:         logger,
-		RedisHostPort:  config.AppConfig.RedisHostPort,
-		RequiredLabels: config.AppConfig.RequiredLabels,
-		Maintainers:    config.AppConfig.Maintainers,
-		BotUsername:    config.GetBotUsername(),
+		RedisHostPort:  RedisHost,
+		RequiredLabels: RequiredLabels,
+		BotUsername:    BotUsername,
+		Maintainers:    Maintainers,
 	}
 
 	prHandler := &handlers.PullRequestHandler{
 		ClientCreator:  cc,
 		Logger:         logger,
-		RequiredLabels: config.AppConfig.RequiredLabels,
-		BotUsername:    config.GetBotUsername(),
+		RequiredLabels: RequiredLabels,
+		BotUsername:    BotUsername,
 	}
 
-	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler, prHandler)
+	webhookHandler := githubapp.NewDefaultEventDispatcher(ghConfig, prCommentHandler, prHandler)
 
 	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
 
-	addr := net.JoinHostPort(config.Server.Address, strconv.Itoa(config.Server.Port))
+	addr := net.JoinHostPort(HTTPAddress, strconv.Itoa(HTTPPort))
 	logger.Infof("Starting server on %s...", addr)
 
 	wg := sync.WaitGroup{}
-	if config.AppConfig.WebhookProxyURL != "" {
+	if WebhookProxyURL != "" {
 		args := []string{
 			"gosmee",
 			"client",
-			config.AppConfig.WebhookProxyURL,
+			WebhookProxyURL,
 			fmt.Sprintf("http://%s/api/github/hook", addr),
 		}
 		wg.Add(1)
@@ -98,18 +151,72 @@ func Run(zLogger *zap.Logger) error {
 	}()
 	wg.Add(1)
 	go func() {
-		receiveResults(config, logger, cc)
+		receiveResults(RedisHost, logger, cc)
 	}()
 	wg.Wait()
-
 	return nil
 }
 
-func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func initLogger(debug bool) *zap.Logger {
+	level := zap.InfoLevel
+
+	if debug {
+		level = zap.DebugLevel
+	}
+
+	loggerConfig := zap.Config{
+		Level:            zap.NewAtomicLevelAt(level),
+		Encoding:         "console",
+		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+	logger, _ := loggerConfig.Build()
+	return logger
+}
+
+func initializeConfig(cmd *cobra.Command) error {
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(".")
+	v.AddConfigPath("$HOME/.config/instruct-lab-bot")
+	v.AddConfigPath("/etc/instruct-lab-bot")
+	if err := v.ReadInConfig(); err != nil {
+		// It's okay if there isn't a config file
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return err
+		}
+	}
+	v.SetEnvPrefix("ILBOT")
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.AutomaticEnv()
+	bindFlags(cmd, v)
+	return nil
+}
+
+func bindFlags(cmd *cobra.Command, v *viper.Viper) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		configName := f.Name
+		if !f.Changed && v.IsSet(configName) {
+			val := v.Get(configName)
+			_ = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
+		}
+	})
+}
+
+func receiveResults(redisHostPort string, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {
 	ctx := context.Background()
 
 	r := redis.NewClient(&redis.Options{
-		Addr:     config.AppConfig.RedisHostPort,
+		Addr:     redisHostPort,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -145,6 +252,7 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			logger.Errorf("No installation ID found for job %s", result)
 			continue
 		}
+
 		installIDInt, err := strconv.Atoi(installID)
 		if err != nil {
 			logger.Errorf("Error converting installation ID to int: %v", err)

@@ -6,20 +6,19 @@
     password: "{{ github_token }}"
     reauthorize: true
 
-- name: Generate config.yaml for gobot
-  ansible.builtin.template:
-    src: gobot/templates/config.yaml.j2
-    dest: /home/fedora/config.yaml
-    mode: '0640'
-    owner: fedora
-  become: true
-
 - name: Start the container
   community.docker.docker_container:
     name: instruct-lab-bot
     image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
     state: started
     pull: always
-    # Mount the config.yaml file
-    volumes:
-      - /home/fedora/config.yaml:/config.yaml
+    env:
+      ILBOT_GITHUB_INTEGRATION_ID: "{{ app_id }}"
+      ILBOT_GITHUB_APP_PRIVATE_KEY: "{{ private_key }}"
+      ILBOT_GITHUB_WEBHOOK_SECRET: "{{ webhook_secret }}"
+      ILBOT_WEBHOOK_PROXY_URL: "{{ webhook_proxy_url }}"
+      ILBOT_REDIS: "{{ redis_ip }}:6379"
+      ILBOT_HTTP_ADDRESS: "127.0.0.1"
+      ILBOT_HTTP_PORT: "8080"
+      ILBOT_MAINTAINERS: "taxonomy-triagers taxonomy-approvers taxonomy-maintainers labrador-org-maintainers instruct-lab-bot-maintainers"
+      ILBOT_REQUIRED_LABELS: "skill knowledge"

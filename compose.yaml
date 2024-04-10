@@ -10,14 +10,23 @@ services:
   bot:
     container_name: bot
     image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    env_file:
+      - .env
     depends_on:
       - redis
-    volumes:
-      - ./config.yaml:/config.yaml
 
   worker-test:
     container_name: worker-test
     image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
     depends_on:
       - redis
-    command: ["/instruct-lab-bot-worker", "--test", "--redis", "redis:6379", "generate", "-g", ""]
+    env_file:
+      - .env
+    command:
+      [
+        "/instruct-lab-bot-worker",
+        "--test",
+        "--redis",
+        "redis:6379",
+        "generate",
+      ]

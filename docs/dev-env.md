@@ -42,18 +42,18 @@ Select the local fork of the `taxonomy` repository that you have created in your
 
 This setup deploys a podman compose stack. By default, the stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
 
-Create a `config.yaml` file in the root of the project:
+There are several variables that need to be provided and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps).
 
-```bash
-cp gobot/config.yaml.sample config.yaml
-```
+You may provide these options as command line flags, environment variables, or in a `config.yaml` file.
 
-There are several fields that need to be filled in and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps). Fill the following fields in the `config.yaml` file:
+| Flag | Environment Variable | `config.yaml` Key | Description |
+| ---- | -------------------- | ----------------- | ----------- |
+| `--webhook-proxy-url` | `ILBOT_WEBHOOK_PROXY_URL` | `webhook-proxy-url` | The URL of the webhook proxy. |
+| `--github-integration-id` | `ILBOT_GITHUB_INTEGRATION_ID` | `github-integration_id` | The App ID of the GitHub App. |
+| `--github-app-private-key` | `ILBOT_GITHUB_APP_PRIVATE_KEY` | `github-app-private-key` | The private key of the GitHub App. |
+| `--github-webhook-secret` | `ILBOT_GITHUB_WEBHOOK_SECRET` | `webhook-secret` | The Webhook Secret of the GitHub App. |
 
-- `app_configuration.webhook_proxy_url` Set to the Webhook URL you generated from smee.io.
-- `github.app.integration_id` Set to the App ID from the GitHub App you just registered.
-- `github.app.private_key` Set to the private key you generated from the GitHub App you just registered and saved locally on your machine. Just `cat` the file and copy & paste the contents in the `config.yaml` file.
-- `github.app.webhook_secret` Set to the Webhook Secret you set for the app.
+A template `.env.example` file is provided in the root of the repository. You can copy this file to `.env` and fill in the values.
 
 To run the bot:
 
