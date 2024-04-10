@@ -13,9 +13,9 @@ import (
 
 type PullRequestHandler struct {
 	githubapp.ClientCreator
-	Logger        *zap.SugaredLogger
-	RequiredLabel string
-	BotUsername   string
+	Logger         *zap.SugaredLogger
+	RequiredLabels []string
+	BotUsername    string
 }
 
 func (h *PullRequestHandler) Handles() []string {
@@ -44,10 +44,10 @@ func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID s
 	}
 	msg := fmt.Sprintf("Beep, boop 🤖 Hi, I'm %s and I'm going to help you"+
 		" with your pull request. Thanks for you contribution! 🎉\n\n", h.BotUsername)
-	if h.RequiredLabel != "" {
+	if len(h.RequiredLabels) > 0 {
 		msg += fmt.Sprintf("> [!NOTE]\n"+
 			"> Before you are able to use the bot's commands, it must be triaged "+
-			"and have the `%s` label applied to it.\n\n", h.RequiredLabel)
+			"and have one of the `%v` labels applied to it.\n\n", h.RequiredLabels)
 	}
 	msg += fmt.Sprintf("I support the following commands:\n\n"+
 		"* `%s precheck` -- Check existing model behavior using the questions in this proposed change.\n"+

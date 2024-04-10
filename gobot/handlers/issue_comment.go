@@ -16,10 +16,10 @@ import (
 
 type PRCommentHandler struct {
 	githubapp.ClientCreator
-	Logger        *zap.SugaredLogger
-	RedisHostPort string
-	RequiredLabel string
-	BotUsername   string
+	Logger         *zap.SugaredLogger
+	RedisHostPort  string
+	RequiredLabels []string
+	BotUsername    string
 }
 
 type PRComment struct {
@@ -110,8 +110,8 @@ func (h *PRCommentHandler) reportError(ctx context.Context, client *github.Clien
 	}
 }
 
-func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *github.Client, prComment *PRComment, requiredLabel string) (bool, error) {
-	if requiredLabel == "" {
+func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *github.Client, prComment *PRComment, requiredLabels []string) (bool, error) {
+	if len(requiredLabels) == 0 {
 		return true, nil
 	}
 
@@ -122,16 +122,18 @@ func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *githu
 
 	labelFound := false
 	for _, label := range pr.Labels {
-		if label.GetName() == requiredLabel {
-			labelFound = true
-			break
+		for _, required := range requiredLabels {
+			if label.GetName() == required {
+				labelFound = true
+				break
+			}
 		}
 	}
 
 	if !labelFound {
-		h.Logger.Infof("Required label %s not found on PR %s/%s#%d by %s",
-			requiredLabel, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
-		missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have the '%s' label.", requiredLabel)
+		h.Logger.Infof("Required label %s not found on PR %v/%s#%d by %s",
+			requiredLabels, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+		missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have the '%v' labels.", requiredLabels)
 		botComment := github.IssueComment{Body: &missingLabelComment}
 		_, _, err = client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment)
 		if err != nil {
@@ -217,7 +219,7 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
 	if !present || err != nil {
 		return err
 	}
@@ -229,7 +231,7 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 	h.Logger.Infof("Precheck command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
 	if !present || err != nil {
 		return err
 	}
@@ -241,7 +243,7 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 	h.Logger.Infof("SDG svc command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabel)
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
 	if !present || err != nil {
 		return err
 	}
