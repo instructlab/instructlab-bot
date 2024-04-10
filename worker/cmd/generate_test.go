@@ -143,7 +143,18 @@ func TestFetchModelName(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL, "")
+	w := NewJobProcessor(
+		context.Background(),
+		nil,
+		nil,
+		zap.NewExample().Sugar(),
+		"job-id",
+		mockServer.URL,
+		"http://sdg-example.com",
+		"dummy-client-cert-path.pem",
+		"dummy-client-key-path.pem",
+		"dummy-ca-cert-path.pem",
+	)
 
 	modelName, err := w.fetchModelName(false)
 	assert.NoError(t, err, "fetchModelName should not return an error")
@@ -192,8 +203,18 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	w := NewJobProcessor(context.Background(), nil, nil, zap.NewExample().Sugar(), "", mockServer.URL, "")
-
+	w := NewJobProcessor(
+		context.Background(),
+		nil,
+		nil,
+		zap.NewExample().Sugar(),
+		"job-id",
+		mockServer.URL,
+		"http://sdg-example.com",
+		"dummy-client-cert-path.pem",
+		"dummy-client-key-path.pem",
+		"dummy-ca-cert-path.pem",
+	)
 	modelName, err := w.fetchModelName(false)
 
 	// Verify that an error was returned due to the invalid "object" field

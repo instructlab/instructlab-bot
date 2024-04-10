@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -46,6 +48,7 @@ var (
 	TlsClientKeyPath    string
 	TlsServerCaCertPath string
 	TlsInsecure         bool
+	TaxonomyFolders     = []string{"compositional_skills", "knowledge"}
 )
 
 const (
@@ -56,28 +59,36 @@ const (
 	jobSDG         = "sdg-svc"
 	jobGenerate    = "generate"
 	jobPreCheck    = "precheck"
+	sdgModel       = "mistralai/mixtral-8x7b-instruct-v0-1"
 )
 
 // Worker encapsulates dependencies and methods to process jobs
 type Worker struct {
-	ctx         context.Context
-	pool        *redis.Pool
-	svc         *s3.Client
-	logger      *zap.SugaredLogger
-	job         string
-	endpoint    string
-	sdgEndpoint string
+	ctx                 context.Context
+	pool                *redis.Pool
+	svc                 *s3.Client
+	logger              *zap.SugaredLogger
+	job                 string
+	endpoint            string
+	sdgEndpoint         string
+	jobStart            time.Time
+	tlsClientCertPath   string
+	tlsClientKeyPath    string
+	tlsServerCaCertPath string
 }
 
-func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, endpoint, sdgEndpoint string) *Worker {
+func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, endpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string) *Worker {
 	return &Worker{
-		ctx:         ctx,
-		pool:        pool,
-		svc:         svc,
-		logger:      logger,
-		job:         job,
-		endpoint:    endpoint,
-		sdgEndpoint: sdgEndpoint,
+		ctx:                 ctx,
+		pool:                pool,
+		svc:                 svc,
+		logger:              logger,
+		job:                 job,
+		endpoint:            endpoint,
+		sdgEndpoint:         sdgEndpoint,
+		tlsClientCertPath:   tlsClientCertPath,
+		tlsClientKeyPath:    tlsClientKeyPath,
+		tlsServerCaCertPath: tlsServerCaCertPath,
 	}
 }
 
@@ -175,7 +186,7 @@ var generateCmd = &cobra.Command{
 		go func(ch <-chan string) {
 			defer wg.Done()
 			for job := range ch {
-				jp := NewJobProcessor(ctx, pool, svc, sugar, job, EndpointURL, SdgEndpointURL)
+				jp := NewJobProcessor(ctx, pool, svc, sugar, job, EndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath)
 				jp.processJob()
 			}
 		}(jobChan)
@@ -246,7 +257,6 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 	if yamlFileCount == 0 {
 		errMsg := "No modified YAML files detected in the PR for precheck"
 		w.logger.Error(errMsg)
-		//w.reportJobError(fmt.Errorf(errMsg))
 		return fmt.Errorf(errMsg)
 	}
 
@@ -320,7 +330,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 // processJob processes a given job, all jobs start here
 func (w *Worker) processJob() {
 	sugar := w.logger.With("job", w.job)
-	sugar.Info("Processing job")
+	sugar.Infof("Processing job %s", w.job)
 
 	// Get a new Redis connection from the pool for this operation
 	conn := w.pool.Get()
@@ -535,36 +545,51 @@ func (w *Worker) processJob() {
 			return
 		}
 	case jobSDG:
-		generateArgs := []string{
-			jobSDG,
-			"--num-instructions", fmt.Sprintf("%d", NumInstructions),
-			"--output-dir", outputDir,
-			"--tls-client-cert", TlsClientCertPath,
-			"--tls-client-key", TlsClientKeyPath,
-			"--tls-server-ca-cert", TlsServerCaCertPath,
-			"--endpoint-url", SdgEndpointURL,
-		}
-
-		cmd = exec.CommandContext(w.ctx, lab, generateArgs...)
-		if WorkDir != "" {
-			cmd.Dir = WorkDir
-		}
-
+		// TODO: temporarily disabling ilab diff since most taxonomy files fail this check and its hard
+		// to try and validate this when most fail (especially small quick ones)
+		// Execute 'ilab diff' and capture its output
+		cmdDiff := exec.Command("ilab", "diff")
 		var stderr bytes.Buffer
-		// Capture both the ilab err buffer and the os.Stderr
-		cmd.Stderr = io.MultiWriter(&stderr, os.Stderr)
-		cmd.Env = os.Environ()
-		cmd.Stdout = os.Stdout
+		cmdDiff.Stderr = &stderr
 
-		sugar.Debug(fmt.Sprintf("Running %s job", jobType))
-		// Run the command
-		sugar.Infof("Running the ilab sdg-svc command: %s", cmd.String())
-		if err := cmd.Run(); err != nil {
-			detailedErr := fmt.Errorf("Error running command (%s %s): %v. \nDetails: %s", cmd.Path, strings.Join(generateArgs, " "), err, stderr.String())
-			sugar.Errorf(detailedErr.Error())
+		diffOutput, err := cmdDiff.Output()
+		if err != nil {
+			detailedErr := fmt.Errorf("Failed to execute 'ilab diff': %v. \nDetails: %s", err, stderr.String())
 			w.reportJobError(detailedErr)
+			sugar.Errorf(detailedErr.Error())
 			return
 		}
+
+		diffOutputLines := strings.Split(string(diffOutput), "\n")
+
+		// Filter taxonomy files ending in .yaml
+		var taxonomyFiles []string
+		for _, line := range diffOutputLines {
+			if strings.HasSuffix(line, ".yaml") {
+				taxonomyFiles = append(taxonomyFiles, path.Join(workDir, "taxonomy", line))
+			}
+		}
+
+		// Uncomment to bypass ilab diff
+		//taxonomyFiles, err := discoverGitTaxonomyFiles(taxonomyDir, "main")
+		//if err != nil {
+		//	sugar.Errorf("Failed to discover taxonomy files: %v", err)
+		//	return
+		//}
+
+		if len(taxonomyFiles) == 0 {
+			sugar.Info("No taxonomy files were changed.")
+			return
+		}
+
+		outputFiles, err := w.datagenSvc(taxonomyFiles, outputDir, NumInstructions)
+		if err != nil {
+			sugar.Errorf("Failed to generate data: %v", err)
+			w.reportJobError(err)
+			return
+		}
+		sugar.Infof("Generated data written to: %v", outputFiles)
+
 	default:
 		sugar.Errorf("Unknown job type: %s", jobType)
 		return
@@ -646,6 +671,12 @@ func (w *Worker) processJob() {
 func (w *Worker) postJobResults(URL, jobType string) {
 	conn := w.pool.Get()
 	defer conn.Close()
+
+	jobDuration := time.Since(w.jobStart).Seconds()
+	w.logger.Infof("Job took %f s to run", jobDuration)
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:duration", w.job), jobDuration); err != nil {
+		w.logger.Errorf("Could not set job duration in redis: %v", err)
+	}
 
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", w.job), URL); err != nil {
 		w.logger.Errorf("Could not set s3_url in redis: %v", err)
@@ -865,3 +896,179 @@ func (w *Worker) determineModelName(jobType string) string {
 
 	return w.getModelNameFromConfig()
 }
+
+// datagenSvc generates data for the given taxonomy files and writes the results to the specified output directory.
+func (w *Worker) datagenSvc(taxonomyFiles []string, outputDir string, numSamples int) ([]string, error) {
+	var outputFiles []string
+
+	certs, err := tls.LoadX509KeyPair(w.tlsClientCertPath, w.tlsClientKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load client certificate/key: %w", err)
+	}
+	caCert, err := os.ReadFile(w.tlsServerCaCertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{certs},
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: true,
+	}
+	httpClient := &http.Client{
+		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+	}
+
+	// Iterate over taxonomy files and make HTTP requests for each
+	for _, tf := range taxonomyFiles {
+		tfData, err := os.ReadFile(tf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read taxonomy file '%s': %w", tf, err)
+		}
+
+		// Convert interface maps to string maps for JSON marshaling
+		var tfMapInterface map[interface{}]interface{}
+		if err := yaml.Unmarshal(tfData, &tfMapInterface); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
+		}
+		tfMap := interfaceMapToStringMap(tfMapInterface).(map[string]interface{})
+
+		tfMap["mm_model_id"] = sdgModel
+		tfMap["num_samples"] = numSamples
+
+		jsonData, err := json.Marshal(tfMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+
+		// Modify the endpoint URL if the filepath includes "taxonomy/knowledge"
+		requestURL := w.sdgEndpoint
+		if strings.Contains(tf, "taxonomy/knowledge") {
+			requestURL = strings.Replace(requestURL, "skill", "knowledge", -1)
+		}
+
+		request, err := http.NewRequest("POST", requestURL, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Accept", "application/json")
+
+		w.logger.Infof("SDG Post Details: %v", request)
+
+		response, err := httpClient.Do(request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute request: %w", err)
+		}
+		defer response.Body.Close()
+
+		responseBody, err := io.ReadAll(response.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("unexpected status code %d: %s", response.StatusCode, string(responseBody))
+		}
+
+		outputPath := path.Join(outputDir, fmt.Sprintf("sdg_%d_%s.json", time.Now().Unix(), filepath.Base(tf)))
+		if err := os.WriteFile(outputPath, responseBody, 0644); err != nil {
+			return nil, fmt.Errorf("failed to write output file: %w", err)
+		}
+
+		outputFiles = append(outputFiles, outputPath)
+	}
+
+	return outputFiles, nil
+}
+
+func interfaceMapToStringMap(in interface{}) interface{} {
+	switch x := in.(type) {
+	case map[interface{}]interface{}:
+		m2 := map[string]interface{}{}
+		for k, v := range x {
+			m2[fmt.Sprint(k)] = interfaceMapToStringMap(v)
+		}
+		return m2
+	case []interface{}:
+		for i, v := range x {
+			x[i] = interfaceMapToStringMap(v)
+		}
+	}
+	return in
+}
+
+/* Uncomment to bypass ilab diff
+// discoverGitTaxonomyFiles discovers new or modified YAML taxonomy files in the specified Git repository.
+// This temporarily replaces ilab diff since that fails on most files because it's hard to validate when most taxonomies
+// to test with fail when using ilab diff.
+func discoverGitTaxonomyFiles(repoPath string, baseBranchName string) ([]string, error) {
+	r, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the HEAD commit
+	headRef, err := r.Head()
+	if err != nil {
+		return nil, err
+	}
+	headCommit, err := r.CommitObject(headRef.Hash())
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the HEAD commit tree
+	headTree, err := headCommit.Tree()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the base branch commit
+	baseRef, err := r.Reference(plumbing.NewBranchReferenceName(baseBranchName), true)
+	if err != nil {
+		return nil, err
+	}
+	baseCommit, err := r.CommitObject(baseRef.Hash())
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the base commit tree
+	baseTree, err := baseCommit.Tree()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the diff between the base and HEAD commit trees
+	diff, err := object.DiffTree(baseTree, headTree)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate a patch from the diff
+	patch, err := diff.Patch()
+	if err != nil {
+		return nil, err
+	}
+
+	var taxonomyFiles []string
+	for _, filePatch := range patch.FilePatches() {
+		_, to := filePatch.Files()
+		if to == nil {
+			continue // Deleted file, skip it
+		}
+		filePath := to.Path()
+		// Parse out yaml files
+		for _, folder := range TaxonomyFolders {
+			if strings.HasPrefix(filePath, folder+"/") && strings.HasSuffix(filePath, ".yaml") {
+				taxonomyFiles = append(taxonomyFiles, filePath)
+				break
+			}
+		}
+	}
+
+	return taxonomyFiles, nil
+}
+*/
