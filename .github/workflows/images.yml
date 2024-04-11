@@ -3,11 +3,10 @@ name: Publish container image
 on:
   workflow_dispatch:
 
-# Temporarily disable automated image push due to repo resource constraints until open sourced
-# on:
-#   push:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   push_to_registries_bot:
