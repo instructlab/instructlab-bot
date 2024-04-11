@@ -116,3 +116,11 @@ This playbook installs all the components in the containers.
 ```console
 ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-bot-stack.yml
 ```
+
+## Install or reconfigure the Worker stack
+
+This playbook installs all the required component on the host itself
+
+```console
+ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-worker-stack.yml
+```

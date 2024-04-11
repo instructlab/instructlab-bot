@@ -8,10 +8,10 @@
 ### VPC Security Group ###
 - name: Creating Security Group for VPC Instruct Bot
   amazon.aws.ec2_security_group:
-    name: "{{ secgroup_name }}"
-    aws_region: "{{ aws_region }}"
-    description: "{{ security_group_description }}"
-    vpc_id: "{{ vpc_id }}"
+    name: "{{ ec2_secgroup_name }}"
+    aws_region: "{{ ec2_aws_region }}"
+    description: "{{ ec2_security_group_description }}"
+    vpc_id: "{{ ec2_vpc_id }}"
     rules:
       - proto: all
         cidr_ip: "0.0.0.0/0"
@@ -19,12 +19,12 @@
 #### Node Deployment ###
 - name: Deploying EC2 Node
   amazon.aws.ec2_instance:
-    name: "{{ aws_nodetype_tag }}-{{ item + 1 }}"
-    aws_region: "{{ aws_region }}"
-    key_name: "{{ aws_key_name }}"
-    instance_type: "{{ aws_instance_type }}"
-    image_id: "{{ aws_image_id }}"
-    security_group: "{{ secgroup_name }}"
+    name: "{{ ec2_aws_nodetype_tag }}-{{ item + 1 }}"
+    aws_region: "{{ ec2_aws_region }}"
+    key_name: "{{ ec2_aws_key_name }}"
+    instance_type: "{{ ec2_aws_instance_type }}"
+    image_id: "{{ ec2_aws_image_id }}"
+    security_group: "{{ ec2_secgroup_name }}"
     volumes:
       - device_name: /dev/sda1
         ebs:
@@ -33,13 +33,13 @@
           volume_type: standard
     network:
       assign_public_ip: true
-    subnet_id: "{{ aws_subnet }}"
+    subnet_id: "{{ ec2_aws_subnet }}"
     tags:
-      NodeType: "{{ aws_nodetype_tag }}"
+      NodeType: "{{ ec2_aws_nodetype_tag }}"
     state: running
     wait: true
   register: node_ip
-  loop: "{{ range(0, node_count | int) }}"
+  loop: "{{ range(0, ec2_node_count | int) }}"
   async: 7200
   poll: 0
 
@@ -53,15 +53,15 @@
 
 - name: Combine ec2_jobs and index
   ansible.builtin.set_fact:
-    ec2_jobs_with_index: "{{ ec2_jobs.results | zip(range(0, node_count | int)) | list }}"
+    ec2_jobs_with_index: "{{ ec2_jobs.results | zip(range(0, ec2_node_count | int)) | list }}"
 
 - name: Updating the node's public ip in inventory
   ansible.builtin.lineinfile:
     path: "{{ inventory_location }}"
     regexp: "labNodes"
-    line: "[labNodes]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file=~/.ssh/id_rsa"
+    line: "[labNodes]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file={{ aws_key_path }}"
   loop: "{{ ec2_jobs_with_index }}"
-  when: aws_instance_type == "g4dn.xlarge"
+  when: ec2_aws_instance_type == "g4dn.xlarge"
 
 - name: Updating the node's public ip in inventory
   ansible.builtin.lineinfile:
@@ -69,7 +69,7 @@
     regexp: "botNode"
     line: "[botNode]\n{{ item.0['instances'][0]['public_ip_address'] }} ansible_ssh_user=fedora ansible_ssh_private_key_file={{ aws_key_path }}"
   loop: "{{ ec2_jobs_with_index }}"
-  when: aws_instance_type != "g4dn.xlarge"
+  when: ec2_aws_instance_type != "g4dn.xlarge"
 
 - name: Parse the first host from the inventory
   ansible.builtin.set_fact:

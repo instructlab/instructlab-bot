@@ -1,10 +1,39 @@
 ## Global Variables
-nexd_args: "--reg-key <nexodus-reg-key-url>"
+## Ansible variables
+inventory_location: inventory.txt     # leaving this as is will use the inventory.txt file in the base directory
+
+## AWS variables
+aws_key_path: "./instruct-bot.pem"
+aws_access_key_id:
+aws_secret_access_key:
+
+## Bot setup variables
+nexodus_reg_key:
+# redis_ip: "" # Set it to the wireguard IP of the botNode
 redis_port: 6379
 github_token:
-webhook_proxy_url: "<smee-proxy-url>"
+webhook_proxy_url: ""
 app_id:
 webhook_secret: ""
 private_key: |
       -----BEGIN RSA PRIVATE KEY-----
       -----END RSA PRIVATE KEY-----
+
+## Worker Stack Variables
+
+# taxonomy_repo: https://instruct-lab-bot:{{ github_token }}@github.com/instruct-lab/taxonomy.git
+# bot_repo: https://instruct-lab-bot:{{ github_token }}@github.com/instruct-lab/instruct-lab-bot.git
+endpoint_url:
+sdg_endpoint_url:
+
+tls_client_cert: |
+      -----BEGIN CERTIFICATE-----
+      -----END CERTIFICATE-----
+
+tls_client_key: |
+      -----BEGIN PRIVATE KEY-----
+      -----END PRIVATE KEY-----
+
+tls_server_ca_cert: |
+      -----BEGIN CERTIFICATE-----
+      -----END CERTIFICATE-----

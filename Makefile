@@ -136,3 +136,12 @@ run-dev: ## Deploy the bot development stack.
 redis-stack: ## Run a redis-stack container
 	$(ECHO_PREFIX) printf "  %-12s redis/redis-stack:latest\n" "[PODMAN]"
 	$(CMD_PREFIX) podman run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+
+.PHONY: deploy-aws-stack
+deploy-aws-stack: ## Deploy the bot stack to AWS
+	$(ECHO_PREFIX) printf "  %-12s \n" "[DEPLOY AWS INSTRUCT LAB BOT STACK]"
+	$(ECHO_PREFIX) printf "Deploy the Instruct Lab Bot stack to AWS\n"
+	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook ./deploy-ec2-bot.yml
+	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook -i ./inventory.txt ./deploy-bot-stack.yml
+	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook ./deploy-ec2-worker.yml
+	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook -i ./inventory.txt ./deploy-worker-stack.yml

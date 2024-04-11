@@ -14,7 +14,7 @@
 - name: Configure nexodus by updated /etc/sysconfig/nexodus
   ansible.builtin.lineinfile:
     path: /etc/sysconfig/nexodus
-    line: 'NEXD_ARGS={{ nexd_args }}'
+    line: 'NEXD_ARGS="--reg-key {{ nexodus_reg_key | mandatory }}"'
   become: true
 
 - name: Start nexodus systemd service

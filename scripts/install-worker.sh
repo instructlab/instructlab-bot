@@ -4,11 +4,27 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
 COMMAND=""
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
+TAXONOMY_REPO=${TAXONOMY_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/taxonomy.git"}
+BOT_REPO=${BOT_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/instruct-lab-bot.git"}
+GITHUB_TOKEN=${GITHUB_TOKEN:-""}
+
 GPU_TYPE=${GPU_TYPE:-""}
 NEXODUS_REG_KEY=${NEXODUS_REG_KEY:-""}
 OS=""
 REDIS_IP=${REDIS_IP:-"127.0.0.1"}
 WORK_DIR=${WORK_DIR:-"${HOME}/instruct-lab-bot"}
+
+ENDPOINT_URL=${ENDPOINT_URL:-"http://localhost:8000/v1"}
+SDG_ENDPOINT_URL=${SDG_ENDPOINT_URL:-""}
+
+TLS_CLIENT_KEY=${TLS_CLIENT_KEY:-""}
+TLS_CLIENT_CERT=${TLS_CLIENT_CERT:-""}
+TLS_SERVER_CA_CERT=${TLS_SERVER_CA_CERT:-""}
+
+TLS_SECRETS_DIR=${TLS_SECRETS_DIR:-"${HOME}/instruct-lab-bot"}
+TLS_SECRETS_EXISTS=0
+
+EXTRA_ARGS=""
 
 # Export CUDA environment variables
 export CUDA_HOME=/usr/local/cuda
@@ -36,6 +52,12 @@ usage() {
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
     echo "  --redis-ip IP: Optionally the IP address of the Redis server. Default: ${REDIS_IP}"
     echo "  --work-dir DIR: Optionally the directory to use for the worker. Default: ${WORK_DIR}"
+    echo "  --endpoint-url URL: The endpoint URL for the icli precheck. Default: http://localhost:8000/v1"
+    echo "  --sdg-endpoint-url URL: The endpoint URL for the icli sdg-svc. Default: "
+    echo "  --tls-client-key KEY: The TLS client key for icli sdg-svc"
+    echo "  --tls-client-cert CERT: The TLS client certificate for icli sdg-svc"
+    echo "  --tls-server-ca-cert CERT: The TLS server CA cert for icli sdg-svc"
+    echo "  --tls-secrets-dir DIR: Directory to store TLS secrets. Default: ${TLS_SECRETS_DIR}"
     echo
     supported_envs
 }
@@ -161,11 +183,25 @@ install_nexodus() {
     fi
 }
 
+install_tls_secrets() {
+    if [ -n "${TLS_CLIENT_KEY}" ] && [ -n "${TLS_CLIENT_CERT}" ] && [ -n "${TLS_SERVER_CA_CERT}" ]; then
+        sudo mkdir -p "${TLS_SECRETS_DIR}"
+        sudo echo "${TLS_CLIENT_KEY}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/tls-client.key"
+        sudo echo "${TLS_CLIENT_CERT}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/tls-cert.key"
+        sudo echo "${TLS_SERVER_CA_CERT}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/tls-server-ca.crt"
+        TLS_SECRETS_EXISTS=1
+    elif
+      [ -f "${TLS_SECRETS_DIR}/tls-client.key" ] && [ -f "${TLS_SECRETS_DIR}/tls-cert.key" ] && [ -f "${TLS_SECRETS_DIR}/tls-server-ca.crt" ]; then
+        echo "TLS secrets already exist in ${TLS_SECRETS_DIR}"
+        TLS_SECRETS_EXISTS=1
+    fi
+}
+
 setup_workdir() {
     mkdir -p "${WORK_DIR}"
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if [ ! -d taxonomy ]; then
-        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/taxonomy.git"
+        git clone "${TAXONOMY_REPO}"
     fi
 }
 
@@ -183,7 +219,7 @@ RestartSec=1
 User=fedora
 Group=fedora
 ExecStart=ilab serve
-WorkingDirectory=/home/fedora/instruct-lab-bot
+WorkingDirectory=${WORK_DIR}
 
 [Install]
 WantedBy=multi-user.target
@@ -215,7 +251,7 @@ install_lab() {
 install_bot_worker() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if [ ! -d bot-repo ]; then
-        git clone "https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/instruct-lab-bot.git" bot-repo
+        git clone "${BOT_REPO}" bot-repo
     fi
     pushd bot-repo || (echo "Failed to change to bot-repo directory" && exit 1)
     git pull -r
@@ -233,6 +269,16 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
+    # Check if ENDPOINT_URL is set
+    if [ -n "${ENDPOINT_URL}" ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --endpoint-url ${ENDPOINT_URL}"
+    fi
+
+    # Check if SDG_ENDPOINT_URL is set and TLS_SECRETS_EXISTS is true
+    if [ -n "${SDG_ENDPOINT_URL}" ] && [ "${TLS_SECRETS_EXISTS}" -eq 1 ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --sdg-endpoint-url ${SDG_ENDPOINT_URL} --tls-client-key ${TLS_SECRETS_DIR}/tls-client.key --tls-client-cert ${TLS_SECRETS_DIR}/tls-cert.key --tls-server-ca-cert ${TLS_SECRETS_DIR}/tls-server-ca.crt"
+    fi
+
     cat << EOF > labbotworker.service
 [Unit]
 Description=Instruct Lab GitHub Bot Worker
@@ -246,8 +292,8 @@ RestartSec=1
 User=fedora
 Group=fedora
 EnvironmentFile=/etc/sysconfig/labbotworker
-WorkingDirectory=/home/fedora/instruct-lab-bot
-ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379
+WorkingDirectory=${WORK_DIR}
+ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379 ${EXTRA_ARGS}
 
 [Install]
 WantedBy=multi-user.target
@@ -262,6 +308,7 @@ command_install() {
     check_install_prereqs
     install_prereqs
     install_nexodus
+    install_tls_secrets
     setup_workdir
     install_lab
     install_bot_worker
@@ -302,6 +349,14 @@ while [ $# -gt 0 ]; do
             GITHUB_TOKEN="$2"
             shift
             ;;
+        --taxonomy-repo)
+            TAXONOMY_REPO="$2"
+            shift
+            ;;
+        --bot-repo)
+            BOT_REPO="$2"
+            shift
+            ;;
         --gpu-type)
             GPU_TYPE="$2"
             shift
@@ -319,6 +374,30 @@ while [ $# -gt 0 ]; do
             ;;
         --work-dir)
             WORK_DIR="$2"
+            shift
+            ;;
+        --endpoint-url)
+            ENDPOINT_URL="$2"
+            shift
+            ;;
+        --sdg-endpoint-url)
+            SDG_ENDPOINT_URL="$2"
+            shift
+            ;;
+        --tls-client-key)
+            TLS_CLIENT_KEY="$2"
+            shift
+            ;;
+        --tls-client-cert)
+            TLS_CLIENT_CERT="$2"
+            shift
+            ;;
+        --tls-server-ca-cert)
+            TLS_SERVER_CA_CERT="$2"
+            shift
+            ;;
+        --tls-secrets-dir)
+            TLS_SECRETS_DIR="$2"
             shift
             ;;
         *)
