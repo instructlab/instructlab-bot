@@ -19,6 +19,7 @@ import (
 
 	"github.com/instruct-lab/instruct-lab-bot/gobot/config"
 	"github.com/instruct-lab/instruct-lab-bot/gobot/handlers"
+	"github.com/instruct-lab/instruct-lab-bot/gobot/util"
 )
 
 func Run(zLogger *zap.Logger) error {
@@ -49,6 +50,7 @@ func Run(zLogger *zap.Logger) error {
 		Logger:         logger,
 		RedisHostPort:  config.AppConfig.RedisHostPort,
 		RequiredLabels: config.AppConfig.RequiredLabels,
+		Maintainers:    config.AppConfig.Maintainers,
 		BotUsername:    config.GetBotUsername(),
 	}
 
@@ -133,11 +135,6 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			logger.Errorf("No PR number found for job %s", result)
 			continue
 		}
-		prNumInt, err := strconv.Atoi(prNumber)
-		if err != nil {
-			logger.Errorf("Error converting PR number to int: %v", err)
-			continue
-		}
 
 		installID, err := r.Get("jobs:" + result + ":installation_id").Result()
 		if err != nil || installID == "" {
@@ -162,14 +159,46 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			continue
 		}
 
+		jobType, err := r.Get("jobs:" + result + ":job_type").Result()
+		if err != nil || repoName == "" {
+			logger.Errorf("No job type found for job %s", result)
+			continue
+		}
+
+		prSha, err := r.Get("jobs:" + result + ":pr_sha").Result()
+		if err != nil || repoName == "" {
+			logger.Errorf("No pr sha found for job %s", result)
+			continue
+		}
+
 		logger.Infof("Processing result for %s/%s#%s, job ID: %s", repoOwner, repoName, prNumber, result)
+
+		var statusContext string
+		switch jobType {
+		case "generate":
+			statusContext = util.GenerateLocalStatus
+		case "precheck":
+			statusContext = util.PrecheckStatus
+		case "sdg-svc":
+			statusContext = util.GenerateSDGStatus
+		default:
+			logger.Errorf("Unknown job type: %s", jobType)
+		}
+
+		client, err := cc.NewInstallationClient(int64(installIDInt))
+		if err != nil {
+			logger.Errorf("Failed to create installation client: %v", err)
+			continue
+		}
 
 		// check for errors prior to checking for an S3 url and models since that will not get produced on a failure
 		prErrors, _ := r.Get("jobs:" + result + ":errors").Result()
 		if prErrors != "" {
-			errCommentBody := fmt.Sprintf("Beep, boop 🤖 an error occurred while processing your request, please review the following log for job id %s :\n```\n%s\n```", result, prErrors)
-			if err := PostComment(ctx, cc, logger, installIDInt, repoOwner, repoName, prNumInt, errCommentBody); err != nil {
-				logger.Errorf("Failed to send issue comment: %v", err)
+			errCommentBody := fmt.Sprintf("An error occurred while processing your request, please review the following log for job id %s :\n```\n%s\n```", result, prErrors)
+
+			err = util.PostPullRequestStatus(ctx, client, util.Error, errCommentBody, statusContext, util.InstructLabMaintainersTeamUrl, repoOwner, repoName, prSha)
+			if err != nil {
+				logger.Errorf("Failed to update pull request status: %v", err)
 			}
 			continue
 		}
@@ -189,16 +218,17 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		}
 
 		// Add the model name only if it's not empty
-		commentBody := fmt.Sprintf("Beep, boop 🤖  The test data has been generated for job ID: %s", result)
+		commentBody := fmt.Sprintf("The test data has been generated for job ID: %s", result)
 		if modelName != "" {
 			commentBody += " " + modelName
 		}
-		commentBody += fmt.Sprintf("!\n\nFind your results [here](%s).", s3Url)
+		commentBody += "!\n\nClick details ."
 
-		err = PostComment(ctx, cc, logger, installIDInt, repoOwner, repoName, prNumInt, commentBody)
+		err = util.PostPullRequestStatus(ctx, client, util.Success, commentBody, statusContext, s3Url, repoOwner, repoName, prSha)
 		if err != nil {
-			logger.Errorf("Failed to send issue comment: %v", err)
+			logger.Errorf("Failed to update pull request status: %v", err)
 		}
+
 	}
 }
 

@@ -23,6 +23,7 @@ type MyApplicationConfig struct {
 	RedisHostPort   string   `yaml:"redis_hostport"`
 	WebhookProxyURL string   `yaml:"webhook_proxy_url"`
 	RequiredLabels  []string `yaml:"required_labels,omitempty"`
+	Maintainers     []string `yaml:"maintainers,omitempty"`
 	BotUsername     string   `yaml:"bot_username,omitempty"`
 }
 
