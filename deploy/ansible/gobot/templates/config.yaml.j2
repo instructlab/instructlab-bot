@@ -5,6 +5,14 @@ server:
 app_configuration:
   redis_hostport: "{{ redis_ip }}:6379"
   webhook_proxy_url: "{{ webhook_proxy_url }}"
+  maintainers:
+    - "taxonomy-triagers"
+    - "taxonomy-approvers"
+    - "taxonomy-maintainers"
+    - "labrador-org-maintainers"
+  required_labels:
+    - "skill"
+    - "knowledge"
 
 github:
   v3_api_url: "https://api.github.com/"
