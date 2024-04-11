@@ -11,7 +11,9 @@ app_configuration:
   # bot commands are allowed to execute. If none is specified,
   # bot commands will always be allowed by anyone able to comment
   # on PRs.
-  required_label: "triage-ok-to-test"
+  required_labels: 
+    - "triage-ok-to-test"
+    - "knowledge"
   # Optional. If left commented, the default bot account is @instruct-lab-bot
   # bot_username: "@instruct-lab-bot"
 

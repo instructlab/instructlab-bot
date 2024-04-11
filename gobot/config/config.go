@@ -20,10 +20,10 @@ type HTTPConfig struct {
 }
 
 type MyApplicationConfig struct {
-	RedisHostPort   string `yaml:"redis_hostport"`
-	WebhookProxyURL string `yaml:"webhook_proxy_url"`
-	RequiredLabel   string `yaml:"required_label,omitempty"`
-	BotUsername     string `yaml:"bot_username,omitempty"`
+	RedisHostPort   string   `yaml:"redis_hostport"`
+	WebhookProxyURL string   `yaml:"webhook_proxy_url"`
+	RequiredLabels  []string `yaml:"required_labels,omitempty"`
+	BotUsername     string   `yaml:"bot_username,omitempty"`
 }
 
 func ReadConfig(path string) (*Config, error) {

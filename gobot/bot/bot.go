@@ -45,18 +45,18 @@ func Run(zLogger *zap.Logger) error {
 	}
 
 	prCommentHandler := &handlers.PRCommentHandler{
-		ClientCreator: cc,
-		Logger:        logger,
-		RedisHostPort: config.AppConfig.RedisHostPort,
-		RequiredLabel: config.AppConfig.RequiredLabel,
-		BotUsername:   config.GetBotUsername(),
+		ClientCreator:  cc,
+		Logger:         logger,
+		RedisHostPort:  config.AppConfig.RedisHostPort,
+		RequiredLabels: config.AppConfig.RequiredLabels,
+		BotUsername:    config.GetBotUsername(),
 	}
 
 	prHandler := &handlers.PullRequestHandler{
-		ClientCreator: cc,
-		Logger:        logger,
-		RequiredLabel: config.AppConfig.RequiredLabel,
-		BotUsername:   config.GetBotUsername(),
+		ClientCreator:  cc,
+		Logger:         logger,
+		RequiredLabels: config.AppConfig.RequiredLabels,
+		BotUsername:    config.GetBotUsername(),
 	}
 
 	webhookHandler := githubapp.NewDefaultEventDispatcher(config.Github, prCommentHandler, prHandler)
