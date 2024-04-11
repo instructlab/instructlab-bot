@@ -38,6 +38,13 @@ Click on Install button to install the app in your account. Installation will as
 
 Select the local fork of the `taxonomy` repository that you have created in your account.
 
+### Create a personal access token
+
+A Github PAT is required to checkout the contents of a private repository. To create a personal access token, go to [Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) and follow the instructions to create a new token.
+You may choose to create a fine-grained token that only has access to the `taxonomy` repository fork.
+
+The username and PAT can be provided to the worker using environment variables in your `.env` file
+
 ## Setup local development deployment
 
 This setup deploys a podman compose stack. By default, the stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
