@@ -62,6 +62,13 @@ You may provide these options as command line flags, environment variables, or i
 
 A template `.env.example` file is provided in the root of the repository. You can copy this file to `.env` and fill in the values.
 
+The certificate should be stored on a single line in the .env file, without quotes.
+This can be done with the following command:
+
+```bash
+awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' cert-name.pem
+```
+
 To run the bot:
 
 ```bash

@@ -46,9 +46,9 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&RedisHost, "redis", "", "redis:6379", "The Redis instance to connect to")
-	rootCmd.PersistentFlags().StringVarP(&HTTPAddress, "http-address", "", "0.0.0.0", "HTTP Address to bind to")
+	rootCmd.PersistentFlags().StringVarP(&HTTPAddress, "http-address", "", "127.0.0.1", "HTTP Address to bind to")
 	rootCmd.PersistentFlags().IntVarP(&HTTPPort, "http-port", "", 8080, "HTTP Port to bind to")
-	rootCmd.PersistentFlags().IntVarP(&GithubIntegrationID, "integration-id", "", 0, "The GitHub App Integration ID")
+	rootCmd.PersistentFlags().IntVarP(&GithubIntegrationID, "github-integration-id", "", 0, "The GitHub App Integration ID")
 	rootCmd.PersistentFlags().StringVarP(&GithubURL, "github-url", "", "https://api.github.com/", "The URL of the GitHub instance")
 	rootCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
 	rootCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
@@ -75,6 +75,8 @@ var rootCmd = &cobra.Command{
 func run(logger *zap.SugaredLogger) error {
 	logger.Info("Starting bot...")
 	metricsRegistry := metrics.DefaultRegistry
+	// Replace all instances of \n with actual newlines
+	GithubAppPrivateKey = strings.ReplaceAll(GithubAppPrivateKey, "\\n", "\n")
 
 	ghConfig := githubapp.Config{
 		V3APIURL: GithubURL,
