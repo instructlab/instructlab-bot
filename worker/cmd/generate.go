@@ -378,112 +378,15 @@ func (w *Worker) processJob() {
 	taxonomyDir := path.Join(workDir, "taxonomy")
 	sugar = sugar.With("work_dir", workDir, "origin", Origin)
 
-	sugar.Debug("Opening taxonomy git repo")
-	r, err := git.PlainOpen(taxonomyDir)
+	headHash, err := w.gitOperations(sugar, taxonomyDir, prNumber)
 	if err != nil {
-		sugar.Errorf("Could not open taxonomy git repo: %v", err)
+		w.logger.Errorf("git operations error: %v", err)
+		wrappedErr := fmt.Errorf("git operations error: %w", err)
+		w.reportJobError(wrappedErr)
 		return
 	}
 
-	retryFetch := func() error {
-		var lastErr error
-		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
-			sugar.Debug("Fetching from origin")
-			err = r.Fetch(&git.FetchOptions{
-				RemoteName: Origin,
-				Auth: &githttp.BasicAuth{
-					Username: "instruct-lab-bot",
-					Password: GithubToken,
-				},
-			})
-			if err == nil {
-				return nil
-			}
-			lastErr = err
-			if attempt < gitMaxRetries {
-				sugar.Infof("Retrying fetching updates, attempt %d/%d", attempt+1, gitMaxRetries)
-				time.Sleep(gitRetryDelay)
-			}
-		}
-		return lastErr
-	}
-	if err := retryFetch(); err != nil && err != git.NoErrAlreadyUpToDate {
-		sugar.Errorf("Could not fetch from origin: %v", err)
-		return
-	}
-
-	wt, err := r.Worktree()
-	if err != nil {
-		sugar.Errorf("Could not get worktree: %v", err)
-		return
-	}
-
-	sugar.Debug("Checking out main")
-	// Retry mechanism for checking out main branch
-	retryCheckout := func() error {
-		var lastErr error
-		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
-			err := wt.Checkout(&git.CheckoutOptions{
-				Branch: plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/main", Origin)),
-			})
-			if err == nil {
-				return nil
-			}
-			lastErr = err
-			if attempt < gitMaxRetries {
-				sugar.Infof("Retrying checkout of main, attempt %d/%d", attempt+1, gitMaxRetries)
-				time.Sleep(gitRetryDelay)
-			}
-		}
-		return lastErr
-	}
-
-	if err := retryCheckout(); err != nil {
-		sugar.Errorf("Could not checkout main after retries: %v", err)
-		return
-	}
-
-	prBranchName := fmt.Sprintf("pr-%s", prNumber)
-	if _, err := r.Branch(prBranchName); err == nil {
-		err = r.DeleteBranch(prBranchName)
-		if err != nil {
-			sugar.Errorf("Could not delete branch %s: %v", prBranchName, err)
-			return
-		}
-	}
-
-	sugar = sugar.With("pr_branch_name", prBranchName)
-	sugar.Debug("Fetching PR branch")
-	refspec := gitconfig.RefSpec(fmt.Sprintf("refs/pull/%s/head:refs/heads/%s", prNumber, prBranchName))
-	err = r.Fetch(&git.FetchOptions{
-		RemoteName: Origin,
-		RefSpecs:   []gitconfig.RefSpec{refspec},
-		Auth: &githttp.BasicAuth{
-			Username: "instruct-lab-bot",
-			Password: GithubToken,
-		},
-	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
-		sugar.Errorf("Could not fetch PR branch: %v", err)
-		return
-	}
-
-	sugar.Debug("Checking out PR branch")
-	err = wt.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(prBranchName),
-	})
-	if err != nil {
-		sugar.Errorf("Could not checkout PR branch: %v", err)
-		return
-	}
-
-	head, err := r.Head()
-	if err != nil {
-		sugar.Errorf("Could not get HEAD: %v", err)
-		return
-	}
-
-	outDirName := fmt.Sprintf("%s-pr-%s-%s", jobType, prNumber, head.Hash())
+	outDirName := fmt.Sprintf("%s-pr-%s-%s", jobType, prNumber, headHash)
 	outputDir := path.Join(workDir, outDirName)
 
 	sugar = sugar.With("out_dir", outputDir)
@@ -665,6 +568,108 @@ func (w *Worker) processJob() {
 	// Notify the "results" queue that the job is done with the public URL
 	w.postJobResults(indexPublicURL, jobType)
 	sugar.Infof("Job done")
+}
+
+// gitOperations handles the Git-related operations for a job and returns the head hash
+func (w *Worker) gitOperations(sugar *zap.SugaredLogger, taxonomyDir string, prNumber string) (string, error) {
+	sugar.Debug("Opening taxonomy git repo")
+	r, err := git.PlainOpen(taxonomyDir)
+	if err != nil {
+		return "", fmt.Errorf("could not open taxonomy git repo: %v", err)
+	}
+
+	retryFetch := func() error {
+		var lastErr error
+		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
+			sugar.Debug("Fetching from origin")
+			err = r.Fetch(&git.FetchOptions{
+				RemoteName: Origin,
+				Auth: &githttp.BasicAuth{
+					Username: "instruct-lab-bot",
+					Password: GithubToken,
+				},
+			})
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+			if attempt < gitMaxRetries {
+				sugar.Infof("Retrying fetching updates, attempt %d/%d", attempt+1, gitMaxRetries)
+				time.Sleep(gitRetryDelay)
+			}
+		}
+		return lastErr
+	}
+	if err := retryFetch(); err != nil && err != git.NoErrAlreadyUpToDate {
+		return "", fmt.Errorf("could not fetch from origin: %v", err)
+	}
+
+	wt, err := r.Worktree()
+	if err != nil {
+		return "", fmt.Errorf("could not get worktree: %v", err)
+	}
+
+	sugar.Debug("Checking out main")
+	// Retry mechanism for checking out main branch
+	retryCheckout := func() error {
+		var lastErr error
+		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
+			err := wt.Checkout(&git.CheckoutOptions{
+				Branch: plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/main", Origin)),
+			})
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+			if attempt < gitMaxRetries {
+				sugar.Infof("Retrying checkout of main, attempt %d/%d", attempt+1, gitMaxRetries)
+				time.Sleep(gitRetryDelay)
+			}
+		}
+		return lastErr
+	}
+
+	if err := retryCheckout(); err != nil {
+		return "", fmt.Errorf("could not checkout main after retries: %v", err)
+	}
+
+	prBranchName := fmt.Sprintf("pr-%s", prNumber)
+	if _, err := r.Branch(prBranchName); err == nil {
+		err = r.DeleteBranch(prBranchName)
+		if err != nil {
+			return "", fmt.Errorf("could not delete branch %s: %v", prBranchName, err)
+		}
+	}
+
+	sugar = sugar.With("pr_branch_name", prBranchName)
+	sugar.Debug("Fetching PR branch")
+	refspec := gitconfig.RefSpec(fmt.Sprintf("refs/pull/%s/head:refs/heads/%s", prNumber, prBranchName))
+	err = r.Fetch(&git.FetchOptions{
+		RemoteName: Origin,
+		RefSpecs:   []gitconfig.RefSpec{refspec},
+		Auth: &githttp.BasicAuth{
+			Username: "instruct-lab-bot",
+			Password: GithubToken,
+		},
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return "", fmt.Errorf("could not fetch PR branch: %v", err)
+	}
+
+	sugar.Debug("Checking out PR branch")
+	err = wt.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(prBranchName),
+	})
+	if err != nil {
+		return "", fmt.Errorf("could not checkout PR branch: %v", err)
+	}
+
+	head, err := r.Head()
+	if err != nil {
+		return "", fmt.Errorf("could not get HEAD: %v", err)
+	}
+
+	return head.Hash().String(), nil
 }
 
 // postJobResults posts the results of a job to a Redis queue
