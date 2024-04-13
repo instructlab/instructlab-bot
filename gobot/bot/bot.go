@@ -173,8 +173,8 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 
 		jobDuration, err := r.Get("jobs:" + result + ":duration").Result()
 		if err != nil || jobDuration == "" {
-			logger.Errorf("No job duration time found for job %s", result)
-			continue
+			// Do not break out of the current iteration since the job could have failed without a duration
+			logger.Warnf("No job duration time found for job %s", result)
 		}
 
 		logger.Infof("Processing result for %s/%s#%s, job ID: %s, job duration: %ss ", repoOwner, repoName, prNumber, result, jobDuration)
@@ -197,14 +197,36 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			continue
 		}
 
+		prNum, err := strconv.Atoi(prNumber)
+		if err != nil {
+			logger.Errorf("error converting string to int: %v", err)
+			continue
+		}
+
 		// check for errors prior to checking for an S3 url and models since that will not get produced on a failure
 		prErrors, _ := r.Get("jobs:" + result + ":errors").Result()
 		if prErrors != "" {
 			errCommentBody := fmt.Sprintf("An error occurred while processing your request, please review the following log for job id %s :\n```\n%s\n```", result, prErrors)
 
-			err = util.PostPullRequestStatus(ctx, client, util.Error, errCommentBody, statusContext, util.InstructLabMaintainersTeamUrl, repoOwner, repoName, prSha)
+			params := util.PullRequestStatusParams{
+				State:      util.Error,
+				RepoOwner:  repoOwner,
+				RepoName:   repoName,
+				PrNum:      prNum,
+				JobID:      result,
+				PrSha:      prSha,
+				JobType:    jobType,
+				MsgComment: errCommentBody,
+				StatusCtx:  statusContext,
+				JobErr:     errCommentBody,
+			}
+
+			logger.Errorf("Error processing command on %s/%s#%d: err %s",
+				params.RepoOwner, params.RepoName, params.PrNum, params.JobErr)
+
+			err = util.PostPullRequestError(ctx, client, params)
 			if err != nil {
-				logger.Errorf("Failed to update pull request status: %v", err)
+				logger.Errorf("Failed to update error message on PR for job %s error: %v", result, err)
 			}
 			continue
 		}
@@ -224,13 +246,26 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		}
 
 		// Add the model name only if it's not empty
-		commentBody := fmt.Sprintf("The test data has been generated for job ID: %s", result)
+		msgStatus := fmt.Sprintf("Results for job ID: %s", result)
 		if modelName != "" {
-			commentBody += " " + modelName
+			msgStatus += " " + modelName
 		}
-		commentBody += "!\n\nClick details ."
+		msgStatus += "!\n\nClick details for results."
 
-		err = util.PostPullRequestStatus(ctx, client, util.Success, commentBody, statusContext, s3Url, repoOwner, repoName, prSha)
+		params := util.PullRequestStatusParams{
+			State:     util.Success,
+			RepoOwner: repoOwner,
+			RepoName:  repoName,
+			PrNum:     prNum,
+			JobID:     result,
+			PrSha:     prSha,
+			JobType:   jobType,
+			TargetURL: s3Url,
+			MsgStatus: msgStatus,
+			StatusCtx: statusContext,
+		}
+
+		err = util.PostPullRequestStatus(ctx, client, params)
 		if err != nil {
 			logger.Errorf("Failed to update pull request status: %v", err)
 		}
