@@ -30,15 +30,15 @@ type PRCommentHandler struct {
 }
 
 type PRComment struct {
-	repoOwner         string
-	repoName          string
-	repoOrg           string
-	prNum             int
-	author            string
-	body              string
-	installID         int64
-	sha               string
-	labels            []*github.Label
+	repoOwner string
+	repoName  string
+	repoOrg   string
+	prNum     int
+	author    string
+	body      string
+	installID int64
+	sha       string
+	labels    []*github.Label
 }
 
 func (h *PRCommentHandler) Handles() []string {
@@ -71,7 +71,6 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		body:      event.GetComment().GetBody(),
 		installID: githubapp.GetInstallationIDFromEvent(&event),
 	}
-
 
 	client, err := h.NewInstallationClient(prComment.installID)
 	if err != nil {
@@ -146,7 +145,7 @@ func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *githu
 	labelFound := false
 	for _, required := range requiredLabels {
 		for _, label := range prComment.labels {
-				if label.GetName() == required {
+			if label.GetName() == required {
 				labelFound = true
 				break
 			}
@@ -229,9 +228,12 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
-	msg := "Generating test data for your pull request.\n\n" +
-		"This will take several minutes...\n\n" +
-		"Your job ID is " + strconv.FormatInt(jobNumber, 10) + "."
+	msgStatus := "Job ID: " + strconv.FormatInt(jobNumber, 10) + " - Generating test data for your PR.\n\n" +
+		"This may take several minutes...\n\n"
+
+	msgComment := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. Your Job ID is %d. The "+
+		"reults will be presented below in the pull request status box. This may take several minutes...\n\n",
+		jobType, jobNumber)
 
 	var statusContext string
 	switch jobType {
@@ -247,7 +249,21 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
 
-	return util.PostPullRequestStatus(ctx, client, "pending", msg, statusContext, util.InstructLabMaintainersTeamUrl, prComment.repoOwner, prComment.repoName, prComment.sha)
+	params := util.PullRequestStatusParams{
+		State:      util.Pending,
+		MsgStatus:  msgStatus,
+		MsgComment: msgComment,
+		StatusCtx:  statusContext,
+		TargetURL:  util.InstructLabMaintainersTeamUrl,
+		RepoOwner:  prComment.repoOwner,
+		RepoName:   prComment.repoName,
+		PrSha:      prComment.sha,
+		PrNum:      prComment.prNum,
+		JobType:    jobType,
+		JobID:      strconv.FormatInt(jobNumber, 10),
+	}
+
+	return util.PostPullRequestStatus(ctx, client, params)
 
 }
 
@@ -278,7 +294,6 @@ func (h *PRCommentHandler) checkAuthorPermission(ctx context.Context, client *gi
 	return true, nil
 }
 
-
 func (h *PRCommentHandler) checkEnableStatus(ctx context.Context, client *github.Client, prComment *PRComment) (bool, error) {
 	repoStatus, response, err := client.Repositories.ListStatuses(ctx, prComment.repoOwner, prComment.repoName, prComment.sha, nil)
 	if err != nil {
@@ -290,8 +305,8 @@ func (h *PRCommentHandler) checkEnableStatus(ctx context.Context, client *github
 
 	if response.StatusCode == http.StatusOK {
 		for _, status := range repoStatus {
-			if strings.HasSuffix(status.GetURL(),prComment.sha) {
-				if status.GetState() == util.Success && status.GetContext() == util.TriageReadinessStatus{
+			if strings.HasSuffix(status.GetURL(), prComment.sha) {
+				if status.GetState() == util.Success && status.GetContext() == util.TriageReadinessStatus {
 					return true, nil
 				}
 			}
@@ -338,7 +353,19 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 		h.Logger.Error("Failed to comment on pull request: %w", err)
 	}
 
-	return util.PostPullRequestStatus(ctx, client, util.Success, TriageReadinessMsg, util.TriageReadinessStatus, util.InstructLabMaintainersTeamUrl, prComment.repoOwner, prComment.repoName, prComment.sha)
+	params := util.PullRequestStatusParams{
+		State:     util.Success,
+		MsgStatus: TriageReadinessMsg,
+		StatusCtx: util.TriageReadinessStatus,
+		TargetURL: util.InstructLabMaintainersTeamUrl,
+		RepoOwner: prComment.repoOwner,
+		RepoName:  prComment.repoName,
+		PrSha:     prComment.sha,
+		PrNum:     prComment.prNum,
+	}
+
+	return util.PostPullRequestStatus(ctx, client, params)
+	//return util.PostPullRequestStatus(ctx, client, util.Success, TriageReadinessMsg, util.TriageReadinessStatus, util.InstructLabMaintainersTeamUrl, prComment.repoOwner, prComment.repoName, prComment.sha, 0, "", "")
 }
 
 func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
