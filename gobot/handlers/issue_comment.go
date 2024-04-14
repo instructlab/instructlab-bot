@@ -18,6 +18,9 @@ import (
 
 const (
 	TriageReadinessMsg = "PR is ready for evaluation."
+	AccessCheckFailed  = "Access check failed."
+	LabelsNotFound      = "Required labels not found."
+	BotEnabled	  = "Bot is successfully enabled."
 )
 
 type PRCommentHandler struct {
@@ -37,7 +40,7 @@ type PRComment struct {
 	author    string
 	body      string
 	installID int64
-	sha       string
+	prSha     string
 	labels    []*github.Label
 }
 
@@ -83,7 +86,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return err
 	}
 
-	prComment.sha = pr.GetHead().GetSHA()
+	prComment.prSha = pr.GetHead().GetSHA()
 	prComment.labels = pr.Labels
 
 	words := strings.Fields(strings.TrimSpace(prComment.body))
@@ -93,47 +96,18 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	if words[0] != h.BotUsername {
 		return nil
 	}
+
 	switch words[1] {
 	case "enable":
-		err = h.enableCommand(ctx, client, &prComment)
-		if err != nil {
-			h.reportError(ctx, client, &prComment, err)
-		}
-		return err
+		return h.enableCommand(ctx, client, &prComment)
 	case "generate-local":
-		err = h.generateCommand(ctx, client, &prComment)
-		if err != nil {
-			h.reportError(ctx, client, &prComment, err)
-		}
-		return err
+		return  h.generateCommand(ctx, client, &prComment)
 	case "precheck":
-		err = h.precheckCommand(ctx, client, &prComment)
-		if err != nil {
-			h.reportError(ctx, client, &prComment, err)
-		}
-		return err
+		return h.precheckCommand(ctx, client, &prComment)
 	case "generate":
-		err = h.sdgSvcCommand(ctx, client, &prComment)
-		if err != nil {
-			h.reportError(ctx, client, &prComment, err)
-		}
-		return err
+		return h.sdgSvcCommand(ctx, client, &prComment)
 	default:
 		return h.unknownCommand(ctx, client, &prComment)
-	}
-}
-
-func (h *PRCommentHandler) reportError(ctx context.Context, client *github.Client, prComment *PRComment, err error) {
-	h.Logger.Warnf("Error processing command on %s/%s#%d by %s: %v",
-		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author, err)
-
-	msg := fmt.Sprintf("Beep, boop 🤖  Sorry, An error has occurred : %v", err)
-	botComment := github.IssueComment{
-		Body: &msg,
-	}
-
-	if _, _, err := client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment); err != nil {
-		h.Logger.Error("Failed to comment on pull request: %w", err)
 	}
 }
 
@@ -152,19 +126,7 @@ func (h *PRCommentHandler) checkRequiredLabel(ctx context.Context, client *githu
 		}
 	}
 
-	if !labelFound {
-		h.Logger.Infof("Required label %s not found on PR %v/%s#%d by %s",
-			requiredLabels, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
-		missingLabelComment := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", requiredLabels)
-		botComment := github.IssueComment{Body: &missingLabelComment}
-		_, _, err := client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment)
-		if err != nil {
-			h.Logger.Errorf("Failed to comment on pull request about missing label: %v", err)
-		}
-		return false, nil
-	}
-
-	return true, nil
+	return labelFound, nil
 }
 
 func setJobKey(r *redis.Client, jobNumber int64, key string, value interface{}) error {
@@ -188,7 +150,7 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "pr_sha", prComment.sha)
+	err = setJobKey(r, jobNumber, "pr_sha", prComment.prSha)
 	if err != nil {
 		return err
 	}
@@ -228,42 +190,54 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
-	msgStatus := "Job ID: " + strconv.FormatInt(jobNumber, 10) + " - Generating test data for your PR.\n\n" +
-		"This may take several minutes...\n\n"
-
-	msgComment := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. Your Job ID is %d. The "+
-		"reults will be presented below in the pull request status box. This may take several minutes...\n\n",
+	summaryMsg := "Job ID: " + strconv.FormatInt(jobNumber, 10) + " - Generating test data.\n\n"
+	detailsMsg := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. \n" +
+					"Related Job ID is %d.\n" +
+					"This may take several minutes...\n\n", jobType, jobNumber)
+	commentMsg := fmt.Sprintf("Beep, boop 🤖, Generating test data for your PR with the job type: *%s*. Your Job ID is %d. The "+
+		"results will be presented below in the pull request status box. This may take several minutes...\n\n",
 		jobType, jobNumber)
 
 	var statusContext string
 	switch jobType {
 	case "generate":
-		statusContext = util.GenerateLocalStatus
+		statusContext = util.GenerateLocalCheck
 	case "precheck":
-		statusContext = util.PrecheckStatus
+		statusContext = util.PrecheckCheck
 	case "sdg-svc":
-		statusContext = util.GenerateSDGStatus
+		statusContext = util.GenerateSDGCheck
 	case "enable":
-		statusContext = util.TriageReadinessStatus
+		statusContext = util.TriageReadinessCheck
 	default:
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
 
 	params := util.PullRequestStatusParams{
-		State:      util.Pending,
-		MsgStatus:  msgStatus,
-		MsgComment: msgComment,
-		StatusCtx:  statusContext,
-		TargetURL:  util.InstructLabMaintainersTeamUrl,
-		RepoOwner:  prComment.repoOwner,
-		RepoName:   prComment.repoName,
-		PrSha:      prComment.sha,
-		PrNum:      prComment.prNum,
-		JobType:    jobType,
-		JobID:      strconv.FormatInt(jobNumber, 10),
+		Status:       util.CheckInProgress,
+		CheckSummary: summaryMsg,
+		CheckDetails: detailsMsg,
+		Comment:      commentMsg,
+		CheckName:    statusContext,
+		JobType:      jobType,
+		JobID:        strconv.FormatInt(jobNumber, 10),
+		RepoOwner:    prComment.repoOwner,
+		RepoName:     prComment.repoName,
+		PrNum:        prComment.prNum,
+		PrSha:        prComment.prSha,
 	}
 
-	return util.PostPullRequestStatus(ctx, client, params)
+	err = util.PostPullRequestComment(ctx, client, params)
+	if err != nil {
+		h.Logger.Errorf("Failed to post comment on PR %s/%s#%d: %v", params.RepoOwner, params.RepoName, params.PrNum, err)
+		return err
+	}
+
+	err = util.PostPullRequestCheck(ctx, client, params)
+	if err != nil {
+		h.Logger.Errorf("Failed to post check on PR %s/%s#%d: %v", params.RepoOwner, params.RepoName, params.PrNum, err)
+		return err
+	}
+	return nil
 
 }
 
@@ -283,7 +257,6 @@ func (h *PRCommentHandler) checkAuthorPermission(ctx context.Context, client *gi
 		return false, err
 	}
 
-	h.Logger.Debugf("Team membership response for user %s: %v", prComment.author, response)
 	h.Logger.Debugf("Team membership for user %s: %v", prComment.author, teamMembership)
 
 	if teamMembership.GetState() != "active" || teamMembership.GetRole() != "maintainer" {
@@ -294,21 +267,21 @@ func (h *PRCommentHandler) checkAuthorPermission(ctx context.Context, client *gi
 	return true, nil
 }
 
-func (h *PRCommentHandler) checkEnableStatus(ctx context.Context, client *github.Client, prComment *PRComment) (bool, error) {
-	repoStatus, response, err := client.Repositories.ListStatuses(ctx, prComment.repoOwner, prComment.repoName, prComment.sha, nil)
+func (h *PRCommentHandler) checkBotEnableStatus(ctx context.Context, client *github.Client, prComment *PRComment) (bool, error) {
+	checkStatus, response, err := client.Checks.ListCheckRunsForRef(ctx, prComment.repoOwner, prComment.repoName, prComment.prSha, nil)
 	if err != nil {
-		h.Logger.Errorf("Failed to check repository status for %s/%s: %v", prComment.repoOwner, prComment.repoName, err.Error())
+		h.Logger.Errorf("Failed to check bot enable status for %s/%s: %v", prComment.repoOwner, prComment.repoName, err.Error())
 		return false, err
 	}
 
-	h.Logger.Debugf("Repository status for %s/%s: %v", prComment.repoOwner, prComment.repoName, repoStatus)
+	h.Logger.Debugf("Repository status for %s/%s: %v", prComment.repoOwner, prComment.repoName, checkStatus)
 
 	if response.StatusCode == http.StatusOK {
-		for _, status := range repoStatus {
-			if strings.HasSuffix(status.GetURL(), prComment.sha) {
-				if status.GetState() == util.Success && status.GetContext() == util.TriageReadinessStatus {
-					return true, nil
-				}
+		for _, status := range checkStatus.CheckRuns {
+			if status.GetHeadSHA() == prComment.prSha &&
+				status.GetConclusion() == util.CheckStatusSuccess &&
+				status.GetName() == util.TriageReadinessCheck {
+				return true, nil
 			}
 		}
 	}
@@ -319,7 +292,7 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 	h.Logger.Infof("Enable command received on %s/%s#%d by author %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	h.Logger.Infof("Maintainers: %v", h.Maintainers)
+	h.Logger.Debugf("Maintainers: %v", h.Maintainers)
 
 	// Check if user is part of the teams that are allowed to enable the bot
 	isAllowed := true
@@ -334,56 +307,100 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 		}
 	}
 
-	if !isAllowed {
-		return fmt.Errorf("User %s is not allowed to enable the instruct bot. Only %v teams are allowed to enable the bot.", prComment.author, h.Maintainers)
+	params := util.PullRequestStatusParams{
+		Status:       util.CheckComplete,
+		CheckName:    util.TriageReadinessCheck,
+		RepoOwner:    prComment.repoOwner,
+		RepoName:     prComment.repoName,
+		PrNum:        prComment.prNum,
+		PrSha:        prComment.prSha,
 	}
 
-	msg := fmt.Sprintf("Beep, boop 🤖 Hi, I'm %s and I'm going to help you"+
+	if !isAllowed {
+		detailsMsg := fmt.Sprintf("User %s is not allowed to enable the instruct bot. Only %v teams are allowed to enable the bot.", prComment.author, h.Maintainers)
+		params.Conclusion = util.CheckStatusFailure
+		params.CheckSummary = AccessCheckFailed
+		params.CheckDetails = detailsMsg
+		params.Comment = detailsMsg
+
+		err := util.PostPullRequestCheck(ctx, client, params)
+		if err != nil {
+			h.Logger.Errorf("Failed to post check on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
+			return err
+		}
+		err = util.PostPullRequestComment(ctx, client, params)
+		if err != nil {
+			h.Logger.Errorf("Failed to post comment on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
+			return err
+		}
+		return nil
+	}
+
+	detailsMsg := fmt.Sprintf("Beep, boop .. Hi, I'm %s and I'm going to help you"+
 		" with your pull request. Thanks for you contribution! 🎉\n\n", h.BotUsername)
-	msg += fmt.Sprintf("I support the following commands:\n\n"+
+		detailsMsg += fmt.Sprintf("I support the following commands:\n\n"+
 		"* `%s precheck` -- Check existing model behavior using the questions in this proposed change.\n"+
 		"* `%s generate` -- Generate a sample of synthetic data using the synthetic data generation backend infrastructure.\n"+
-		"* `%s generate-local` -- Generate a sample of synthetic data using a local model.\n",
+		"* `%s generate-local` -- Generate a sample of synthetic data using a local model.\n"+
+		"> [!NOTE]  **Results or Errors of these commands will be posted as a pull request check in the Checks section below**.\n",
 		h.BotUsername, h.BotUsername, h.BotUsername)
-	botComment := github.IssueComment{
-		Body: &msg,
-	}
 
-	if _, _, err := client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment); err != nil {
-		h.Logger.Error("Failed to comment on pull request: %w", err)
-	}
+	params.Conclusion = util.CheckStatusSuccess
+	params.CheckSummary = BotEnabled
+	params.CheckDetails = detailsMsg
+	params.Comment = detailsMsg
 
-	params := util.PullRequestStatusParams{
-		State:     util.Success,
-		MsgStatus: TriageReadinessMsg,
-		StatusCtx: util.TriageReadinessStatus,
-		TargetURL: util.InstructLabMaintainersTeamUrl,
-		RepoOwner: prComment.repoOwner,
-		RepoName:  prComment.repoName,
-		PrSha:     prComment.sha,
-		PrNum:     prComment.prNum,
+	err := util.PostPullRequestComment(ctx, client, params)
+	if err != nil {
+		h.Logger.Errorf("Failed to post comment on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
+		return err
 	}
-
-	return util.PostPullRequestStatus(ctx, client, params)
-	//return util.PostPullRequestStatus(ctx, client, util.Success, TriageReadinessMsg, util.TriageReadinessStatus, util.InstructLabMaintainersTeamUrl, prComment.repoOwner, prComment.repoName, prComment.sha, 0, "", "")
+	err = util.PostPullRequestCheck(ctx, client, params)
+	if err != nil {
+		h.Logger.Errorf("Failed to post check on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
+		return err
+	}
+	return nil
 }
 
 func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
 	h.Logger.Infof("Generate command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	isBotEnabled, err := h.checkEnableStatus(ctx, client, prComment)
-	if err != nil {
-		return err
+	params := util.PullRequestStatusParams{
+		Status:       util.CheckComplete,
+		Conclusion:   util.CheckStatusFailure,
+		CheckName:    util.GenerateLocalCheck,
+		RepoOwner:    prComment.repoOwner,
+		RepoName:     prComment.repoName,
+		PrNum:        prComment.prNum,
+		PrSha:        prComment.prSha,
 	}
 
+	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
 	if !isBotEnabled {
-		return errors.New("Bot is not enabled on this PR. Maintainers need to enable the bot first.")
+		detailsMsg := "Bot is not enabled on this PR. Maintainers need to enable the bot first."
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = AccessCheckFailed
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
 	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	if !present || err != nil {
-		return err
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "generate")
@@ -393,18 +410,40 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 	h.Logger.Infof("Precheck command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	isBotEnabled, err := h.checkEnableStatus(ctx, client, prComment)
-	if err != nil {
-		return err
+	params := util.PullRequestStatusParams{
+		Status:       util.CheckComplete,
+		Conclusion:   util.CheckStatusFailure,
+		CheckName:    util.PrecheckCheck,
+		RepoOwner:    prComment.repoOwner,
+		RepoName:     prComment.repoName,
+		PrNum:        prComment.prNum,
+		PrSha:        prComment.prSha,
 	}
 
+	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
 	if !isBotEnabled {
-		return fmt.Errorf("Bot is not enabled on this PR. Maintainers need to enable the bot first.")
+		detailsMsg := "Bot is not enabled on this PR. Maintainers need to enable the bot first."
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = AccessCheckFailed
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
 	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	if !present || err != nil {
-		return err
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "precheck")
@@ -414,18 +453,39 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 	h.Logger.Infof("SDG svc command received on %s/%s#%d by %s",
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
-	isBotEnabled, err := h.checkEnableStatus(ctx, client, prComment)
-	if err != nil {
-		return err
+	params := util.PullRequestStatusParams{
+		Status:       util.CheckComplete,
+		Conclusion:   util.CheckStatusFailure,
+		CheckName:    util.GenerateSDGCheck,
+		RepoOwner:    prComment.repoOwner,
+		RepoName:     prComment.repoName,
+		PrNum:        prComment.prNum,
+		PrSha:        prComment.prSha,
 	}
 
+	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
 	if !isBotEnabled {
-		return fmt.Errorf("Bot is not enabled on this PR. Maintainers need to enable the bot first.")
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+		params.CheckSummary = AccessCheckFailed
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
 	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	if !present || err != nil {
-		return err
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "sdg-svc")
