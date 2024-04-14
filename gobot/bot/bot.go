@@ -173,8 +173,8 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 
 		jobDuration, err := r.Get("jobs:" + result + ":duration").Result()
 		if err != nil || jobDuration == "" {
-			logger.Errorf("No job duration time found for job %s", result)
-			continue
+			// Do not break out of the current iteration since the job could have failed without a duration
+			logger.Warnf("No job duration time found for job %s", result)
 		}
 
 		logger.Infof("Processing result for %s/%s#%s, job ID: %s, job duration: %ss ", repoOwner, repoName, prNumber, result, jobDuration)
