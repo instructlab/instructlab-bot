@@ -3,6 +3,8 @@ package util
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v60/github"
@@ -17,10 +19,15 @@ const (
 	CheckStatusError              = "error"
 	CheckStatusPending            = "pending"
 
-	TriageReadinessCheck = "Triage Readiness"
-	PrecheckCheck        = "Precheck"
-	GenerateLocalCheck   = "Generate Local"
-	GenerateSDGCheck     = "Generate SDG Status"
+	TriageReadinessCheck = "Triage Readiness Check"
+	PrecheckCheck        = "Precheck Check"
+	GenerateLocalCheck   = "Generate Local Check"
+	GenerateSDGCheck     = "Generate SDG Check"
+
+	TriageReadinessStatus         = "Triage Readiness Status"
+	PrecheckStatus                = "Precheck Status"
+	GenerateLocalStatus           = "Generate Local Status"
+	GenerateSDGStatus             = "Generate SDG Status"
 )
 
 type PullRequestStatusParams struct {
@@ -39,6 +46,24 @@ type PullRequestStatusParams struct {
 	RepoName  string
 	PrNum     int
 	PrSha     string
+}
+
+func StatusExist(ctx context.Context, client *github.Client, params PullRequestStatusParams, statusName string) (bool, error) {
+	repoStatus, response, err := client.Repositories.ListStatuses(ctx, params.RepoOwner, params.RepoName, params.PrSha, nil)
+	if err != nil {
+		return false, err
+	}
+
+	if response.StatusCode == http.StatusOK {
+		for _, status := range repoStatus {
+			if strings.HasSuffix(status.GetURL(), params.PrSha) {
+				if status.GetContext() == statusName {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }
 
 func PostPullRequestErrorComment(ctx context.Context, client *github.Client,  params PullRequestStatusParams, err error) error {
