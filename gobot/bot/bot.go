@@ -269,6 +269,7 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			CheckName:    statusContext,
 			CheckSummary: summaryMsg,
 			CheckDetails: detailsMsg,
+			Comment:      detailsMsg,
 			RepoOwner:    repoOwner,
 			RepoName:     repoName,
 			PrNum:        prNum,
