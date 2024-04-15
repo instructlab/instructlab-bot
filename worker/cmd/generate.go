@@ -19,7 +19,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -53,14 +52,15 @@ var (
 )
 
 const (
-	gitMaxRetries    = 3
-	gitRetryDelay    = 2 * time.Second
-	ilabConfigPath   = "config.yaml"
-	localEndpoint    = "http://localhost:8000/v1"
-	jobSDG           = "sdg-svc"
-	jobGenerateLocal = "generate"
-	jobPreCheck      = "precheck"
-	sdgModel         = "mistralai/mixtral-8x7b-instruct-v0-1"
+	gitMaxRetries            = 3
+	gitRetryDelay            = 2 * time.Second
+	ilabConfigPath           = "config.yaml"
+	localEndpoint            = "http://localhost:8000/v1"
+	jobSDG                   = "sdg-svc"
+	jobGenerateLocal         = "generate"
+	jobPreCheck              = "precheck"
+	sdgModel                 = "mistralai/mixtral-8x7b-instruct-v0-1"
+	jsonViewerFilenameSuffix = "-viewer.html"
 )
 
 // Worker encapsulates dependencies and methods to process jobs
@@ -498,72 +498,14 @@ func (w *Worker) processJob() {
 		return
 	}
 
-	items, err := os.ReadDir(outputDir)
-	if err != nil {
-		sugar.Errorf("Could not read output directory: %v", err)
+	// handle file operations and get the index file key
+	indexUpKey := w.handleOutputFiles(outputDir, prNumber, outDirName)
+	if indexUpKey == "" {
+		sugar.Errorf("Failed to handle output files correctly")
 		return
 	}
 
-	publicFiles := make([]map[string]string, 0)
-
-	for _, item := range items {
-		file, err := os.Open(path.Join(outputDir, item.Name()))
-		if err != nil {
-			sugar.Errorf("Could not open file: %v", err)
-			return
-		}
-		defer file.Close()
-		upKey := fmt.Sprintf("%s/%s", outDirName, item.Name())
-		_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
-			Bucket:      aws.String(S3Bucket),
-			Key:         aws.String(upKey),
-			Body:        file,
-			ContentType: aws.String("application/json-lines+json"),
-		})
-		if err != nil {
-			sugar.Errorf("Could not upload file to S3: %v", err)
-			return
-		}
-
-		publicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
-		publicFiles = append(publicFiles, map[string]string{
-			"name": item.Name(),
-			"url":  publicURL,
-		})
-	}
-
-	indexFile, err := os.Create(path.Join(outputDir, "index.html"))
-	if err != nil {
-		sugar.Errorf("Could not create index.html: %v", err)
-		return
-	}
-	if err := generateIndexHTML(indexFile, prNumber, publicFiles); err != nil {
-		sugar.Errorf("Could not generate index.html: %v", err)
-		indexFile.Close()
-		return
-	}
-	indexFile.Close()
-
-	indexFile, err = os.Open(indexFile.Name())
-	if err != nil {
-		sugar.Errorf("Could not re-open index.html: %v", err)
-		return
-	}
-	defer indexFile.Close()
-
-	upKey := fmt.Sprintf("%s/index.html", outDirName)
-	_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(S3Bucket),
-		Key:         aws.String(upKey),
-		Body:        indexFile,
-		ContentType: aws.String("text/html"),
-	})
-	if err != nil {
-		sugar.Errorf("Could not upload index.html to S3: %v", err)
-		return
-	}
-
-	indexPublicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
+	indexPublicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, indexUpKey)
 
 	// Notify the "results" queue that the job is done with the public URL
 	w.postJobResults(indexPublicURL, jobType)
@@ -699,90 +641,6 @@ func (w *Worker) postJobResults(URL, jobType string) {
 	if _, err := conn.Do("LPUSH", "results", w.job); err != nil {
 		w.logger.Errorf("Could not push to redis queue: %v", err)
 	}
-}
-
-func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map[string]string) error {
-	const INDEX_HTML = `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Generated Data for {{ .Name }}</title>
-    <style>
-        :root {
-            --primary-color: #007bff;
-            --hover-color: #0056b3;
-            --text-color: #333;
-            --background-color: #f8f9fa;
-            --link-color: #0066cc;
-            --link-hover-color: #0044cc;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--background-color);
-            margin: 0;
-            padding: 20px;
-            color: var(--text-color);
-        }
-
-        h1 {
-            color: var(--primary-color);
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        ul {
-            list-style-type: none;
-            padding: 0;
-            max-width: 600px;
-            margin: auto;
-        }
-
-        li {
-            background-color: #fff;
-            margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s ease-in-out;
-        }
-
-        li:hover {
-            transform: translateY(-3px);
-        }
-
-        a {
-            color: var(--link-color);
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        a:hover {
-            color: var(--link-hover-color);
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <h1>Generated Data for {{ .Name }}</h1>
-	<ul>
-	{{- range .Files}}
-		<li><a href="{{ .url }}">{{ .name }}</a></li>
-	{{- end }}
-	</ul>
-</body>
-</html>`
-
-	tmpl := template.Must(template.New("index").Parse(INDEX_HTML))
-	data := struct {
-		Name  string
-		Files []map[string]string
-	}{
-		Name:  fmt.Sprintf("PR %s", prNumber),
-		Files: presignedFiles,
-	}
-
-	return tmpl.Execute(indexFile, data)
 }
 
 // getModelNameFromConfig retrieves the model name from the config file or precheckEndpoint
@@ -1073,6 +931,108 @@ func interfaceMapToStringMap(in interface{}) interface{} {
 		}
 	}
 	return in
+}
+
+func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) string {
+	sugar := w.logger.With("directory", outputDir)
+
+	items, err := os.ReadDir(outputDir)
+	if err != nil {
+		sugar.Errorf("Could not read output directory: %v", err)
+		return ""
+	}
+
+	publicFiles := make([]map[string]string, 0)
+
+	for _, item := range items {
+		filename := item.Name()
+		// Skip the index.html file from the index
+		if filename == "index.html" {
+			continue
+		}
+		fullPath := path.Join(outputDir, filename)
+		info, err := item.Info()
+		if err != nil {
+			sugar.Errorf("Could not get info for file %s: %v", filename, err)
+			continue
+		}
+
+		// Only process JSON files for formatting that are created after the job started (e.g. current job)
+		if info.ModTime().After(w.jobStart) {
+			if strings.HasSuffix(filename, ".json") || strings.HasSuffix(filename, ".jsonl") {
+				formattedKey := generateFormattedJSON(w.ctx, outputDir, filename, w.svc, w.logger)
+				if formattedKey != "" {
+					formattedURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedKey)
+					publicFiles = append(publicFiles, map[string]string{
+						"name": filename + jsonViewerFilenameSuffix,
+						"url":  formattedURL,
+					})
+				}
+			}
+
+			// Upload the rest of the files created in the current job only (not previous jobs)
+			file, err := os.Open(fullPath)
+			if err != nil {
+				sugar.Errorf("Could not open file: %v", err)
+				continue
+			}
+			defer file.Close()
+
+			upKey := fmt.Sprintf("%s/%s", outDirName, filename)
+			_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
+				Bucket:      aws.String(S3Bucket),
+				Key:         aws.String(upKey),
+				Body:        file,
+				ContentType: aws.String("application/json-lines+json"),
+			})
+			if err != nil {
+				sugar.Errorf("Could not upload file to S3: %v", err)
+				continue
+			}
+		}
+
+		// Add all files in the job directory to the indexfile (including old job files for the PR/jobType)
+		publicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, fmt.Sprintf("%s/%s", outDirName, filename))
+		publicFiles = append(publicFiles, map[string]string{
+			"name": filename,
+			"url":  publicURL,
+		})
+	}
+
+	// Generate index.html
+	indexFile, err := os.Create(path.Join(outputDir, "index.html"))
+	if err != nil {
+		sugar.Errorf("Could not create index.html: %v", err)
+		return ""
+	}
+	defer indexFile.Close()
+
+	if err := generateIndexHTML(indexFile, prNumber, publicFiles); err != nil {
+		sugar.Errorf("Could not generate index.html: %v", err)
+		return ""
+	}
+
+	// Re-open index file for uploading
+	indexFile, err = os.Open(path.Join(outputDir, "index.html"))
+	if err != nil {
+		sugar.Errorf("Could not re-open index.html: %v", err)
+		return ""
+	}
+	defer indexFile.Close()
+
+	indexUpKey := fmt.Sprintf("%s/index.html", outDirName)
+	_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(S3Bucket),
+		Key:         aws.String(indexUpKey),
+		Body:        indexFile,
+		ContentType: aws.String("text/html"),
+	})
+	if err != nil {
+		sugar.Errorf("Could not upload index.html to S3: %v", err)
+		return ""
+	}
+
+	return indexUpKey
 }
 
 /* Uncomment to bypass ilab diff (temporary until upstream files are validated prior to merge)
