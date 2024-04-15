@@ -257,7 +257,7 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		if modelName != "" {
 			detailsMsg += " " + modelName
 		}
-		detailsMsg += fmt.Sprintf("!\n\nResults can be found at %s.", s3Url)
+		detailsMsg += fmt.Sprintf("!\n\nResults can be found [here](%s).", s3Url)
 
 		summaryMsg := fmt.Sprintf("Job ID: %s completed successfully. Check Details.", result)
 
