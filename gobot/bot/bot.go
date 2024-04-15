@@ -22,6 +22,10 @@ import (
 	"github.com/instruct-lab/instruct-lab-bot/gobot/util"
 )
 
+const (
+	JobFailed = "Command execution failed. Check details."
+)
+
 func Run(zLogger *zap.Logger) error {
 	config, err := config.ReadConfig("config.yaml")
 	if err != nil {
@@ -177,16 +181,16 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 			logger.Warnf("No job duration time found for job %s", result)
 		}
 
-		logger.Infof("Processing result for %s/%s#%s, job ID: %s, job duration: %ss ", repoOwner, repoName, prNumber, result, jobDuration)
+		logger.Infof("Processing result for %s/%s#%s, job ID: %s ", repoOwner, repoName, prNumber, result)
 
 		var statusContext string
 		switch jobType {
 		case "generate":
-			statusContext = util.GenerateLocalStatus
+			statusContext = util.GenerateLocalCheck
 		case "precheck":
-			statusContext = util.PrecheckStatus
+			statusContext = util.PrecheckCheck
 		case "sdg-svc":
-			statusContext = util.GenerateSDGStatus
+			statusContext = util.GenerateSDGCheck
 		default:
 			logger.Errorf("Unknown job type: %s", jobType)
 		}
@@ -206,25 +210,28 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		// check for errors prior to checking for an S3 url and models since that will not get produced on a failure
 		prErrors, _ := r.Get("jobs:" + result + ":errors").Result()
 		if prErrors != "" {
-			errCommentBody := fmt.Sprintf("An error occurred while processing your request, please review the following log for job id %s :\n```\n%s\n```", result, prErrors)
+			errCommentBody := fmt.Sprintf("An error occurred while processing your request, please review the following log for job id %s :\n\n```\n%s\n```", result, prErrors)
 
 			params := util.PullRequestStatusParams{
-				State:      util.Error,
-				RepoOwner:  repoOwner,
-				RepoName:   repoName,
-				PrNum:      prNum,
-				JobID:      result,
-				PrSha:      prSha,
-				JobType:    jobType,
-				MsgComment: errCommentBody,
-				StatusCtx:  statusContext,
-				JobErr:     errCommentBody,
+				Status:       util.CheckComplete,
+				Conclusion:   util.CheckStatusFailure,
+				CheckName:    statusContext,
+				CheckSummary: JobFailed,
+				CheckDetails: errCommentBody,
+				Comment:      errCommentBody,
+				JobType:      jobType,
+				JobID:        result,
+				JobErr:       errCommentBody,
+				RepoOwner:    repoOwner,
+				RepoName:     repoName,
+				PrNum:        prNum,
+				PrSha:        prSha,
 			}
 
 			logger.Errorf("Error processing command on %s/%s#%d: err %s",
 				params.RepoOwner, params.RepoName, params.PrNum, params.JobErr)
 
-			err = util.PostPullRequestError(ctx, client, params)
+			err = util.PostPullRequestCheck(ctx, client, params)
 			if err != nil {
 				logger.Errorf("Failed to update error message on PR for job %s error: %v", result, err)
 			}
@@ -246,30 +253,37 @@ func receiveResults(config *config.Config, logger *zap.SugaredLogger, cc githuba
 		}
 
 		// Add the model name only if it's not empty
-		msgStatus := fmt.Sprintf("Results for job ID: %s", result)
+		detailsMsg := fmt.Sprintf("Results for job ID: %s", result)
 		if modelName != "" {
-			msgStatus += " " + modelName
+			detailsMsg += " " + modelName
 		}
-		msgStatus += "!\n\nClick details for results."
+		detailsMsg += fmt.Sprintf("!\n\nResults can be found at %s.", s3Url)
+
+		summaryMsg := fmt.Sprintf("Job ID: %s completed successfully. Check Details.", result)
 
 		params := util.PullRequestStatusParams{
-			State:     util.Success,
-			RepoOwner: repoOwner,
-			RepoName:  repoName,
-			PrNum:     prNum,
-			JobID:     result,
-			PrSha:     prSha,
-			JobType:   jobType,
-			TargetURL: s3Url,
-			MsgStatus: msgStatus,
-			StatusCtx: statusContext,
+			Status:       util.CheckComplete,
+			Conclusion:   util.CheckStatusSuccess,
+			JobID:        result,
+			JobType:      jobType,
+			CheckName:    statusContext,
+			CheckSummary: summaryMsg,
+			CheckDetails: detailsMsg,
+			RepoOwner:    repoOwner,
+			RepoName:     repoName,
+			PrNum:        prNum,
+			PrSha:        prSha,
 		}
 
-		err = util.PostPullRequestStatus(ctx, client, params)
+		err = util.PostPullRequestCheck(ctx, client, params)
 		if err != nil {
-			logger.Errorf("Failed to update pull request status: %v", err)
+			logger.Errorf("Failed to post check on pr %s/%s#%d: %v", params.RepoOwner, params.RepoName, params.PrNum, err)
 		}
 
+		err = util.PostPullRequestComment(ctx, client, params)
+		if err != nil {
+			logger.Errorf("Failed to post comment on pr %s/%s#%d: %v", params.RepoOwner, params.RepoName, params.PrNum, err)
+		}
 	}
 }
 
