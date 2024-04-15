@@ -1,9 +1,6 @@
 name: Publish container image
 
 on:
-  workflow_dispatch:
-
-on:
   push:
     branches:
       - main
