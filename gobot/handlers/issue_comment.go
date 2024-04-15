@@ -198,16 +198,21 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		"results will be presented below in the pull request status box. This may take several minutes...\n\n",
 		jobType, jobNumber)
 
-	var statusContext string
+	var checkName string
+	var statusName string
 	switch jobType {
 	case "generate":
-		statusContext = util.GenerateLocalCheck
+		checkName = util.GenerateLocalCheck
+		statusName = util.GenerateLocalStatus
 	case "precheck":
-		statusContext = util.PrecheckCheck
+		checkName = util.PrecheckCheck
+		statusName = util.PrecheckStatus
 	case "sdg-svc":
-		statusContext = util.GenerateSDGCheck
+		checkName = util.GenerateSDGCheck
+		statusName = util.GenerateSDGStatus
 	case "enable":
-		statusContext = util.TriageReadinessCheck
+		checkName = util.TriageReadinessCheck
+		statusName = util.TriageReadinessStatus
 	default:
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
@@ -217,13 +222,21 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		CheckSummary: summaryMsg,
 		CheckDetails: detailsMsg,
 		Comment:      commentMsg,
-		CheckName:    statusContext,
+		CheckName:    checkName,
 		JobType:      jobType,
 		JobID:        strconv.FormatInt(jobNumber, 10),
 		RepoOwner:    prComment.repoOwner,
 		RepoName:     prComment.repoName,
 		PrNum:        prComment.prNum,
 		PrSha:        prComment.prSha,
+	}
+
+	statusExist, _ := util.StatusExist(ctx, client, params, statusName)
+	if statusExist {
+		commentMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n" +
+		"Please ignore that Status because we recently moved from github Status to github Checks.\n" +
+		"Results (success or error) for this command will be present under the new github Check named %s.\n", statusName, checkName)
+		params.Comment = commentMsg
 	}
 
 	err = util.PostPullRequestComment(ctx, client, params)
@@ -349,6 +362,14 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 	params.CheckSummary = BotEnabled
 	params.CheckDetails = detailsMsg
 	params.Comment = detailsMsg
+
+	statusExist, _ := util.StatusExist(ctx, client, params, util.TriageReadinessStatus)
+	if statusExist {
+		detailsMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n" +
+		"Please ignore that Status because we recently moved from github Status to github Checks.\n" +
+		"Results (success or error) for this command will be present under the new github Check named %s.\n", util.TriageReadinessStatus, util.TriageReadinessCheck)
+		params.Comment = detailsMsg
+	}
 
 	err := util.PostPullRequestComment(ctx, client, params)
 	if err != nil {
