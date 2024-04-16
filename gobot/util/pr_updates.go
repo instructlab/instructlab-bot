@@ -11,23 +11,23 @@ import (
 )
 
 const (
-	CheckComplete                 = "completed"
-	CheckQueued                   = "queued"
-	CheckInProgress               = "in_progress"
-	CheckStatusSuccess            = "success"
-	CheckStatusFailure            = "failure"
-	CheckStatusError              = "error"
-	CheckStatusPending            = "pending"
+	CheckComplete      = "completed"
+	CheckQueued        = "queued"
+	CheckInProgress    = "in_progress"
+	CheckStatusSuccess = "success"
+	CheckStatusFailure = "failure"
+	CheckStatusError   = "error"
+	CheckStatusPending = "pending"
 
 	TriageReadinessCheck = "Triage Readiness Check"
 	PrecheckCheck        = "Precheck Check"
 	GenerateLocalCheck   = "Generate Local Check"
 	GenerateSDGCheck     = "Generate SDG Check"
 
-	TriageReadinessStatus         = "Triage Readiness Status"
-	PrecheckStatus                = "Precheck Status"
-	GenerateLocalStatus           = "Generate Local Status"
-	GenerateSDGStatus             = "Generate SDG Status"
+	TriageReadinessStatus = "Triage Readiness Status"
+	PrecheckStatus        = "Precheck Status"
+	GenerateLocalStatus   = "Generate Local Status"
+	GenerateSDGStatus     = "Generate SDG Status"
 )
 
 type PullRequestStatusParams struct {
@@ -66,7 +66,7 @@ func StatusExist(ctx context.Context, client *github.Client, params PullRequestS
 	return false, nil
 }
 
-func PostPullRequestErrorComment(ctx context.Context, client *github.Client,  params PullRequestStatusParams, err error) error {
+func PostPullRequestErrorComment(ctx context.Context, client *github.Client, params PullRequestStatusParams, err error) error {
 	params.Comment = fmt.Sprintf("Beep, boop 🤖  Sorry, An error has occurred : %v", err)
 	return PostPullRequestComment(ctx, client, params)
 }
@@ -84,10 +84,10 @@ func PostPullRequestComment(ctx context.Context, client *github.Client, params P
 func PostPullRequestCheck(ctx context.Context, client *github.Client, params PullRequestStatusParams) error {
 
 	checkRequest := github.CreateCheckRunOptions{
-		Name:       params.CheckName,
-		HeadSHA:    params.PrSha,
-		Status:     github.String(params.Status),
-		StartedAt:  &github.Timestamp{Time: time.Now()}, // Optional
+		Name:      params.CheckName,
+		HeadSHA:   params.PrSha,
+		Status:    github.String(params.Status),
+		StartedAt: &github.Timestamp{Time: time.Now()}, // Optional
 		Output: &github.CheckRunOutput{
 			Title:   github.String(params.CheckName),
 			Summary: github.String(params.CheckSummary),
