@@ -486,7 +486,7 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 
 	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
 	if !isBotEnabled {
-		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		detailsMsg := "Bot is not enabled on this PR. Maintainers need to enable the bot first."
 		if err != nil {
 			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
 		}

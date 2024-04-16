@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"go.uber.org/zap"
+	"sigs.k8s.io/yaml"
 )
 
 func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map[string]string) error {
@@ -166,6 +167,84 @@ func generateFormattedJSON(ctx context.Context, outputDir, filename string, svc 
 	}
 
 	file, err := os.Open(formattedHTMLFile)
+	if err != nil {
+		logger.Errorf("Could not open generated HTML file: %v", err)
+		return ""
+	}
+	defer file.Close()
+
+	_, err = svc.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(S3Bucket),
+		Key:         aws.String(s3Key),
+		Body:        file,
+		ContentType: aws.String("text/html"),
+	})
+	if err != nil {
+		logger.Errorf("Could not upload formatted HTML file to S3: %v", err)
+		return ""
+	}
+
+	return s3Key
+}
+
+// Generate formatted YAML HTML from JSON files
+func generateFormattedYAML(ctx context.Context, outputDir, filename string, svc *s3.Client, logger *zap.SugaredLogger) string {
+	inputFile := path.Join(outputDir, filename)
+	outputFile := inputFile + ".yaml.html"
+	s3Key := fmt.Sprintf("%s/%s", path.Base(outputDir), path.Base(outputFile))
+
+	jsonData, err := os.ReadFile(inputFile)
+	if err != nil {
+		logger.Errorf("Failed to read JSON file: %v", err)
+		return ""
+	}
+
+	var temp interface{}
+	// If the JSON doesn't marshall, skip.
+	// TODO: support invalid top-level format such as an array in generate-local such as test_merlinite & train_merlinite
+	if err := json.Unmarshal(jsonData, &temp); err != nil {
+		return ""
+	}
+
+	yamlData, err := yaml.JSONToYAML(jsonData)
+	if err != nil {
+		logger.Errorf("Failed to convert JSON to YAML: %v", err)
+		return ""
+	}
+
+	htmlContent := fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YAML Viewer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+    </style>
+</head>
+<body>
+<pre><code class="language-yaml">%s</code></pre>
+<script>
+    document.addEventListener('DOMContentLoaded', (event) => {
+        document.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightBlock(block);
+        });
+    });
+</script>
+</body>
+</html>
+`, string(yamlData))
+
+	err = os.WriteFile(outputFile, []byte(htmlContent), 0644)
+	if err != nil {
+		logger.Errorf("Failed to write HTML file: %v", err)
+		return ""
+	}
+
+	file, err := os.Open(outputFile)
 	if err != nil {
 		logger.Errorf("Could not open generated HTML file: %v", err)
 		return ""
