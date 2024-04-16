@@ -16,6 +16,15 @@ else
     PIPE_DEV_NULL=
 endif
 
+.PHONY: go-fmt
+go-fmt: ## Run gofmt on worker and bot
+	$(CMD_PREFIX) gofmt -l -w .
+
+.PHONY: go-lint
+go-lint: ## Run golint on worker and bot
+	$(CMD_PREFIX) cd ./worker; golangci-lint run ./...
+	$(CMD_PREFIX) cd ./gobot; golangci-lint run ./...
+
 .PHONY: md-lint
 md-lint: ## Lint markdown files
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[MD LINT]"
