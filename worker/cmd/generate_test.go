@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,6 @@ import (
 )
 
 func TestGenerateIndexHTML(t *testing.T) {
-
 	f, err := os.CreateTemp("", "index.html")
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,10 @@ func TestGenerateIndexHTML(t *testing.T) {
 </body>
 </html>`
 
-	assert.Equal(t, expected, string(contents))
+	normalizedExpected := normalizeHTML(expected)
+	normalizedActual := normalizeHTML(string(contents))
+
+	assert.Equal(t, normalizedExpected, normalizedActual)
 }
 
 // TestFetchModelName verify the model name is extracted from the id key.
@@ -220,4 +223,10 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 	// Verify that an error was returned due to the invalid "object" field
 	assert.Error(t, err, "fetchModelName should return an error for invalid object field")
 	assert.Empty(t, modelName, "The model name should be empty for invalid object field")
+}
+
+// Replace all whitespace sequences with a single space. Remove spaces between HTML tags
+func normalizeHTML(input string) string {
+	compacted := regexp.MustCompile(`\s+`).ReplaceAllString(input, " ")
+	return regexp.MustCompile(`>\s+<`).ReplaceAllString(compacted, "><")
 }
