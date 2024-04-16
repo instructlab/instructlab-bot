@@ -272,7 +272,7 @@ func (h *PRCommentHandler) checkAuthorPermission(ctx context.Context, client *gi
 
 	h.Logger.Debugf("Team membership for user %s: %v", prComment.author, teamMembership)
 
-	if teamMembership.GetState() != "active" || teamMembership.GetRole() != "maintainer" {
+	if teamMembership.GetState() != "active" {
 		h.Logger.Infof("User %s does not have required permission in the team %s", prComment.author, teamName)
 		return false, nil
 	}
