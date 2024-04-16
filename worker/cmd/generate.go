@@ -960,12 +960,24 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 		// Only process JSON files for formatting that are created after the job started (e.g. current job)
 		if info.ModTime().After(w.jobStart) {
 			if strings.HasSuffix(filename, ".json") || strings.HasSuffix(filename, ".jsonl") {
-				formattedKey := generateFormattedJSON(w.ctx, outputDir, filename, w.svc, w.logger)
-				if formattedKey != "" {
-					formattedURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedKey)
+				// Generate and upload JSON viewer HTML
+				formattedJSONKey := generateFormattedJSON(w.ctx, outputDir, filename, w.svc, w.logger)
+				if formattedJSONKey != "" {
+					formattedJSONURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedJSONKey)
 					publicFiles = append(publicFiles, map[string]string{
-						"name": filename + jsonViewerFilenameSuffix,
-						"url":  formattedURL,
+						"name": filename + jsonViewerFilenameSuffix, // Example: file.json.html
+						"url":  formattedJSONURL,
+					})
+				}
+
+				// Generate and upload YAML viewer HTML for the same JSON file
+				formattedYAMLKey := generateFormattedYAML(w.ctx, outputDir, filename, w.svc, w.logger)
+				if formattedYAMLKey != "" {
+					yamlFilename := strings.TrimSuffix(filename, path.Ext(filename)) + ".yaml"
+					formattedYAMLURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedYAMLKey)
+					publicFiles = append(publicFiles, map[string]string{
+						"name": yamlFilename + ".html",
+						"url":  formattedYAMLURL,
 					})
 				}
 			}

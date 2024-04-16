@@ -19,8 +19,8 @@ import (
 const (
 	TriageReadinessMsg = "PR is ready for evaluation."
 	AccessCheckFailed  = "Access check failed."
-	LabelsNotFound      = "Required labels not found."
-	BotEnabled	  = "Bot is successfully enabled."
+	LabelsNotFound     = "Required labels not found."
+	BotEnabled         = "Bot is successfully enabled."
 )
 
 type PRCommentHandler struct {
@@ -101,7 +101,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	case "enable":
 		return h.enableCommand(ctx, client, &prComment)
 	case "generate-local":
-		return  h.generateCommand(ctx, client, &prComment)
+		return h.generateCommand(ctx, client, &prComment)
 	case "precheck":
 		return h.precheckCommand(ctx, client, &prComment)
 	case "generate":
@@ -191,9 +191,9 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	}
 
 	summaryMsg := "Job ID: " + strconv.FormatInt(jobNumber, 10) + " - Generating test data.\n\n"
-	detailsMsg := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. \n" +
-					"Related Job ID is %d.\n" +
-					"This may take several minutes...\n\n", jobType, jobNumber)
+	detailsMsg := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. \n"+
+		"Related Job ID is %d.\n"+
+		"This may take several minutes...\n\n", jobType, jobNumber)
 	commentMsg := fmt.Sprintf("Beep, boop 🤖, Generating test data for your PR with the job type: *%s*. Your Job ID is %d. The "+
 		"results will be presented below in the pull request status box. This may take several minutes...\n\n",
 		jobType, jobNumber)
@@ -233,9 +233,9 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 
 	statusExist, _ := util.StatusExist(ctx, client, params, statusName)
 	if statusExist {
-		commentMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n" +
-		"Please ignore that Status because we recently moved from github Status to github Checks.\n" +
-		"Results (success or error) for this command will be present under the new github Check named %s.\n", statusName, checkName)
+		commentMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
+			"Please ignore that Status because we recently moved from github Status to github Checks.\n"+
+			"Results (success or error) for this command will be present under the new github Check named %s.\n", statusName, checkName)
 		params.Comment = commentMsg
 	}
 
@@ -321,12 +321,12 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 	}
 
 	params := util.PullRequestStatusParams{
-		Status:       util.CheckComplete,
-		CheckName:    util.TriageReadinessCheck,
-		RepoOwner:    prComment.repoOwner,
-		RepoName:     prComment.repoName,
-		PrNum:        prComment.prNum,
-		PrSha:        prComment.prSha,
+		Status:    util.CheckComplete,
+		CheckName: util.TriageReadinessCheck,
+		RepoOwner: prComment.repoOwner,
+		RepoName:  prComment.repoName,
+		PrNum:     prComment.prNum,
+		PrSha:     prComment.prSha,
 	}
 
 	if !isAllowed {
@@ -351,7 +351,7 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 
 	detailsMsg := fmt.Sprintf("Beep, boop .. Hi, I'm %s and I'm going to help you"+
 		" with your pull request. Thanks for you contribution! 🎉\n\n", h.BotUsername)
-		detailsMsg += fmt.Sprintf("I support the following commands:\n\n"+
+	detailsMsg += fmt.Sprintf("I support the following commands:\n\n"+
 		"* `%s precheck` -- Check existing model behavior using the questions in this proposed change.\n"+
 		"* `%s generate` -- Generate a sample of synthetic data using the synthetic data generation backend infrastructure.\n"+
 		"* `%s generate-local` -- Generate a sample of synthetic data using a local model.\n"+
@@ -365,9 +365,9 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 
 	statusExist, _ := util.StatusExist(ctx, client, params, util.TriageReadinessStatus)
 	if statusExist {
-		detailsMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n" +
-		"Please ignore that Status because we recently moved from github Status to github Checks.\n" +
-		"Results (success or error) for this command will be present under the new github Check named %s.\n", util.TriageReadinessStatus, util.TriageReadinessCheck)
+		detailsMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
+			"Please ignore that Status because we recently moved from github Status to github Checks.\n"+
+			"Results (success or error) for this command will be present under the new github Check named %s.\n", util.TriageReadinessStatus, util.TriageReadinessCheck)
 		params.Comment = detailsMsg
 	}
 
@@ -389,13 +389,13 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:       util.CheckComplete,
-		Conclusion:   util.CheckStatusFailure,
-		CheckName:    util.GenerateLocalCheck,
-		RepoOwner:    prComment.repoOwner,
-		RepoName:     prComment.repoName,
-		PrNum:        prComment.prNum,
-		PrSha:        prComment.prSha,
+		Status:     util.CheckComplete,
+		Conclusion: util.CheckStatusFailure,
+		CheckName:  util.GenerateLocalCheck,
+		RepoOwner:  prComment.repoOwner,
+		RepoName:   prComment.repoName,
+		PrNum:      prComment.prNum,
+		PrSha:      prComment.prSha,
 	}
 
 	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
@@ -432,13 +432,13 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:       util.CheckComplete,
-		Conclusion:   util.CheckStatusFailure,
-		CheckName:    util.PrecheckCheck,
-		RepoOwner:    prComment.repoOwner,
-		RepoName:     prComment.repoName,
-		PrNum:        prComment.prNum,
-		PrSha:        prComment.prSha,
+		Status:     util.CheckComplete,
+		Conclusion: util.CheckStatusFailure,
+		CheckName:  util.PrecheckCheck,
+		RepoOwner:  prComment.repoOwner,
+		RepoName:   prComment.repoName,
+		PrNum:      prComment.prNum,
+		PrSha:      prComment.prSha,
 	}
 
 	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
@@ -475,18 +475,18 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:       util.CheckComplete,
-		Conclusion:   util.CheckStatusFailure,
-		CheckName:    util.GenerateSDGCheck,
-		RepoOwner:    prComment.repoOwner,
-		RepoName:     prComment.repoName,
-		PrNum:        prComment.prNum,
-		PrSha:        prComment.prSha,
+		Status:     util.CheckComplete,
+		Conclusion: util.CheckStatusFailure,
+		CheckName:  util.GenerateSDGCheck,
+		RepoOwner:  prComment.repoOwner,
+		RepoName:   prComment.repoName,
+		PrNum:      prComment.prNum,
+		PrSha:      prComment.prSha,
 	}
 
 	isBotEnabled, err := h.checkBotEnableStatus(ctx, client, prComment)
 	if !isBotEnabled {
-		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		detailsMsg := "Bot is not enabled on this PR. Maintainers need to enable the bot first."
 		if err != nil {
 			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
 		}
