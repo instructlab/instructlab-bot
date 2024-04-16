@@ -137,7 +137,7 @@ run-dev: ## Deploy the bot development stack.
 		exit 1 ; \
 	fi
 	$(ECHO_PREFIX) printf "Deploy the development stack\n"
-	$(CMD_PREFIX) podman compose up
+	$(CMD_PREFIX) podman compose up -d
 
 .PHONY: redis-stack
 redis-stack: ## Run a redis-stack container
