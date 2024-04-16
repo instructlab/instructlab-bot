@@ -233,7 +233,7 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 
 	statusExist, _ := util.StatusExist(ctx, client, params, statusName)
 	if statusExist {
-		commentMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
+		commentMsg += fmt.Sprintf("\n > [!CAUTION] \n > **Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
 			"Please ignore that Status because we recently moved from github Status to github Checks.\n"+
 			"Results (success or error) for this command will be present under the new github Check named %s.\n", statusName, checkName)
 		params.Comment = commentMsg
@@ -355,7 +355,7 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 		"* `%s precheck` -- Check existing model behavior using the questions in this proposed change.\n"+
 		"* `%s generate` -- Generate a sample of synthetic data using the synthetic data generation backend infrastructure.\n"+
 		"* `%s generate-local` -- Generate a sample of synthetic data using a local model.\n"+
-		"> [!NOTE]  **Results or Errors of these commands will be posted as a pull request check in the Checks section below**.\n",
+		"> [!NOTE] \n > **Results or Errors of these commands will be posted as a pull request check in the Checks section below**.\n",
 		h.BotUsername, h.BotUsername, h.BotUsername)
 
 	params.Conclusion = util.CheckStatusSuccess
@@ -365,7 +365,7 @@ func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Cli
 
 	statusExist, _ := util.StatusExist(ctx, client, params, util.TriageReadinessStatus)
 	if statusExist {
-		detailsMsg += fmt.Sprintf("\n**Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
+		detailsMsg += fmt.Sprintf("\n > [!CAUTION] \n > **Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
 			"Please ignore that Status because we recently moved from github Status to github Checks.\n"+
 			"Results (success or error) for this command will be present under the new github Check named %s.\n", util.TriageReadinessStatus, util.TriageReadinessCheck)
 		params.Comment = detailsMsg
