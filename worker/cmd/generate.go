@@ -943,13 +943,11 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 	}
 
 	publicFiles := make([]map[string]string, 0)
+	// Append job ID to outDirName for uniqueness
+	jobSpecificOutDirName := fmt.Sprintf("%s-job-%s", outDirName, w.job)
 
 	for _, item := range items {
 		filename := item.Name()
-		// Skip the index.html file from the index
-		if filename == "index.html" {
-			continue
-		}
 		fullPath := path.Join(outputDir, filename)
 		info, err := item.Info()
 		if err != nil {
@@ -957,32 +955,30 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 			continue
 		}
 
-		// Only process JSON files for formatting that are created after the job started (e.g. current job)
+		// Only process files created after the job start time
 		if info.ModTime().After(w.jobStart) {
 			if strings.HasSuffix(filename, ".json") || strings.HasSuffix(filename, ".jsonl") {
-				// Generate and upload JSON viewer HTML
 				formattedJSONKey := generateFormattedJSON(w.ctx, outputDir, filename, w.svc, w.logger)
 				if formattedJSONKey != "" {
 					formattedJSONURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedJSONKey)
 					publicFiles = append(publicFiles, map[string]string{
-						"name": filename + jsonViewerFilenameSuffix, // Example: file.json.html
+						"name": filename + jsonViewerFilenameSuffix,
 						"url":  formattedJSONURL,
-					})
-				}
-
-				// Generate and upload YAML viewer HTML for the same JSON file
-				formattedYAMLKey := generateFormattedYAML(w.ctx, outputDir, filename, w.svc, w.logger)
-				if formattedYAMLKey != "" {
-					yamlFilename := strings.TrimSuffix(filename, path.Ext(filename)) + ".yaml"
-					formattedYAMLURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedYAMLKey)
-					publicFiles = append(publicFiles, map[string]string{
-						"name": yamlFilename + ".html",
-						"url":  formattedYAMLURL,
 					})
 				}
 			}
 
-			// Upload the rest of the files created in the current job only (not previous jobs)
+			formattedYAMLKey := generateFormattedYAML(w.ctx, outputDir, filename, w.svc, w.logger)
+			if formattedYAMLKey != "" {
+				yamlFilename := strings.TrimSuffix(filename, path.Ext(filename)) + ".yaml-viewer"
+				formattedYAMLURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, formattedYAMLKey)
+				publicFiles = append(publicFiles, map[string]string{
+					"name": yamlFilename + ".html",
+					"url":  formattedYAMLURL,
+				})
+			}
+
+			// Upload the job file and add it to the publicFiles list
 			file, err := os.Open(fullPath)
 			if err != nil {
 				sugar.Errorf("Could not open file: %v", err)
@@ -990,7 +986,7 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 			}
 			defer file.Close()
 
-			upKey := fmt.Sprintf("%s/%s", outDirName, filename)
+			upKey := fmt.Sprintf("%s/%s", jobSpecificOutDirName, filename)
 			_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
 				Bucket:      aws.String(S3Bucket),
 				Key:         aws.String(upKey),
@@ -1001,14 +997,16 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 				sugar.Errorf("Could not upload file to S3: %v", err)
 				continue
 			}
+			publicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, upKey)
+			publicFiles = append(publicFiles, map[string]string{
+				"name": filename,
+				"url":  publicURL,
+			})
 		}
+	}
 
-		// Add all files in the job directory to the indexfile (including old job files for the PR/jobType)
-		publicURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Bucket, AWSRegion, fmt.Sprintf("%s/%s", outDirName, filename))
-		publicFiles = append(publicFiles, map[string]string{
-			"name": filename,
-			"url":  publicURL,
-		})
+	if len(publicFiles) == 0 {
+		return ""
 	}
 
 	// Generate index.html
@@ -1032,7 +1030,7 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 	}
 	defer indexFile.Close()
 
-	indexUpKey := fmt.Sprintf("%s/index.html", outDirName)
+	indexUpKey := fmt.Sprintf("%s/index.html", jobSpecificOutDirName)
 	_, err = w.svc.PutObject(w.ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(S3Bucket),
 		Key:         aws.String(indexUpKey),
