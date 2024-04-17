@@ -61,6 +61,7 @@ const (
 	jobPreCheck              = "precheck"
 	sdgModel                 = "mistralai/mixtral-8x7b-instruct-v0-1"
 	jsonViewerFilenameSuffix = "-viewer.html"
+	maxSeedQA                = 20
 )
 
 // Worker encapsulates dependencies and methods to process jobs
@@ -473,7 +474,7 @@ func (w *Worker) processJob() {
 			}
 		}
 
-		// Uncomment to bypass ilab diff
+		// Uncomment to bypass ilab diff and run our own discovery of a tax repo diff of this PR
 		//taxonomyFiles, err := discoverGitTaxonomyFiles(taxonomyDir, "main")
 		//if err != nil {
 		//	sugar.Errorf("Failed to discover taxonomy files: %v", err)
@@ -485,7 +486,55 @@ func (w *Worker) processJob() {
 			return
 		}
 
-		outputFiles, err := w.datagenSvc(taxonomyFiles, outputDir, NumInstructions)
+		// Process each YAML file and filter questions if necessary
+		filteredFiles := []string{}
+		for _, file := range taxonomyFiles {
+			f, err := os.Open(file)
+			if err != nil {
+				sugar.Errorf("Failed to open file: %v", err)
+				continue
+			}
+			defer f.Close()
+
+			decoder := yaml.NewDecoder(f)
+			var data map[string]interface{}
+			if err := decoder.Decode(&data); err != nil {
+				sugar.Errorf("Failed to decode YAML file: %v", err)
+				continue
+			}
+
+			if seedExamples, ok := data["seed_examples"].([]interface{}); ok && len(seedExamples) > 20 {
+				originalCount := len(seedExamples)
+				data["seed_examples"] = seedExamples[:maxSeedQA]
+				outputData, err := yaml.Marshal(data)
+				if err != nil {
+					sugar.Errorf("Failed to re-marshal filtered YAML data: %v", err)
+					continue
+				}
+
+				// Write the modified content back to a temporary file
+				tmpFile, err := os.CreateTemp("", "filtered-*.yaml")
+				if err != nil {
+					sugar.Errorf("Failed to create temporary file: %v", err)
+					continue
+				}
+				defer tmpFile.Close()
+
+				if _, err = tmpFile.Write(outputData); err != nil {
+					sugar.Errorf("Failed to write filtered data to temporary file: %v", err)
+					continue
+				}
+				sugar.Infof("Trimmed %s from %d to 20 Q&A pairs", file, originalCount)
+
+				filteredFiles = append(filteredFiles, tmpFile.Name())
+			} else {
+				// No filtering needed, use the original file
+				filteredFiles = append(filteredFiles, file)
+			}
+		}
+
+		// Generate data with potentially filtered files
+		outputFiles, err := w.datagenSvc(filteredFiles, outputDir, NumInstructions)
 		if err != nil {
 			sugar.Errorf("Failed to generate data: %v", err)
 			w.reportJobError(err)
