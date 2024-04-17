@@ -11,32 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  golangci-lint-worker:
+  golangci-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: worker/go.mod
+          go-version-file: go.mod
           cache: false
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.54
           working-directory: worker
-  golangci-lint-bot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: gobot/go.mod
-          cache: false
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: v1.54
-          working-directory: gobot
   ansible:
     runs-on: ubuntu-latest
     steps:
@@ -66,7 +53,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: gobot/go.mod
+          go-version-file: go.mod
       - name: Go Format
         run: |
           [ -z "$(gofmt -l .)" ] || (echo "$(gofmt -l .)" && exit 1)

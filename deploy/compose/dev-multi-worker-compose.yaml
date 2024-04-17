@@ -20,7 +20,7 @@ services:
 
   bot:
     container_name: bot
-    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main
     env_file:
       - .env
     depends_on:

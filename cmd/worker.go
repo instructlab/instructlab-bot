@@ -103,27 +103,27 @@ type IlabConfig struct {
 }
 
 func init() {
-	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
-	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
-	generateCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
-	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
-	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
-	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instruct-lab/taxonomy", "The git remote for the taxonomy repo")
-	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
-	generateCmd.Flags().StringVarP(&GithubUsername, "github-username", "u", "instruct-lab-bot", "The GitHub username to use for authentication")
-	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
-	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
-	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
-	generateCmd.Flags().StringVarP(&TlsClientCertPath, "tls-client-cert", "", "client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
-	generateCmd.Flags().StringVarP(&TlsClientKeyPath, "tls-client-key", "", "client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
-	generateCmd.Flags().StringVarP(&TlsServerCaCertPath, "tls-server-ca-cert", "", "server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
-	generateCmd.Flags().BoolVarP(&TlsInsecure, "tls-insecure", "", false, "Whether to skip TLS verification")
-	_ = generateCmd.MarkFlagRequired("github-token")
-	rootCmd.AddCommand(generateCmd)
+	workerCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
+	workerCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
+	workerCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
+	workerCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
+	workerCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
+	workerCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instruct-lab/taxonomy", "The git remote for the taxonomy repo")
+	workerCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
+	workerCmd.Flags().StringVarP(&GithubUsername, "github-username", "u", "instruct-lab-bot", "The GitHub username to use for authentication")
+	workerCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
+	workerCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
+	workerCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
+	workerCmd.Flags().StringVarP(&TlsClientCertPath, "tls-client-cert", "", "client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
+	workerCmd.Flags().StringVarP(&TlsClientKeyPath, "tls-client-key", "", "client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
+	workerCmd.Flags().StringVarP(&TlsServerCaCertPath, "tls-server-ca-cert", "", "server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
+	workerCmd.Flags().BoolVarP(&TlsInsecure, "tls-insecure", "", false, "Whether to skip TLS verification")
+	_ = workerCmd.MarkFlagRequired("github-token")
+	rootCmd.AddCommand(workerCmd)
 }
 
-var generateCmd = &cobra.Command{
-	Use:   "generate",
+var workerCmd = &cobra.Command{
+	Use:   "worker",
 	Short: "Listen for jobs on the 'generate' Redis queue and process them.",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := initLogger(Debug)

@@ -9,7 +9,7 @@ spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+        - image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main
           env:
             - name: ILBOT_GITHUB_INTEGRATION_ID
               valueFrom:
@@ -26,6 +26,11 @@ spec:
                 secretKeyRef:
                   name: instruct-lab-bot
                   key: ILBOT_GITHUB_APP_PRIVATE_KEY
+          args:
+            - /bin/instruct-lab-bot
+            - bot
+            - --redis
+            - redis:6379
           name: bot
           resources:
             limits:

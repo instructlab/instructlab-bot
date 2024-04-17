@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,13 +14,11 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/google/go-github/v60/github"
 	"github.com/gregjones/httpcache"
-	"github.com/instruct-lab/instruct-lab-bot/gobot/handlers"
-	"github.com/instruct-lab/instruct-lab-bot/gobot/util"
+	"github.com/instruct-lab/instruct-lab-bot/handlers"
+	"github.com/instruct-lab/instruct-lab-bot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/rcrowley/go-metrics"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -30,7 +27,6 @@ const (
 )
 
 var (
-	RedisHost           string
 	HTTPAddress         string
 	HTTPPort            int
 	GithubIntegrationID int
@@ -41,25 +37,25 @@ var (
 	RequiredLabels      []string
 	Maintainers         []string
 	BotUsername         string
-	Debug               bool
 )
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&RedisHost, "redis", "", "redis:6379", "The Redis instance to connect to")
-	rootCmd.PersistentFlags().StringVarP(&HTTPAddress, "http-address", "", "127.0.0.1", "HTTP Address to bind to")
-	rootCmd.PersistentFlags().IntVarP(&HTTPPort, "http-port", "", 8080, "HTTP Port to bind to")
-	rootCmd.PersistentFlags().IntVarP(&GithubIntegrationID, "github-integration-id", "", 0, "The GitHub App Integration ID")
-	rootCmd.PersistentFlags().StringVarP(&GithubURL, "github-url", "", "https://api.github.com/", "The URL of the GitHub instance")
-	rootCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
-	rootCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
-	rootCmd.PersistentFlags().StringVarP(&WebhookProxyURL, "webhook-proxy-url", "", "", "Get an ID from https://smee.io/new. If blank, the app will not use a webhook proxy")
-	rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{"triage-ok-to-test"}, "Label(s) required before a PR can be tested")
-	rootCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
-	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
-	rootCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instruct-lab-bot", "The username of the bot")
+	botCmd.PersistentFlags().StringVarP(&RedisHost, "redis", "", "redis:6379", "The Redis instance to connect to")
+	botCmd.PersistentFlags().StringVarP(&HTTPAddress, "http-address", "", "127.0.0.1", "HTTP Address to bind to")
+	botCmd.PersistentFlags().IntVarP(&HTTPPort, "http-port", "", 8080, "HTTP Port to bind to")
+	botCmd.PersistentFlags().IntVarP(&GithubIntegrationID, "github-integration-id", "", 0, "The GitHub App Integration ID")
+	botCmd.PersistentFlags().StringVarP(&GithubURL, "github-url", "", "https://api.github.com/", "The URL of the GitHub instance")
+	botCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
+	botCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
+	botCmd.PersistentFlags().StringVarP(&WebhookProxyURL, "webhook-proxy-url", "", "", "Get an ID from https://smee.io/new. If blank, the app will not use a webhook proxy")
+	botCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{"triage-ok-to-test"}, "Label(s) required before a PR can be tested")
+	botCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
+	botCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
+	botCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instruct-lab-bot", "The username of the bot")
+	rootCmd.AddCommand(botCmd)
 }
 
-var rootCmd = &cobra.Command{
+var botCmd = &cobra.Command{
 	Use:   "bot",
 	Short: "Bot receives events from GitHub and processes them",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -157,61 +153,6 @@ func run(logger *zap.SugaredLogger) error {
 	}()
 	wg.Wait()
 	return nil
-}
-
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-func initLogger(debug bool) *zap.Logger {
-	level := zap.InfoLevel
-
-	if debug {
-		level = zap.DebugLevel
-	}
-
-	loggerConfig := zap.Config{
-		Level:            zap.NewAtomicLevelAt(level),
-		Encoding:         "console",
-		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	logger, _ := loggerConfig.Build()
-	return logger
-}
-
-func initializeConfig(cmd *cobra.Command) error {
-	v := viper.New()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.config/instruct-lab-bot")
-	v.AddConfigPath("/etc/instruct-lab-bot")
-	if err := v.ReadInConfig(); err != nil {
-		// It's okay if there isn't a config file
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return err
-		}
-	}
-	v.SetEnvPrefix("ILBOT")
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	v.AutomaticEnv()
-	bindFlags(cmd, v)
-	return nil
-}
-
-func bindFlags(cmd *cobra.Command, v *viper.Viper) {
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		configName := f.Name
-		if !f.Changed && v.IsSet(configName) {
-			val := v.Get(configName)
-			_ = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
-		}
-	})
 }
 
 func receiveResults(redisHostPort string, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {

@@ -14,11 +14,11 @@ spec:
                   name: instruct-lab-bot
                   key: ILWORKER_GITHUB_TOKEN
           args:
-            - /instruct-lab-bot-worker
+            - /bin/instruct-lab-bot
+            - worker
             - --test
             - --redis
             - redis:6379
-            - generate
           image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
           name: worker
           resources:

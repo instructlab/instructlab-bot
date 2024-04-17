@@ -4,7 +4,7 @@
     redis_ip: "{{ hostvars[groups['botNode'][0]]['ansible_wg0']['ipv4']['address'] }}"
     cacheable: true
   when: redis_ip is not defined or
-        redis_ip == ""
+    redis_ip == ""
 
 - name: Install git
   ansible.builtin.dnf:
@@ -17,65 +17,64 @@
     path: "~/instruct-lab-bot"
     state: absent
 
-- name: Clone the repository  # noqa latest[git]
+- name: Clone the repository # noqa latest[git]
   ansible.builtin.git:
-    repo: 'https://{{ github_token }}@github.com/instruct-lab/instruct-lab-bot'
+    repo: "https://{{ github_token }}@github.com/instruct-lab/instruct-lab-bot"
     dest: "~/instruct-lab-bot"
 
 - name: Set default args for install-worker
   ansible.builtin.set_fact:
     worker_args: "--gpu-type cuda --github-token {{ github_token }} \
-    --redis-ip {{ redis_ip }} \
-    --nexodus-reg-key {{ nexodus_reg_key }} \
-    --aws-access-key-id {{ aws_access_key_id }} \
-    --aws-secret-access-key {{ aws_secret_access_key }}"
+      --redis-ip {{ redis_ip }} \
+      --nexodus-reg-key {{ nexodus_reg_key }} \
+      --aws-access-key-id {{ aws_access_key_id }} \
+      --aws-secret-access-key {{ aws_secret_access_key }}"
 
 - name: Set args for taxonomy repo
   ansible.builtin.set_fact:
     worker_args: "{{ worker_args }} --taxonomy-repo {{ taxonomy_repo }}"
   when: taxonomy_repo is defined and
-        taxonomy_repo != None and
-        taxonomy_repo | trim != ''
+    taxonomy_repo != None and
+    taxonomy_repo | trim != ''
 
 - name: Set args for bot repo
   ansible.builtin.set_fact:
     worker_args: "{{ worker_args }} --bot-repo {{ bot_repo }}"
   when: bot_repo is defined and
-        bot_repo != None and
-        bot_repo | trim != ''
+    bot_repo != None and
+    bot_repo | trim != ''
 
 - name: Append args for endpoint_url
   ansible.builtin.set_fact:
     worker_args: "{{ worker_args }} --endpoint-url {{ endpoint_url }}"
   when: endpoint_url is defined and
-        endpoint_url != None and
-        endpoint_url | trim != ''
+    endpoint_url != None and
+    endpoint_url | trim != ''
 
 - name: Set args for sdg_endpoint_url
   ansible.builtin.set_fact:
     worker_args: "{{ worker_args }} --sdg-endpoint-url {{ sdg_endpoint_url }} \
-    --tls-client-cert \"{{ tls_client_cert }}\" \
-    --tls-client-key \"{{ tls_client_key }}\" \
-    --tls-server-ca-cert \"{{ tls_server_ca_cert }}\""
+      --tls-client-cert \"{{ tls_client_cert }}\" \
+      --tls-client-key \"{{ tls_client_key }}\" \
+      --tls-server-ca-cert \"{{ tls_server_ca_cert }}\""
   when: sdg_endpoint_url is defined and
-        sdg_endpoint_url != None and
-        sdg_endpoint_url | trim != ''
+    sdg_endpoint_url != None and
+    sdg_endpoint_url | trim != ''
 
 - name: Dump the args
   ansible.builtin.debug:
     msg: "{{ worker_args }}"
 
-- name: Run the install script to setup worker and log output  # noqa no-changed-when
+- name: Run the install script to setup worker and log output # noqa no-changed-when
   ansible.builtin.shell: |
     cd ~/instruct-lab-bot/scripts
     nohup ./install-worker.sh install {{ worker_args }} > install-worker.log 2>&1 &
-
 
 - name: Pause for 35 minutes to allow the script to complete
   ansible.builtin.pause:
     minutes: 35
 
-- name: Print the output of the install script log  # noqa no-changed-when
+- name: Print the output of the install script log # noqa no-changed-when
   ansible.builtin.command: cat ~/instruct-lab-bot/scripts/install-worker.log
   register: log_content
 
@@ -92,7 +91,7 @@
     delay: 60
     timeout: 500
 
-- name: Run the install script again to setup worker and log output  # noqa no-changed-when
+- name: Run the install script again to setup worker and log output # noqa no-changed-when
   ansible.builtin.shell: |
     cd ~/instruct-lab-bot/scripts
     nohup ./install-worker.sh install {{ worker_args }} > install-worker.log 2>&1 &

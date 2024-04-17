@@ -9,7 +9,7 @@
 - name: Start the container
   community.docker.docker_container:
     name: instruct-lab-bot
-    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main
     state: started
     pull: always
     env:
@@ -22,3 +22,4 @@
       ILBOT_HTTP_PORT: "8080"
       ILBOT_MAINTAINERS: "taxonomy-triagers taxonomy-approvers taxonomy-maintainers labrador-org-maintainers instruct-lab-bot-maintainers"
       ILBOT_REQUIRED_LABELS: "skill knowledge"
+    command: ["/bin/instruct-lab-bot", "bot"]

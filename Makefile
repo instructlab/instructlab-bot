@@ -22,8 +22,7 @@ go-fmt: ## Run gofmt on worker and bot
 
 .PHONY: go-lint
 go-lint: ## Run golint on worker and bot
-	$(CMD_PREFIX) cd ./worker; golangci-lint run ./...
-	$(CMD_PREFIX) cd ./gobot; golangci-lint run ./...
+	$(CMD_PREFIX) golangci-lint run ./...
 
 .PHONY: md-lint
 md-lint: ## Lint markdown files
@@ -88,46 +87,25 @@ yaml-lint: ## Run Yaml linters
 	$(ECHO_PREFIX) printf "  %-12s ./...\n" "[YAML LINT]"
 	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./ --strict
 
-gobot-image: gobot/Containerfile ## Build continaer image for the Go bot
-	$(ECHO_PREFIX) printf "  %-12s gobot/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f gobot/Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main .
+.PHONY: image
+image: Containerfile ## Build continaer image for the Go bot
+	$(ECHO_PREFIX) printf "  %-12s Containerfile\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build -f Containerfile -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main .
 
-worker-test-image: worker/Containerfile.test ## Build container image for a test worker
-	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.test\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f worker/Containerfile.test -t ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main .
+.output:
+	$(CMD_PREFIX) mkdir -p $@
 
-.PHONY: gobot
-gobot: gobot/gobot ## Build gobot
-
-gobot/gobot: $(wildcard gobot/*.go) $(wildcard gobot/*/*.go)
-	$(CMD_PREFIX) $(MAKE) -C gobot gobot
-
-.PHONY: worker
-worker: worker/worker ## Build worker
-
-worker/worker: $(wildcard worker/*.go) $(wildcard worker/cmd/*.go)
-	$(CMD_PREFIX) $(MAKE) -C worker worker
-
-.PHONY: push-gobot-images
-push-gobot-images: ## Build gobot multi platform container images and push it to ghcr.io
-	$(ECHO_PREFIX) printf "  %-12s gobot/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build --platform linux/amd64,linux/arm64 --manifest instruct-lab-gobot -f gobot/Containerfile .
-	$(CMD_PREFIX) podman tag localhost/instruct-lab-gobot ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
-	$(CMD_PREFIX) podman manifest rm localhost/instruct-lab-gobot
-	$(CMD_PREFIX) podman manifest push --all ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
-	$(CMD_PREFIX) podman manifest rm ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
-
-.PHONY: push-worker-test-images
-push-worker-test-images: ## Build worker (test) multi platform container images and push it to ghcr.io
-	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.test\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build --platform linux/amd64,linux/arm64 --manifest instruct-lab-worker -f worker/Containerfile.test .
-	$(CMD_PREFIX) podman tag localhost/instruct-lab-worker ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
-	$(CMD_PREFIX) podman manifest rm localhost/instruct-lab-worker
-	$(CMD_PREFIX) podman manifest push --all ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
-	$(CMD_PREFIX) podman manifest rm ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+.output/instruct-lab-bot: $(wildcard *.go) $(wildcard **/*.go) | .output
+	$(CMD_PREFIX) go build -o $@ main.go 
 
 .PHONY: push-images
-push-images: push-gobot-images push-worker-test-images ## Build gobot and worker (test) multi platform container images and push it to ghcr.io
+push-images: ## Build bot multi platform container images and push it to ghcr.io
+	$(ECHO_PREFIX) printf "  %-12s Containerfile\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build --platform linux/amd64,linux/arm64 --manifest instruct-lab-bot -f Containerfile .
+	$(CMD_PREFIX) podman tag localhost/instruct-lab-bot ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main
+	$(CMD_PREFIX) podman manifest rm localhost/instruct-lab-bot
+	$(CMD_PREFIX) podman manifest push --all ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main
+	$(CMD_PREFIX) podman manifest rm ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main
 
 .PHONY: run-dev
 run-dev: ## Deploy the bot development stack.
@@ -153,18 +131,12 @@ deploy-aws-stack: ## Deploy the bot stack to AWS
 	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook ./deploy-ec2-worker.yml
 	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook -i ./inventory.txt ./deploy-worker-stack.yml
 
-.PHONY: images
-images: gobot-image worker-test-image ## Build all container images
-
 .PHONY: kind-load-images
 kind-load-images: ## Load images into kind
 	$(ECHO_PREFIX) printf "  %-12s \n" "[LOAD IMAGES INTO KIND]"
-	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main -o /tmp/instruct-lab-gobot.tar
-	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-gobot.tar
-	$(CMD_PREFIX) rm /tmp/instruct-lab-gobot.tar
-	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main -o /tmp/instruct-lab-serve.tar
-	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-serve.tar
-	$(CMD_PREFIX) rm /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main -o /tmp/instruct-lab-bot.tar
+	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-bot.tar
+	$(CMD_PREFIX) rm /tmp/instruct-lab-bot.tar
 
 .PHONY: run-on-kind
 run-on-kind:
@@ -175,12 +147,9 @@ run-on-kind:
 	fi
 	$(CMD_PREFIX) kind create cluster --config deploy/kind.yaml
 	$(CMD_PREFIX) kubectl cluster-info --context kind-instruct-lab-bot-dev
-	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main -o /tmp/instruct-lab-gobot.tar
-	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-gobot.tar
-	$(CMD_PREFIX) rm /tmp/instruct-lab-gobot.tar
-	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main -o /tmp/instruct-lab-serve.tar
-	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-serve.tar
-	$(CMD_PREFIX) rm /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-bot:main -o /tmp/instruct-lab-bot.tar
+	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-bot.tar
+	$(CMD_PREFIX) rm /tmp/instruct-lab-bot.tar
 	$(CMD_PREFIX) kubectl create namespace instruct-lab-bot
 	$(CMD_PREFIX) kubectl create -n instruct-lab-bot secret generic instruct-lab-bot --from-env-file=.env
 	$(CMD_PREFIX) kubectl apply -k deploy/instruct-lab-bot/overlays/dev

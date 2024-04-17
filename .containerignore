@@ -10,3 +10,4 @@
 **/dist
 **/*.pem
 Containerfile
+Makefile
