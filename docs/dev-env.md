@@ -11,8 +11,8 @@
 
 To setup this development environment, you will need to fork the following repositories:
 
-- [taxonomy](https://github.com/instruct-lab/taxonomy)
-- [instruct-lab-bot](https://github.com/instruct-lab/instruct-lab-bot)
+- [taxonomy](https://github.com/instructlab/taxonomy)
+- [instruct-lab-bot](https://github.com/instructlab/instruct-lab-bot)
 
 ### Register the instruct-lab-bot GitHub App in your github account
 

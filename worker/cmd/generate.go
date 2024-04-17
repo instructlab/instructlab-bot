@@ -108,7 +108,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
-	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instruct-lab/taxonomy", "The git remote for the taxonomy repo")
+	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instructlab/taxonomy", "The git remote for the taxonomy repo")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
 	generateCmd.Flags().StringVarP(&GithubUsername, "github-username", "u", "instruct-lab-bot", "The GitHub username to use for authentication")
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/instruct-lab/instruct-lab-bot/worker/cmd"
+	"github.com/instructlab/instruct-lab-bot/worker/cmd"
 	"go.uber.org/zap"
 )
 

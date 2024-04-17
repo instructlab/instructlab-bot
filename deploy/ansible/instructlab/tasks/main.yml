@@ -26,7 +26,7 @@
 
 - name: Clone the taxonomy repository
   ansible.builtin.git:  # noqa latest[git]
-    repo: https://github.com/instruct-lab/taxonomy
+    repo: https://github.com/instructlab/taxonomy
     dest: "{{ taxonomy_directory }}"
     clone: true
     update: true

@@ -1,11 +1,11 @@
 # instruct-lab-bot
 
 A GitHub bot to increase contributor test and review velocity for
-[instruct-lab/taxonomy](https://github.com/instruct-lab/taxonomy).
+[instruct-lab/taxonomy](https://github.com/instructlab/taxonomy).
 
 More detail on how this bot fits into the overall architecture is being
 captured in this [enhancement
-document](https://github.com/instruct-lab/enhancements/blob/main/docs/github-taxonomy-automation.md).
+document](https://github.com/instructlab/enhancements/blob/main/docs/github-taxonomy-automation.md).
 
 ## Overview
 
@@ -41,7 +41,7 @@ The current GitHub workflow in a PR is:
 
 If you have suggestions for how instruct-lab-bot could be improved, or want to report a bug, open an issue! We'd love all and any contributions.
 
-For more, check out the [Instruct-Lab-Bot Contribution Guide](CONTRIBUTING.md) and [Instruct-Lab Community](https://github.com/instruct-lab/community/blob/main/CONTRIBUTING.md).
+For more, check out the [Instruct-Lab-Bot Contribution Guide](CONTRIBUTING.md) and [Instruct-Lab Community](https://github.com/instructlab/community/blob/main/CONTRIBUTING.md).
 
 ## License
 
