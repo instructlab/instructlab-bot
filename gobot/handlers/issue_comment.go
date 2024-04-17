@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/go-github/v60/github"
-	"github.com/instruct-lab/instruct-lab-bot/gobot/util"
+	"github.com/instructlab/instruct-lab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"

@@ -1,4 +1,4 @@
-module github.com/instruct-lab/instruct-lab-bot/gobot
+module github.com/instructlab/instruct-lab-bot/gobot
 
 go 1.21
 

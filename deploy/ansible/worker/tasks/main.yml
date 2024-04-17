@@ -19,7 +19,7 @@
 
 - name: Clone the repository  # noqa latest[git]
   ansible.builtin.git:
-    repo: 'https://{{ github_token }}@github.com/instruct-lab/instruct-lab-bot'
+    repo: 'https://{{ github_token }}@github.com/instructlab/instruct-lab-bot'
     dest: "~/instruct-lab-bot"
 
 - name: Set default args for install-worker

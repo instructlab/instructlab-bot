@@ -1,4 +1,4 @@
-module github.com/instruct-lab/instruct-lab-bot/worker
+module github.com/instructlab/instruct-lab-bot/worker
 
 go 1.21
 

@@ -4,8 +4,8 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
 COMMAND=""
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
-TAXONOMY_REPO=${TAXONOMY_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/taxonomy.git"}
-BOT_REPO=${BOT_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/instruct-lab-bot.git"}
+TAXONOMY_REPO=${TAXONOMY_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instructlab/taxonomy.git"}
+BOT_REPO=${BOT_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instructlab/instruct-lab-bot.git"}
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 
 GPU_TYPE=${GPU_TYPE:-""}
@@ -233,7 +233,7 @@ EOF
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if ! command_exists "ilab"; then
-        sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instruct-lab/cli#egg=cli"
+        sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instructlab/cli#egg=cli"
         if [ "${GPU_TYPE}" = "cuda" ]; then
             CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
         elif [ -n "${GPU_TYPE}" ]; then
