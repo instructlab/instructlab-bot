@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: instruct-lab-bot
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: Deployment
+      name: bot
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ILBOT_WEBHOOK_PROXY_URL
+          valueFrom:
+            secretKeyRef:
+              name: instruct-lab-bot
+              key: ILBOT_WEBHOOK_PROXY_URL

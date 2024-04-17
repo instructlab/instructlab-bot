@@ -152,3 +152,35 @@ deploy-aws-stack: ## Deploy the bot stack to AWS
 	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook -i ./inventory.txt ./deploy-bot-stack.yml
 	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook ./deploy-ec2-worker.yml
 	$(CMD_PREFIX) cd ./deploy/ansible/ && ansible-playbook -i ./inventory.txt ./deploy-worker-stack.yml
+
+.PHONY: images
+images: gobot-image worker-test-image ## Build all container images
+
+.PHONY: kind-load-images
+kind-load-images: ## Load images into kind
+	$(ECHO_PREFIX) printf "  %-12s \n" "[LOAD IMAGES INTO KIND]"
+	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main -o /tmp/instruct-lab-gobot.tar
+	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-gobot.tar
+	$(CMD_PREFIX) rm /tmp/instruct-lab-gobot.tar
+	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main -o /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) rm /tmp/instruct-lab-serve.tar
+
+.PHONY: run-on-kind
+run-on-kind:
+	$(ECHO_PREFIX) printf "  %-12s \n" "[RUN ON KIND]"
+	$(CMD_PREFIX) if [ ! -f .env ]; then \
+		echo ".env not found. Copy .env.example to .env and configure it." ; \
+		exit 1 ; \
+	fi
+	$(CMD_PREFIX) kind create cluster --config deploy/kind.yaml
+	$(CMD_PREFIX) kubectl cluster-info --context kind-instruct-lab-bot-dev
+	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main -o /tmp/instruct-lab-gobot.tar
+	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-gobot.tar
+	$(CMD_PREFIX) rm /tmp/instruct-lab-gobot.tar
+	$(CMD_PREFIX) podman save ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main -o /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) kind load image-archive --name instruct-lab-bot-dev /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) rm /tmp/instruct-lab-serve.tar
+	$(CMD_PREFIX) kubectl create namespace instruct-lab-bot
+	$(CMD_PREFIX) kubectl create -n instruct-lab-bot secret generic instruct-lab-bot --from-env-file=.env
+	$(CMD_PREFIX) kubectl apply -k deploy/instruct-lab-bot/overlays/dev
