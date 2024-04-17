@@ -76,3 +76,19 @@ services:
           devices:
             - driver: nvidia
               capabilities: [gpu]
+
+#  Workflow between services above
+#  1. PR is opened by the Contributor.
+#  2. User runs `@instruct-lab-bot <function>` in a comment on the PR. Current job types are `[generate-local, precheck, generate, enable]`
+#  3. Bot checks for appropriate labels and functions
+#  4. Bot pushes the job to a Redis queue.
+#  5. Worker(s) pop the job sequentially off the queue and process the requested job from the PR.
+#  6. Worker checks out the PR for the job.
+#  7. Worker runs the requested job type:
+#  - `@instruct-lab-bot generate-local` runs generate against the local model running on the worker node
+#  - `@instruct-lab-bot precheck` runs chat against the FMaaS backend infra.
+#  - `@instruct-lab-bot generate` makes a direct api call to the SDG backend for processing for each taxonomy file modified/added.
+#  - `@instruct-lab-bot enable` if enabled on a PR, the user can then exercise bot commands on the shared infrastructure.
+#  8. Worker pushes the results to the S3 bucket and generates a public URL.
+#  9. Worker pushes metadata back on to the job ID in the Redis queue.
+#  10. Bot processes the results from the worker and replies to the PR: "Here is the generated data ..."
