@@ -132,12 +132,10 @@ push-images: push-gobot-images push-worker-test-images ## Build gobot and worker
 .PHONY: run-dev
 run-dev: ## Deploy the bot development stack.
 	$(ECHO_PREFIX) printf "  %-12s \n" "[RUN DEV STACK]"
-	$(CMD_PREFIX) if [ ! -f config.yaml ]; then \
-		echo "config.yaml not found. Copy config.yaml.example to config.yaml and configure it." ; \
+	$(CMD_PREFIX) if [ ! -f .env ]; then \
+		echo ".env not found. Copy .env.example to .env and configure it." ; \
 		exit 1 ; \
 	fi
-	$(ECHO_PREFIX) printf "Linting config.yaml file\n"
-	$(CMD_PREFIX) yamllint -c .yamllint.yaml ./config.yaml
 	$(ECHO_PREFIX) printf "Deploy the development stack\n"
 	$(CMD_PREFIX) podman compose up
 

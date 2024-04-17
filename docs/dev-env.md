@@ -38,22 +38,36 @@ Click on Install button to install the app in your account. Installation will as
 
 Select the local fork of the `taxonomy` repository that you have created in your account.
 
+### Create a personal access token
+
+A Github PAT is required to checkout the contents of a private repository. To create a personal access token, go to [Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) and follow the instructions to create a new token.
+You may choose to create a fine-grained token that only has access to the `taxonomy` repository fork.
+
+The username and PAT can be provided to the worker using environment variables in your `.env` file
+
 ## Setup local development deployment
 
 This setup deploys a podman compose stack. By default, the stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
 
-Create a `config.yaml` file in the root of the project:
+There are several variables that need to be provided and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps).
+
+You may provide these options as command line flags, environment variables, or in a `config.yaml` file.
+
+| Flag | Environment Variable | `config.yaml` Key | Description |
+| ---- | -------------------- | ----------------- | ----------- |
+| `--webhook-proxy-url` | `ILBOT_WEBHOOK_PROXY_URL` | `webhook-proxy-url` | The URL of the webhook proxy. |
+| `--github-integration-id` | `ILBOT_GITHUB_INTEGRATION_ID` | `github-integration_id` | The App ID of the GitHub App. |
+| `--github-app-private-key` | `ILBOT_GITHUB_APP_PRIVATE_KEY` | `github-app-private-key` | The private key of the GitHub App. |
+| `--github-webhook-secret` | `ILBOT_GITHUB_WEBHOOK_SECRET` | `webhook-secret` | The Webhook Secret of the GitHub App. |
+
+A template `.env.example` file is provided in the root of the repository. You can copy this file to `.env` and fill in the values.
+
+The certificate should be stored on a single line in the .env file, without quotes.
+This can be done with the following command:
 
 ```bash
-cp gobot/config.yaml.sample config.yaml
+awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' cert-name.pem
 ```
-
-There are several fields that need to be filled in and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps). Fill the following fields in the `config.yaml` file:
-
-- `app_configuration.webhook_proxy_url` Set to the Webhook URL you generated from smee.io.
-- `github.app.integration_id` Set to the App ID from the GitHub App you just registered.
-- `github.app.private_key` Set to the private key you generated from the GitHub App you just registered and saved locally on your machine. Just `cat` the file and copy & paste the contents in the `config.yaml` file.
-- `github.app.webhook_secret` Set to the Webhook Secret you set for the app.
 
 To run the bot:
 

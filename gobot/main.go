@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/instruct-lab/instruct-lab-bot/gobot/bot"
+	"github.com/instruct-lab/instruct-lab-bot/gobot/cmd"
 	"go.uber.org/zap"
 )
 
@@ -22,10 +22,5 @@ func main() {
 	}()
 
 	zap.ReplaceGlobals(logger)
-
-	logger.Sugar().Info("Starting bot...")
-	err := bot.Run(logger)
-	if err != nil {
-		logger.Sugar().Errorf("Error running bot: %v", err)
-	}
+	cmd.Execute()
 }

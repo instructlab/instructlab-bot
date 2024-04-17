@@ -40,7 +40,9 @@ var (
 	PreCheckEndpointURL string
 	SdgEndpointURL      string
 	NumInstructions     int
+	GitRemote           string
 	Origin              string
+	GithubUsername      string
 	GithubToken         string
 	S3Bucket            string
 	AWSRegion           string
@@ -106,7 +108,9 @@ func init() {
 	generateCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
+	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instruct-lab/taxonomy", "The git remote for the taxonomy repo")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
+	generateCmd.Flags().StringVarP(&GithubUsername, "github-username", "u", "instruct-lab-bot", "The GitHub username to use for authentication")
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
 	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
 	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
@@ -517,19 +521,35 @@ func (w *Worker) processJob() {
 // gitOperations handles the Git-related operations for a job and returns the head hash
 func (w *Worker) gitOperations(sugar *zap.SugaredLogger, taxonomyDir string, prNumber string) (string, error) {
 	sugar.Debug("Opening taxonomy git repo")
-	r, err := git.PlainOpen(taxonomyDir)
-	if err != nil {
-		return "", fmt.Errorf("could not open taxonomy git repo: %v", err)
+
+	var r *git.Repository
+	if _, err := os.Stat(taxonomyDir); os.IsNotExist(err) {
+		sugar.Warnf("Taxonomy directory does not exist, cloning from %s", GitRemote)
+		r, err = git.PlainClone(taxonomyDir, false, &git.CloneOptions{
+			URL: GitRemote,
+			Auth: &githttp.BasicAuth{
+				Username: GithubUsername,
+				Password: GithubToken,
+			},
+		})
+		if err != nil {
+			return "", fmt.Errorf("could not clone taxonomy git repo: %v", err)
+		}
+	} else {
+		r, err = git.PlainOpen(taxonomyDir)
+		if err != nil {
+			return "", fmt.Errorf("could not open taxonomy git repo: %v", err)
+		}
 	}
 
 	retryFetch := func() error {
 		var lastErr error
 		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
 			sugar.Debug("Fetching from origin")
-			err = r.Fetch(&git.FetchOptions{
+			err := r.Fetch(&git.FetchOptions{
 				RemoteName: Origin,
 				Auth: &githttp.BasicAuth{
-					Username: "instruct-lab-bot",
+					Username: GithubUsername,
 					Password: GithubToken,
 				},
 			})
