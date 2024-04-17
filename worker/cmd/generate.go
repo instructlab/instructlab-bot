@@ -285,6 +285,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		var data map[string]interface{}
 		err = yaml.Unmarshal(content, &data)
 		if err != nil {
+			// Odd are, the PR was not yaml-linted since its invalid yaml failing an unmarshall
+			err = fmt.Errorf("the original taxonomy yaml likely did not pass yaml-linting, here is the unmarshalling error: %v", err)
 			w.logger.Error(err)
 			return err
 		}
