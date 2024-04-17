@@ -4,15 +4,15 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
 COMMAND=""
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
-TAXONOMY_REPO=${TAXONOMY_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instructlab/taxonomy.git"}
-BOT_REPO=${BOT_REPO:-"https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instructlab/instruct-lab-bot.git"}
+TAXONOMY_REPO=${TAXONOMY_REPO:-"https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/taxonomy.git"}
+BOT_REPO=${BOT_REPO:-"https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab-bot.git"}
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 
 GPU_TYPE=${GPU_TYPE:-""}
 NEXODUS_REG_KEY=${NEXODUS_REG_KEY:-""}
 OS=""
 REDIS_IP=${REDIS_IP:-"127.0.0.1"}
-WORK_DIR=${WORK_DIR:-"${HOME}/instruct-lab-bot"}
+WORK_DIR=${WORK_DIR:-"${HOME}/instructlab-bot"}
 
 ENDPOINT_URL=${ENDPOINT_URL:-"http://localhost:8000/v1"}
 SDG_ENDPOINT_URL=${SDG_ENDPOINT_URL:-""}
@@ -21,7 +21,7 @@ TLS_CLIENT_KEY=${TLS_CLIENT_KEY:-""}
 TLS_CLIENT_CERT=${TLS_CLIENT_CERT:-""}
 TLS_SERVER_CA_CERT=${TLS_SERVER_CA_CERT:-""}
 
-TLS_SECRETS_DIR=${TLS_SECRETS_DIR:-"${HOME}/instruct-lab-bot"}
+TLS_SECRETS_DIR=${TLS_SECRETS_DIR:-"${HOME}/instructlab-bot"}
 TLS_SECRETS_EXISTS=0
 
 EXTRA_ARGS=""
@@ -233,7 +233,7 @@ EOF
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if ! command_exists "ilab"; then
-        sudo pip install "git+https://instruct-lab-bot:${GITHUB_TOKEN}@github.com/instructlab/cli#egg=cli"
+        sudo pip install "git+https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab#egg=cli"
         if [ "${GPU_TYPE}" = "cuda" ]; then
             CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
         elif [ -n "${GPU_TYPE}" ]; then
@@ -258,7 +258,7 @@ install_bot_worker() {
     pushd worker || (echo "Failed to change to worker directory" && exit 1)
     go build -o worker main.go
     chmod +x worker
-    sudo install -m 755 worker /usr/local/bin/instruct-lab-bot-worker
+    sudo install -m 755 worker /usr/local/bin/instructlab-bot-worker
     popd || (echo "Failed to change to bot-repo directory" && exit 1)
     popd || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
 
@@ -293,7 +293,7 @@ User=fedora
 Group=fedora
 EnvironmentFile=/etc/sysconfig/labbotworker
 WorkingDirectory=${WORK_DIR}
-ExecStart=/usr/local/bin/instruct-lab-bot-worker generate --redis ${REDIS_IP}:6379 ${EXTRA_ARGS}
+ExecStart=/usr/local/bin/instructlab-bot-worker generate --redis ${REDIS_IP}:6379 ${EXTRA_ARGS}
 
 [Install]
 WantedBy=multi-user.target

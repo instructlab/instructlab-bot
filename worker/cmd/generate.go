@@ -110,7 +110,7 @@ func init() {
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instructlab/taxonomy", "The git remote for the taxonomy repo")
 	generateCmd.Flags().StringVarP(&Origin, "origin", "o", "origin", "The origin to fetch from")
-	generateCmd.Flags().StringVarP(&GithubUsername, "github-username", "u", "instruct-lab-bot", "The GitHub username to use for authentication")
+	generateCmd.Flags().StringVarP(&GithubUsername, "github-username", "u", "instructlab-bot", "The GitHub username to use for authentication")
 	generateCmd.Flags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
 	generateCmd.Flags().StringVarP(&S3Bucket, "s3-bucket", "b", "instruct-lab-bot", "The S3 bucket to use")
 	generateCmd.Flags().StringVarP(&AWSRegion, "aws-region", "a", "us-east-2", "The AWS region to use for the S3 Bucket")
@@ -419,7 +419,7 @@ func (w *Worker) processJob() {
 	var cmd *exec.Cmd
 	switch jobType {
 	case jobGenerateLocal:
-		// @instruct-lab-bot generate-local
+		// @instructlab-bot generate-local
 		// Runs generate on the local worker node
 		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
 
@@ -444,7 +444,7 @@ func (w *Worker) processJob() {
 			return
 		}
 	case jobPreCheck:
-		// @instruct-lab-bot precheck
+		// @instructlab-bot precheck
 		// Runs precheck on a backend node
 		err = w.runPrecheck(lab, outputDir, modelName)
 		if err != nil {
@@ -453,7 +453,7 @@ func (w *Worker) processJob() {
 			return
 		}
 	case jobSDG:
-		// @instruct-lab-bot generate
+		// @instructlab-bot generate
 		// Runs generate on the SDG backend
 		// ilab diff is run since the sdg generation is not part of upstream cli
 		cmdDiff := exec.Command("ilab", "diff")
@@ -612,7 +612,7 @@ func (w *Worker) gitOperations(sugar *zap.SugaredLogger, taxonomyDir string, prN
 		RemoteName: Origin,
 		RefSpecs:   []gitconfig.RefSpec{refspec},
 		Auth: &githttp.BasicAuth{
-			Username: "instruct-lab-bot",
+			Username: "instructlab-bot",
 			Password: GithubToken,
 		},
 	})

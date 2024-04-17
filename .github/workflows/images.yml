@@ -30,7 +30,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}/instruct-lab-gobot
+            ghcr.io/${{ github.repository }}/instructlab-gobot
 
       - name: Build and push gobot image
         uses: docker/build-push-action@v5
@@ -38,7 +38,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           build-args: |
-            GITHUB_USER=instruct-lab-bot
+            GITHUB_USER=instructlab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
           target: gobot
           push: true
@@ -87,7 +87,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}/instruct-lab-serve
+            ghcr.io/${{ github.repository }}/instructlab-serve
 
       - name: Build and push serve image
         uses: docker/build-push-action@v5
@@ -95,7 +95,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           build-args: |
-            GITHUB_USER=instruct-lab-bot
+            GITHUB_USER=instructlab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
           target: serve
           push: true

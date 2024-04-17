@@ -18,5 +18,5 @@ RUN NOISY_BUILD=y \
 
 FROM registry.access.redhat.com/ubi8/ubi as gobot
 
-COPY --from=build /src/gobot /instruct-lab-bot
-ENTRYPOINT [ "/instruct-lab-bot" ]
+COPY --from=build /src/gobot /instructlab-bot
+ENTRYPOINT [ "/instructlab-bot" ]

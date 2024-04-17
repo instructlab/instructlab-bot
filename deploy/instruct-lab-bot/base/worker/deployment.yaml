@@ -11,15 +11,15 @@ spec:
             - name: ILWORKER_GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: instruct-lab-bot
+                  name: instructlab-bot
                   key: ILWORKER_GITHUB_TOKEN
           args:
-            - /instruct-lab-bot-worker
+            - /instructlab-bot-worker
             - --test
             - --redis
             - redis:6379
             - generate
-          image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+          image: ghcr.io/instructlab/instructlab-bot/instructlab-serve:main
           name: worker
           resources:
             limits:

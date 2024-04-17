@@ -2,14 +2,14 @@
 - name: Log into GHCR
   community.docker.docker_login:
     registry_url: ghcr.io
-    username: instruct-lab-bot
+    username: instructlab-bot
     password: "{{ github_token }}"
     reauthorize: true
 
 - name: Start the container
   community.docker.docker_container:
-    name: instruct-lab-bot
-    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    name: instructlab-bot
+    image: ghcr.io/instructlab/instructlab-bot/instructlab-gobot:main
     state: started
     pull: always
     env:

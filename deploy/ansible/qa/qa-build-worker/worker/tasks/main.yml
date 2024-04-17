@@ -2,17 +2,17 @@
 - name: Clone the bot repo  # noqa latest[git]
   ansible.builtin.git:
     clone: true
-    repo: "https://{{ qa_github_token }}@github.com/instructlab/instruct-lab-bot.git"
-    dest: /home/{{ ansible_user }}/instruct-lab-bot
+    repo: "https://{{ qa_github_token }}@github.com/instructlab/instructlab-bot.git"
+    dest: /home/{{ ansible_user }}/instructlab-bot
 
 - name: Build worker image
   containers.podman.podman_image:
     build:
-      path: "/home/{{ ansible_user }}/instruct-lab-bot/worker"
+      path: "/home/{{ ansible_user }}/instructlab-bot/worker"
       buildargs:
         GITHUB_USER: "{{ qa_github_uid }}"
         GITHUB_TOKEN: "{{ qa_github_token }}"
-    name: "ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve"
+    name: "ghcr.io/instructlab/instructlab-bot/instructlab-serve"
     tag: "main"
     source: build
 
@@ -29,7 +29,7 @@
 - name: Start the worker
   containers.podman.podman_container:
     name: instruct_lab_worker
-    image: "ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main"
+    image: "ghcr.io/instructlab/instructlab-bot/instructlab-serve:main"
     command: /bin/bash
     tty: true
     detach: true

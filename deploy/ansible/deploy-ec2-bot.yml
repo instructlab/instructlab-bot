@@ -6,4 +6,4 @@
     - role: ec2
       vars:
         ec2_aws_instance_type: t2.xlarge
-        ec2_aws_nodetype_tag: "instruct-lab-bot-node"
+        ec2_aws_nodetype_tag: "instructlab-bot-node"

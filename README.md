@@ -1,7 +1,7 @@
-# instruct-lab-bot
+# instructlab-bot
 
 A GitHub bot to increase contributor test and review velocity for
-[instruct-lab/taxonomy](https://github.com/instructlab/taxonomy).
+[instructlab/taxonomy](https://github.com/instructlab/taxonomy).
 
 More detail on how this bot fits into the overall architecture is being
 captured in this [enhancement
@@ -33,15 +33,15 @@ The current iteration is focused on automating the `ilab generate` portion of th
 The current GitHub workflow in a PR is:
 
 1. PR is opened by the Contributor.
-2. User runs `@instruct-lab-bot generate` in a comment on the PR.
+2. User runs `@instructlab-bot generate` in a comment on the PR.
 3. Bot generates data using `ilab generate` and stores it in an object store (S3).
 4. Bot replies: "Here is the generated data ..."
 
 ## Contributing
 
-If you have suggestions for how instruct-lab-bot could be improved, or want to report a bug, open an issue! We'd love all and any contributions.
+If you have suggestions for how instructlab-bot could be improved, or want to report a bug, open an issue! We'd love all and any contributions.
 
-For more, check out the [Instruct-Lab-Bot Contribution Guide](CONTRIBUTING.md) and [Instruct-Lab Community](https://github.com/instructlab/community/blob/main/CONTRIBUTING.md).
+For more, check out the [InstructLab Bot Contribution Guide](CONTRIBUTING.md) and [InstructLab Community](https://github.com/instructlab/community/blob/main/CONTRIBUTING.md).
 
 ## License
 

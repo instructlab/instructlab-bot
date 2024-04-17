@@ -9,7 +9,7 @@ services:
 
   bot:
     container_name: bot
-    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+    image: ghcr.io/instructlab/instructlab-bot/instructlab-gobot:main
     env_file:
       - .env
     depends_on:
@@ -17,14 +17,14 @@ services:
 
   worker-test:
     container_name: worker-test
-    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+    image: ghcr.io/instructlab/instructlab-bot/instructlab-serve:main
     depends_on:
       - redis
     env_file:
       - .env
     command:
       [
-        "/instruct-lab-bot-worker",
+        "/instructlab-bot-worker",
         "--test",
         "--redis",
         "redis:6379",
