@@ -45,6 +45,8 @@ jobs:
         run: ansible-galaxy install -r ./deploy/ansible/requirements.yml --force
       - name: Run ansible-lint
         uses: ansible/ansible-lint@main
+        with:
+          working-directory: deploy
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-latest
