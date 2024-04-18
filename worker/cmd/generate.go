@@ -54,7 +54,7 @@ var (
 )
 
 const (
-	gitMaxRetries            = 3
+	gitMaxRetries            = 5
 	gitRetryDelay            = 2 * time.Second
 	ilabConfigPath           = "config.yaml"
 	localEndpoint            = "http://localhost:8000/v1"
