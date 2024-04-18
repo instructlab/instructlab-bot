@@ -77,7 +77,7 @@ make run-dev
 
 This will check if the config.yaml exist and if it is a valid yaml file it will deploy the dev stack.
 
->Note: config.yaml is not required as we move to .env. See[dev-multi-worker-compose.yaml](../deploy/compose/dev-multi-worker-compose.yaml) for an example on how to bring up a compose stack which does not mount config.yaml.
+>Note: config.yaml is not required as we move to [.env](../.env.example). See[dev-multi-worker-compose.yaml](../deploy/compose/dev-multi-worker-compose.yaml) for an example on how to bring up a compose stack which does not mount config.yaml.
 
 ## Setup testing deployment
 

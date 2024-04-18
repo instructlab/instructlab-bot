@@ -53,7 +53,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
 	rootCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
 	rootCmd.PersistentFlags().StringVarP(&WebhookProxyURL, "webhook-proxy-url", "", "", "Get an ID from https://smee.io/new. If blank, the app will not use a webhook proxy")
-	rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{""}, "Label(s) required before a PR can be tested")
+	rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{}, "Label(s) required before a PR can be tested")
 	rootCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instructlab-bot", "The username of the bot")
