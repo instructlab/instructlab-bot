@@ -1,8 +1,8 @@
 # Multi-Worker Compose File
-# Each worker needs its own volume to mount with a clone of the taxonomy repo, example uses /home/fedora/instructlab-worker(n).
-# Example local generation:
-# Once the worker starts, exec in and start 'ilab serve'
-# Next, start instruct-lab-bot-worker with the following:
+# 1. Fill in the .env.template from the root of the repo and rename it to .env
+# 2. Each worker needs its own volume to mount with a clone of your taxonomy repo fork, example uses /home/fedora/instructlab-worker(n).
+# 3 Start the compose stack
+# 4. Next, exec into a worker and start instruct-lab-bot-worker with the following:
 # export AWS_ACCESS_KEY_ID=x
 # export AWS_SECRET_ACCESS_KEY=x
 # export AWS_DEFAULT_REGION=x
