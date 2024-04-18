@@ -53,20 +53,20 @@ There are several variables that need to be provided and all the details are ava
 
 You may provide these options as command line flags, environment variables.
 
-| Flag | Environment Variable | `config.yaml` Key | Description |
-| ---- | -------------------- | ----------------- | ----------- |
-| `--webhook-proxy-url` | `ILBOT_WEBHOOK_PROXY_URL` | `webhook-proxy-url` | The URL of the webhook proxy. |
-| `--github-integration-id` | `ILBOT_GITHUB_INTEGRATION_ID` | `github-integration_id` | The App ID of the GitHub App. |
-| `--github-app-private-key` | `ILBOT_GITHUB_APP_PRIVATE_KEY` | `github-app-private-key` | The private key of the GitHub App. |
-| `--github-webhook-secret` | `ILBOT_GITHUB_WEBHOOK_SECRET` | `webhook-secret` | The Webhook Secret of the GitHub App. |
+| Flag | Environment Variable | Description |
+| ---- | -------------------- | ----------- |
+| `--webhook-proxy-url` | `ILBOT_WEBHOOK_PROXY_URL` | The URL of the webhook proxy. |
+| `--github-integration-id` | `ILBOT_GITHUB_INTEGRATION_ID` | The App ID of the GitHub App. |
+| `--github-app-private-key` | `ILBOT_GITHUB_APP_PRIVATE_KEY` | The private key of the GitHub App. |
+| `--github-webhook-secret` | `ILBOT_GITHUB_WEBHOOK_SECRET` | The Webhook Secret of the GitHub App. |
 
 A template `.env.example` file is provided in the root of the repository. You can copy this file to `.env` and fill in the values.
 
-The certificate should be stored on a single line in the .env file, without quotes.
+The private key should be stored on a single line in the .env file, **without quotes.**
 This can be done with the following command:
 
 ```bash
-awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' cert-name.pem
+awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' <your-private-key>.pem
 ```
 
 To run the bot:
@@ -75,9 +75,7 @@ To run the bot:
 make run-dev
 ```
 
-This will check if the config.yaml exist and if it is a valid yaml file it will deploy the dev stack.
-
->Note: config.yaml is not required as we move to [.env](../.env.example). See[dev-multi-worker-compose.yaml](../deploy/compose/dev-multi-worker-compose.yaml) for an example on how to bring up a compose stack which does not mount config.yaml.
+This will check if the .env file exist and deploy the dev stack.
 
 ## Setup testing deployment
 
@@ -89,7 +87,7 @@ We use ansible for deploying this setup on the AWS cloud. To deploy this setup, 
 
 Make sure you copy your aws .pem key in the `deploy/ansible` directory and rename it to `instruct-bot.pem`
 
-To deploy the bot stack and worker stack on this EC2 instance, fill the same details that you fill in `config.yaml` to `./vars.yml` file, with your aws credentials.
+To deploy the bot stack and worker stack on this EC2 instance, fill the same details that you fill in `.env` to `./vars.yml` file, with your aws credentials.
 
 Run the following command to deploy the entire stack (bot and worker):
 
@@ -109,7 +107,7 @@ ansible-playbook ./deploy-ec2-bot.yml
 
 This will deploy an EC2 instance and update the local `./inventory.txt` file with the public IP of the EC2 instance under `botNode` section.
 
-To deploy the bot stack on this EC2 instance, fill the same details that you fill in `config.yaml` to `./vars.yml` file and run the following command:
+To deploy the bot stack on this EC2 instance, fill the same details that you fill in `.env` to `./vars.yml` file and run the following command:
 
 ```bash
 ansible-playbook -i inventory.txt ./deploy-bot-stack.yml

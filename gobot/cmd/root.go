@@ -187,17 +187,6 @@ func initLogger(debug bool) *zap.Logger {
 
 func initializeConfig(cmd *cobra.Command) error {
 	v := viper.New()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.config/instructlab-bot")
-	v.AddConfigPath("/etc/instructlab-bot")
-	if err := v.ReadInConfig(); err != nil {
-		// It's okay if there isn't a config file
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return err
-		}
-	}
 	v.SetEnvPrefix("ILBOT")
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	v.AutomaticEnv()

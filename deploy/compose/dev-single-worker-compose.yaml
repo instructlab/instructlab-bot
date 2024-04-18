@@ -11,7 +11,7 @@ services:
     container_name: bot
     image: ghcr.io/instructlab/instructlab-bot/instructlab-gobot:main
     env_file:
-      - .env
+      - ../../.env
     depends_on:
       - redis
 
@@ -21,7 +21,7 @@ services:
     depends_on:
       - redis
     env_file:
-      - .env
+      - ../../.env
     command:
       [
         "/instructlab-bot-worker",
