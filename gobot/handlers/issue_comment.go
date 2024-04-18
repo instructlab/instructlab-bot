@@ -411,18 +411,18 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	if !present {
-		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
-		if err != nil {
-			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
-		}
-
-		params.CheckSummary = LabelsNotFound
-		params.CheckDetails = detailsMsg
-
-		return util.PostPullRequestCheck(ctx, client, params)
-	}
+	//present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
+	//if !present {
+	//	detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+	//	if err != nil {
+	//		detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+	//	}
+	//
+	//	params.CheckSummary = LabelsNotFound
+	//	params.CheckDetails = detailsMsg
+	//
+	//	return util.PostPullRequestCheck(ctx, client, params)
+	//}
 
 	return h.queueGenerateJob(ctx, client, prComment, "generate")
 }
@@ -454,18 +454,18 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	if !present {
-		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
-		if err != nil {
-			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
-		}
-
-		params.CheckSummary = LabelsNotFound
-		params.CheckDetails = detailsMsg
-
-		return util.PostPullRequestCheck(ctx, client, params)
-	}
+	//present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
+	//if !present {
+	//	detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+	//	if err != nil {
+	//		detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+	//	}
+	//
+	//	params.CheckSummary = LabelsNotFound
+	//	params.CheckDetails = detailsMsg
+	//
+	//	return util.PostPullRequestCheck(ctx, client, params)
+	//}
 
 	return h.queueGenerateJob(ctx, client, prComment, "precheck")
 }
@@ -496,18 +496,18 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
-	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	if !present {
-		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
-		if err != nil {
-			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
-		}
-
-		params.CheckSummary = LabelsNotFound
-		params.CheckDetails = detailsMsg
-
-		return util.PostPullRequestCheck(ctx, client, params)
-	}
+	//present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
+	//if !present {
+	//	detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+	//	if err != nil {
+	//		detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+	//	}
+	//
+	//	params.CheckSummary = LabelsNotFound
+	//	params.CheckDetails = detailsMsg
+	//
+	//	return util.PostPullRequestCheck(ctx, client, params)
+	//}
 
 	return h.queueGenerateJob(ctx, client, prComment, "sdg-svc")
 }

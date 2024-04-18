@@ -51,7 +51,7 @@ This setup deploys a podman compose stack. By default, the stack includes a sing
 
 There are several variables that need to be provided and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps).
 
-You may provide these options as command line flags, environment variables, or in a `config.yaml` file.
+You may provide these options as command line flags, environment variables.
 
 | Flag | Environment Variable | `config.yaml` Key | Description |
 | ---- | -------------------- | ----------------- | ----------- |
@@ -76,6 +76,8 @@ make run-dev
 ```
 
 This will check if the config.yaml exist and if it is a valid yaml file it will deploy the dev stack.
+
+>Note: config.yaml is not required as we move to .env. See[dev-multi-worker-compose.yaml](../deploy/compose/dev-multi-worker-compose.yaml) for an example on how to bring up a compose stack which does not mount config.yaml.
 
 ## Setup testing deployment
 
