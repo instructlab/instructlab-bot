@@ -9,22 +9,22 @@ spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-gobot:main
+        - image: ghcr.io/instructlab/instructlab-bot/instructlab-gobot:main
           env:
             - name: ILBOT_GITHUB_INTEGRATION_ID
               valueFrom:
                 secretKeyRef:
-                  name: instruct-lab-bot
+                  name: instructlab-bot
                   key: ILBOT_GITHUB_INTEGRATION_ID
             - name: ILBOT_GITHUB_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: instruct-lab-bot
+                  name: instructlab-bot
                   key: ILBOT_GITHUB_WEBHOOK_SECRET
             - name: ILBOT_GITHUB_APP_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: instruct-lab-bot
+                  name: instructlab-bot
                   key: ILBOT_GITHUB_APP_PRIVATE_KEY
           name: bot
           resources:

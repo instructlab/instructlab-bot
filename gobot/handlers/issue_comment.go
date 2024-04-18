@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/go-github/v60/github"
-	"github.com/instructlab/instruct-lab-bot/gobot/util"
+	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -77,6 +77,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 
 	client, err := h.NewInstallationClient(prComment.installID)
 	if err != nil {
+		h.Logger.Errorf("Failed to create installation client: %v", err)
 		return err
 	}
 	// Fetch the PR sha and labels to avoid multiple Pull Request API calls
@@ -94,6 +95,7 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return nil
 	}
 	if words[0] != h.BotUsername {
+		h.Logger.Infof("Bot username %s is not found in the comment: %s", h.BotUsername, prComment.body)
 		return nil
 	}
 
@@ -411,18 +413,18 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
-	//present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	//if !present {
-	//	detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
-	//	if err != nil {
-	//		detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
-	//	}
-	//
-	//	params.CheckSummary = LabelsNotFound
-	//	params.CheckDetails = detailsMsg
-	//
-	//	return util.PostPullRequestCheck(ctx, client, params)
-	//}
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
+	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "generate")
 }
@@ -454,18 +456,18 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
-	//present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	//if !present {
-	//	detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
-	//	if err != nil {
-	//		detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
-	//	}
-	//
-	//	params.CheckSummary = LabelsNotFound
-	//	params.CheckDetails = detailsMsg
-	//
-	//	return util.PostPullRequestCheck(ctx, client, params)
-	//}
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
+	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "precheck")
 }
@@ -496,18 +498,18 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 		return util.PostPullRequestCheck(ctx, client, params)
 	}
 
-	//present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
-	//if !present {
-	//	detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
-	//	if err != nil {
-	//		detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
-	//	}
-	//
-	//	params.CheckSummary = LabelsNotFound
-	//	params.CheckDetails = detailsMsg
-	//
-	//	return util.PostPullRequestCheck(ctx, client, params)
-	//}
+	present, err := h.checkRequiredLabel(ctx, client, prComment, h.RequiredLabels)
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
+	}
 
 	return h.queueGenerateJob(ctx, client, prComment, "sdg-svc")
 }

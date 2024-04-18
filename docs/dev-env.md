@@ -12,14 +12,14 @@
 To setup this development environment, you will need to fork the following repositories:
 
 - [taxonomy](https://github.com/instructlab/taxonomy)
-- [instruct-lab-bot](https://github.com/instructlab/instruct-lab-bot)
+- [instructlab-bot](https://github.com/instructlab/instructlab-bot)
 
-### Register the instruct-lab-bot GitHub App in your github account
+### Register the instructlab-bot GitHub App in your github account
 
 [Create a new GitHub application](https://github.com/settings/apps/new) in your personal GitHub account. Fill in the following details for the app:
 
-- GitHub App name: `instruct-lab-bot-<your-github-username>`
-- Homepage URL: `<URL to your local fork of instruct-lab-bot>`
+- GitHub App name: `instructlab-bot-<your-github-username>`
+- Homepage URL: `<URL to your local fork of instructlab-bot>`
 - Select Webhook Active flag and set the Webhook URL
   - To generate the Webhook URL, visit <https://smee.io/new> and copy the URL that is generated
   - Set the webhook secret
@@ -32,7 +32,7 @@ It will take you to the newly created app page. Scroll down, and click on Genera
 
 ### Install the GitHub App in the `taxonomy` repository fork
 
-Go to [GitHub App Installation](https://github.com/settings/apps/instruct-lab-bot-anil/installations) and it should list your account.
+Go to [GitHub App Installation](https://github.com/settings/apps/instructlab-bot-anil/installations) and it should list your account.
 
 Click on Install button to install the app in your account. Installation will ask you to select the repositories where you want to install the app.
 
@@ -49,7 +49,7 @@ The username and PAT can be provided to the worker using environment variables i
 
 This setup deploys a podman compose stack. By default, the stack includes a single worker running in test mode. In this mode, it will not actually perform the work of the jobs. It will pretend it did and immediately post results to the results queue.
 
-There are several variables that need to be provided and all the details are available on the GitHub App you just registered. Go to the instruct-lab-bot you just registered in your [Account Settings](https://github.com/settings/apps).
+There are several variables that need to be provided and all the details are available on the GitHub App you just registered. Go to the instructlab-bot you just registered in your [Account Settings](https://github.com/settings/apps).
 
 You may provide these options as command line flags, environment variables.
 
@@ -118,7 +118,7 @@ ansible-playbook -i inventory.txt ./deploy-bot-stack.yml
 Once the bot stack is deployed, you can verify the deployment by running the following command:
 
 - Hit the following URL in your browser: `http://<node-ip>:333/`, that should take you to the grafana dashboard.
-- Create a PR on your local taxonomy repository fork and add comment `@instruct-lab-bot precheck` to trigger the bot.
+- Create a PR on your local taxonomy repository fork and add comment `@instructlab-bot precheck` to trigger the bot.
 
 ### Deploy the worker stack
 
@@ -141,7 +141,7 @@ Worker node talks to the bot stack through redis. Above playbook determines the 
 
 ### Testing the setup
 
-Create a PR on your local taxonomy repository fork and add comment `@instruct-lab-bot precheck` to trigger the bot. The bot should post a comment on the PR with the results.
+Create a PR on your local taxonomy repository fork and add comment `@instructlab-bot precheck` to trigger the bot. The bot should post a comment on the PR with the results.
 
 ## Troubleshooting
 

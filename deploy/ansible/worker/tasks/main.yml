@@ -12,15 +12,15 @@
     state: present
   become: true
 
-- name: Delete the existing instruct-lab-bot directory
+- name: Delete the existing instructlab-bot directory
   ansible.builtin.file:
-    path: "~/instruct-lab-bot"
+    path: "~/instructlab-bot"
     state: absent
 
 - name: Clone the repository  # noqa latest[git]
   ansible.builtin.git:
-    repo: 'https://{{ github_token }}@github.com/instructlab/instruct-lab-bot'
-    dest: "~/instruct-lab-bot"
+    repo: 'https://{{ github_token }}@github.com/instructlab/instructlab-bot'
+    dest: "~/instructlab-bot"
 
 - name: Set default args for install-worker
   ansible.builtin.set_fact:
@@ -67,7 +67,7 @@
 
 - name: Run the install script to setup worker and log output  # noqa no-changed-when
   ansible.builtin.shell: |
-    cd ~/instruct-lab-bot/scripts
+    cd ~/instructlab-bot/scripts
     nohup ./install-worker.sh install {{ worker_args }} > install-worker.log 2>&1 &
 
 
@@ -76,7 +76,7 @@
     minutes: 35
 
 - name: Print the output of the install script log  # noqa no-changed-when
-  ansible.builtin.command: cat ~/instruct-lab-bot/scripts/install-worker.log
+  ansible.builtin.command: cat ~/instructlab-bot/scripts/install-worker.log
   register: log_content
 
 - name: Display log content
@@ -94,7 +94,7 @@
 
 - name: Run the install script again to setup worker and log output  # noqa no-changed-when
   ansible.builtin.shell: |
-    cd ~/instruct-lab-bot/scripts
+    cd ~/instructlab-bot/scripts
     nohup ./install-worker.sh install {{ worker_args }} > install-worker.log 2>&1 &
 
 - name: Pause for 10 minutes to allow the script to complete

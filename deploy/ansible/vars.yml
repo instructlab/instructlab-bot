@@ -21,8 +21,8 @@ private_key: |
 
 ## Worker Stack Variables
 
-# taxonomy_repo: https://instruct-lab-bot:{{ github_token }}@github.com/instructlab/taxonomy.git
-# bot_repo: https://instruct-lab-bot:{{ github_token }}@github.com/instructlab/instruct-lab-bot.git
+# taxonomy_repo: https://instructlab-bot:{{ github_token }}@github.com/instructlab/taxonomy.git
+# bot_repo: https://instructlab-bot:{{ github_token }}@github.com/instructlab/instructlab-bot.git
 endpoint_url:
 sdg_endpoint_url:
 

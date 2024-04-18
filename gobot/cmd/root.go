@@ -15,8 +15,8 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/google/go-github/v60/github"
 	"github.com/gregjones/httpcache"
-	"github.com/instructlab/instruct-lab-bot/gobot/handlers"
-	"github.com/instructlab/instruct-lab-bot/gobot/util"
+	"github.com/instructlab/instructlab-bot/gobot/handlers"
+	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/rcrowley/go-metrics"
 	"github.com/spf13/cobra"
@@ -53,10 +53,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
 	rootCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
 	rootCmd.PersistentFlags().StringVarP(&WebhookProxyURL, "webhook-proxy-url", "", "", "Get an ID from https://smee.io/new. If blank, the app will not use a webhook proxy")
-	// rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{""}, "Label(s) required before a PR can be tested")
+	rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{""}, "Label(s) required before a PR can be tested")
 	rootCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
-	rootCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instruct-lab-bot", "The username of the bot")
+	rootCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instructlab-bot", "The username of the bot")
 }
 
 var rootCmd = &cobra.Command{
@@ -93,7 +93,7 @@ func run(logger *zap.SugaredLogger) error {
 
 	cc, err := githubapp.NewDefaultCachingClientCreator(
 		ghConfig,
-		githubapp.WithClientUserAgent("instruct-lab-bot/0.0.1"),
+		githubapp.WithClientUserAgent("instructlab-bot/0.0.1"),
 		githubapp.WithClientTimeout(3*time.Second),
 		githubapp.WithClientCaching(false, func() httpcache.Cache { return httpcache.NewMemoryCache() }),
 		githubapp.WithClientMiddleware(
@@ -125,7 +125,6 @@ func run(logger *zap.SugaredLogger) error {
 	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
 
 	addr := net.JoinHostPort(HTTPAddress, strconv.Itoa(HTTPPort))
-	logger.Infof("Starting server on %s...", addr)
 
 	wg := sync.WaitGroup{}
 	if WebhookProxyURL != "" {
@@ -138,6 +137,7 @@ func run(logger *zap.SugaredLogger) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			logger.Infof("Starting gosmee event replayer : %s", args)
 			err := gosmee.Run(args)
 			if err != nil {
 				logger.Errorf("Error running gosmee: %v", err)
@@ -146,6 +146,7 @@ func run(logger *zap.SugaredLogger) error {
 	}
 	wg.Add(1)
 	go func() {
+		logger.Infof("Starting server on %s...", addr)
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			logger.Errorf("Failed to start server: %v", err)
 		}
@@ -189,8 +190,8 @@ func initializeConfig(cmd *cobra.Command) error {
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.config/instruct-lab-bot")
-	v.AddConfigPath("/etc/instruct-lab-bot")
+	v.AddConfigPath("$HOME/.config/instructlab-bot")
+	v.AddConfigPath("/etc/instructlab-bot")
 	if err := v.ReadInConfig(); err != nil {
 		// It's okay if there isn't a config file
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {

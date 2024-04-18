@@ -2,7 +2,7 @@
 - name: Log into GHCR
   community.docker.docker_login:
     registry_url: ghcr.io
-    username: instruct-lab-bot
+    username: instructlab-bot
     password: "{{ github_token }}"
     reauthorize: true
 
@@ -16,7 +16,7 @@
   ansible.builtin.copy:
     dest: "{{ ansible_env.HOME }}/.git-credentials"
     content: |
-      https://instruct-lab-bot:{{ github_token }}@github.com
+      https://instructlab-bot:{{ github_token }}@github.com
     mode: "0600"
 
 - name: Check if the taxonomy directory exists
@@ -91,8 +91,8 @@
 
 - name: Serve the model
   community.docker.docker_container:
-    name: instruct-lab-serve
-    image: ghcr.io/instruct-lab/instruct-lab-bot/instruct-lab-serve:main
+    name: instructlab-serve
+    image: ghcr.io/instructlab/instructlab-bot/instructlab-serve:main
     pull: always
     state: started
     ports:

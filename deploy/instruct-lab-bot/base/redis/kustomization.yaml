@@ -6,4 +6,4 @@ resources:
 labels:
   - includeSelectors: true
     pairs:
-      app.kubernetes.io/part-of: instruct-lab-bot
+      app.kubernetes.io/part-of: instructlab-bot

@@ -6,4 +6,4 @@
     - role: ec2
       vars:
         ec2_aws_instance_type: g4dn.xlarge
-        ec2_aws_nodetype_tag: "instruct-lab-worker-node"
+        ec2_aws_nodetype_tag: "instructlab-worker-node"

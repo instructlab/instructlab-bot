@@ -6,12 +6,12 @@ ENV WORK_DIR /app
 
 WORKDIR ${WORK_DIR}
 
-COPY . ${WORK_DIR}/instruct-lab-bot
+COPY . ${WORK_DIR}/instructlab-bot
 
 # Build the worker binary
-WORKDIR ${WORK_DIR}/instruct-lab-bot/worker
-RUN go build -o instruct-lab-bot-worker main.go && \
-    chmod +x instruct-lab-bot-worker
+WORKDIR ${WORK_DIR}/instructlab-bot/worker
+RUN go build -o instructlab-bot-worker main.go && \
+    chmod +x instructlab-bot-worker
 
 # Stage 2: Setup the base environment with CUDA and dependencies
 FROM nvcr.io/nvidia/cuda:12.3.2-devel-ubi9 as base
@@ -43,13 +43,13 @@ ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/extr
 RUN --mount=type=ssh,id=default \
     python3.11 -m pip --no-cache-dir install --force-reinstall nvidia-cuda-nvcc-cu12 && \
     CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3.11 -m pip install --force-reinstall --no-cache-dir llama-cpp-python && \
-    python3.11 -m pip --no-cache-dir install git+https://${GITHUB_TOKEN}@github.com/instructlab/cli.git@stable
+    python3.11 -m pip --no-cache-dir install git+https://${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable
 
 # Final Stage: Setup the runtime environment
 FROM base as serve
 
 # Copy the Go binary from the builder stage
-COPY --from=builder /app/instruct-lab-bot/worker/instruct-lab-bot-worker /usr/local/bin/instruct-lab-bot-worker
+COPY --from=builder /app/instructlab-bot/worker/instructlab-bot-worker /usr/local/bin/instructlab-bot-worker
 
 VOLUME [ "/data" ]
 WORKDIR /data

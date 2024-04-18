@@ -18,5 +18,5 @@ RUN NOISY_BUILD=y \
 
 FROM registry.access.redhat.com/ubi8/ubi
 
-COPY --from=build /src/worker /instruct-lab-bot-worker
-ENTRYPOINT [ "/instruct-lab-bot-worker", "--test", "generate", "-g", "" ]
+COPY --from=build /src/worker /instructlab-bot-worker
+ENTRYPOINT [ "/instructlab-bot-worker", "--test", "generate", "-g", "" ]
