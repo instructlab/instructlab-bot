@@ -13,7 +13,6 @@ import (
 
 	gosmee "github.com/chmouel/gosmee/gosmee"
 	"github.com/go-redis/redis"
-	"github.com/google/go-github/v60/github"
 	"github.com/gregjones/httpcache"
 	"github.com/instructlab/instructlab-bot/gobot/handlers"
 	"github.com/instructlab/instructlab-bot/gobot/util"
@@ -118,6 +117,7 @@ func run(logger *zap.SugaredLogger) error {
 		Logger:         logger,
 		RequiredLabels: RequiredLabels,
 		BotUsername:    BotUsername,
+		Maintainers:    Maintainers,
 	}
 
 	webhookHandler := githubapp.NewDefaultEventDispatcher(ghConfig, prCommentHandler, prHandler)
@@ -386,24 +386,4 @@ func receiveResults(redisHostPort string, logger *zap.SugaredLogger, cc githubap
 			logger.Errorf("Failed to post comment on pr %s/%s#%d: %v", params.RepoOwner, params.RepoName, params.PrNum, err)
 		}
 	}
-}
-
-// PostComment sends a comment to the GH pull request.
-func PostComment(ctx context.Context, cc githubapp.ClientCreator, logger *zap.SugaredLogger, installIDInt int, repoOwner, repoName string, prNumInt int, commentBody string) error {
-	issueComment := github.IssueComment{
-		Body: github.String(commentBody),
-	}
-
-	client, err := cc.NewInstallationClient(int64(installIDInt))
-	if err != nil {
-		logger.Errorf("Error creating GitHub client: %v", err)
-		return err
-	}
-	_, _, err = client.Issues.CreateComment(ctx, repoOwner, repoName, prNumInt, &issueComment)
-	if err != nil {
-		logger.Errorf("Error posting comment to GitHub PR: %v", err)
-		return err
-	}
-
-	return nil
 }
