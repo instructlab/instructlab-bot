@@ -95,7 +95,6 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return nil
 	}
 	if words[0] != h.BotUsername {
-		h.Logger.Infof("Bot username %s is not found in the comment: %s", h.BotUsername, prComment.body)
 		return nil
 	}
 
