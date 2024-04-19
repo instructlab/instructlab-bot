@@ -76,7 +76,7 @@ func PostPullRequestComment(ctx context.Context, client *github.Client, params P
 		Body: &params.Comment,
 	}
 	if _, _, err := client.Issues.CreateComment(ctx, params.RepoOwner, params.RepoName, int(params.PrNum), comment); err != nil {
-		return fmt.Errorf("failed to comment on the pending job: %w", err)
+		return err
 	}
 	return nil
 }
