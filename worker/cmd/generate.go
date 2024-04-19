@@ -241,7 +241,6 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		return err
 	}
 
-	// Get an array of lines from the output
 	output, err := io.ReadAll(stdout)
 	if err != nil {
 		w.logger.Errorf("Could not read stdout: %v", err)
@@ -271,7 +270,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		if !strings.HasSuffix(file, ".yaml") {
 			continue
 		}
-		filePath := path.Join(WorkDir, "taxonomy", file)
+		filePath := path.Join(workDir, "taxonomy", file)
 
 		f, err := os.Open(filePath)
 		if err != nil {
@@ -316,7 +315,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			}
 
 			chatArgs := []string{"chat", "--quick-question", question}
-			if context, ok := example["context"].(string); ok {
+			context, hasContext := example["context"].(string)
+			if hasContext {
 				chatArgs = append(chatArgs, "--context", context)
 			}
 			if TlsInsecure {
@@ -331,12 +331,41 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			cmd.Dir = workDir
 			cmd.Env = os.Environ()
 			cmd.Stderr = os.Stderr
-			cmd.Stdout = os.Stdout
+			var out bytes.Buffer
+			cmd.Stdout = &out
 			err = cmd.Run()
 			if err != nil {
 				w.logger.Error(err)
-				return err
+				continue
 			}
+
+			logData := map[string]interface{}{
+				"input": map[string]string{
+					"question": question,
+				},
+				"output": out.String(),
+			}
+			if hasContext {
+				logData["input"].(map[string]string)["context"] = context
+			}
+
+			logYAML, err := yaml.Marshal(logData)
+			if err != nil {
+				w.logger.Errorf("Could not marshal log data to YAML: %v", err)
+				continue
+			}
+
+			// Generate uniquely timestamped filenames for the combined input/output yaml files
+			timestamp := time.Now().Format("2006-01-02T15_04_05")
+			logFileName := fmt.Sprintf("chat_%s.yaml", timestamp)
+			err = os.WriteFile(path.Join(chatlogDir, logFileName), logYAML, 0644)
+			if err != nil {
+				w.logger.Errorf("Could not write chatlog to file: %v", err)
+				continue
+			}
+
+			// Sleep to ensure unique timestamps for filenames
+			time.Sleep(1 * time.Second)
 		}
 	}
 	return nil
