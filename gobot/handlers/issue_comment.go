@@ -257,6 +257,7 @@ func (h *PRCommentHandler) checkAuthorPermission(ctx context.Context, client *gi
 	isAllowed := true
 	for _, teamName := range h.Maintainers {
 		var err error
+		isAllowed = true
 		teamMembership, _, err := client.Teams.GetTeamMembershipBySlug(ctx, prComment.repoOrg, teamName, prComment.author)
 		if err != nil {
 			isAllowed = false
