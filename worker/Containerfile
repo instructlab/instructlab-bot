@@ -42,8 +42,8 @@ ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/extr
 # Reinstall llama-cpp-python with CUDA support
 RUN --mount=type=ssh,id=default \
     python3.11 -m pip --no-cache-dir install --force-reinstall nvidia-cuda-nvcc-cu12 && \
-    CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3.11 -m pip install --force-reinstall --no-cache-dir llama-cpp-python && \
-    python3.11 -m pip --no-cache-dir install git+https://${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable
+    python3.11 -m pip --no-cache-dir install git+https://${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable && \
+    CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3.11 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
 
 # Final Stage: Setup the runtime environment
 FROM base as serve
