@@ -1,0 +1,15 @@
+pull_request_rules:
+- name: dependabot-auto-merge
+  description: Automatically merge dependabot PRs that pass CI
+  conditions:
+    - author=dependabot[bot]
+    - check-success=golangci-lint-worker
+    - check-success=golangci-lint-bot
+    - check-success=ansible
+    - check-success=Shellcheck
+    - check-success=markdown-lint
+    - check-success=DCO
+    - label!=hold
+  actions:
+    merge:
+      method: merge
