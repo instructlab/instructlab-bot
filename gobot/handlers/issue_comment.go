@@ -326,7 +326,7 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 	isAllowed := h.checkAuthorPermission(ctx, client, prComment)
 
 	if !isAllowed {
-		params.Comment = fmt.Sprintf("User %s is not not allowed to run the instruct bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
+		params.Comment = fmt.Sprintf("User %s is not allowed to run the InstructLab bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
 
 		err := util.PostPullRequestComment(ctx, client, params)
 		if err != nil {
@@ -372,7 +372,7 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 	// Check if user is part of the teams that are allowed to enable the bot
 	isAllowed := h.checkAuthorPermission(ctx, client, prComment)
 	if !isAllowed {
-		params.Comment = fmt.Sprintf("User %s is not not allowed to run the instruct bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
+		params.Comment = fmt.Sprintf("User %s is not allowed to run the InstructLab bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
 
 		err := util.PostPullRequestComment(ctx, client, params)
 		if err != nil {
@@ -418,7 +418,7 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 	// Check if user is part of the teams that are allowed to enable the bot
 	isAllowed := h.checkAuthorPermission(ctx, client, prComment)
 	if !isAllowed {
-		params.Comment = fmt.Sprintf("User %s is not not allowed to run the InstructLab bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
+		params.Comment = fmt.Sprintf("User %s is not allowed to run the InstructLab bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
 
 		err := util.PostPullRequestComment(ctx, client, params)
 		if err != nil {
