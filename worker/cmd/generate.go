@@ -304,14 +304,21 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		}
 
 		for _, item := range seedExamples {
-			question, ok := item.(map[interface{}]interface{})["question"].(string)
+			example, ok := item.(map[interface{}]interface{})
 			if !ok {
-				err = fmt.Errorf("question not found or not a string")
-				w.logger.Error(err)
-				return err
+				w.logger.Error("Invalid seed example format")
+				continue
+			}
+			question, ok := example["question"].(string)
+			if !ok {
+				w.logger.Error("Question not found or not a string")
+				continue
 			}
 
 			chatArgs := []string{"chat", "--quick-question", question}
+			if context, ok := example["context"].(string); ok {
+				chatArgs = append(chatArgs, "--context", context)
+			}
 			if TlsInsecure {
 				chatArgs = append(chatArgs, "--tls-insecure")
 			}
