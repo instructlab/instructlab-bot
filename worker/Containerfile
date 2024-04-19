@@ -14,12 +14,12 @@ RUN go build -o instructlab-bot-worker main.go && \
     chmod +x instructlab-bot-worker
 
 # Stage 2: Setup the base environment with CUDA and dependencies
-FROM nvcr.io/nvidia/cuda:12.3.2-devel-ubi9 as base
+FROM nvcr.io/nvidia/cuda:12.4.1-devel-ubi9 as base
 
 ARG GITHUB_TOKEN
 
 # Install essential packages, SSH key configuration for ubi, and setup Python
-RUN dnf install -y python3.11 openssh git python3-pip make automake gcc gcc-c++ && \
+RUN dnf install -y python3.11 openssh git python3-pip make automake gcc gcc-c++ python3-devel && \
     ssh-keyscan github.com > ~/.ssh/known_hosts && \
     python3.11 -m ensurepip && \
     dnf install -y gcc && \
