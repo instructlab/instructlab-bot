@@ -4,8 +4,8 @@ A GitHub bot to increase contributor test and review velocity for
 [instructlab/taxonomy](https://github.com/instructlab/taxonomy).
 
 More detail on how this bot fits into the overall architecture is being
-captured in this [enhancement
-document](https://github.com/instructlab/enhancements/blob/main/docs/github-taxonomy-automation.md).
+captured in this [design
+document](docs/github-taxonomy-automation.md).
 
 ## Overview
 
