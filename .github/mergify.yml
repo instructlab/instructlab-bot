@@ -13,3 +13,21 @@ pull_request_rules:
   actions:
     merge:
       method: merge
+
+- name: auto-merge
+  description: automatic merge for main with > 1 approved reviews, all requested reviews have given feedback, not held, and CI is successful
+  conditions:
+    - "#approved-reviews-by>=1"
+    - "#review-requested=0"
+    - "#changes-requested-reviews-by=0"
+    - base=main
+    - label!=hold
+    - check-success=golangci-lint-worker
+    - check-success=golangci-lint-bot
+    - check-success=ansible
+    - check-success=Shellcheck
+    - check-success=markdown-lint
+    - check-success=DCO
+  actions:
+    merge:
+      method: merge
