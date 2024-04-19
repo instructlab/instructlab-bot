@@ -50,6 +50,7 @@ var (
 	TlsClientKeyPath    string
 	TlsServerCaCertPath string
 	TlsInsecure         bool
+	MaxSeed             int
 	TaxonomyFolders     = []string{"compositional_skills", "knowledge"}
 )
 
@@ -78,9 +79,10 @@ type Worker struct {
 	tlsClientCertPath   string
 	tlsClientKeyPath    string
 	tlsServerCaCertPath string
+	maxSeed             int
 }
 
-func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string) *Worker {
+func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
 	return &Worker{
 		ctx:                 ctx,
 		pool:                pool,
@@ -93,6 +95,7 @@ func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logg
 		tlsClientCertPath:   tlsClientCertPath,
 		tlsClientKeyPath:    tlsClientKeyPath,
 		tlsServerCaCertPath: tlsServerCaCertPath,
+		maxSeed:             maxSeed,
 	}
 }
 
@@ -118,6 +121,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&TlsClientKeyPath, "tls-client-key", "", "client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
 	generateCmd.Flags().StringVarP(&TlsServerCaCertPath, "tls-server-ca-cert", "", "server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
 	generateCmd.Flags().BoolVarP(&TlsInsecure, "tls-insecure", "", false, "Whether to skip TLS verification")
+	generateCmd.Flags().IntVarP(&MaxSeed, "max-seed", "m", 40, "Maximum number of seed Q&A pairs to process to SDG.")
 	_ = generateCmd.MarkFlagRequired("github-token")
 	rootCmd.AddCommand(generateCmd)
 }
@@ -192,7 +196,7 @@ var generateCmd = &cobra.Command{
 		go func(ch <-chan string) {
 			defer wg.Done()
 			for job := range ch {
-				jp := NewJobProcessor(ctx, pool, svc, sugar, job, PreCheckEndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath)
+				jp := NewJobProcessor(ctx, pool, svc, sugar, job, PreCheckEndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath, MaxSeed)
 				jp.processJob()
 			}
 		}(jobChan)
@@ -505,7 +509,6 @@ func (w *Worker) processJob() {
 		}
 
 		diffOutputLines := strings.Split(string(diffOutput), "\n")
-
 		// Filter taxonomy files ending in .yaml and prepare them relative to workDir
 		var taxonomyFiles []string
 		for _, line := range diffOutputLines {
@@ -527,7 +530,55 @@ func (w *Worker) processJob() {
 			return
 		}
 
-		outputFiles, err := w.datagenSvc(taxonomyFiles, outputDir, NumInstructions)
+		// Process each YAML file and filter questions if over the max seed
+		filteredFiles := []string{}
+		for _, file := range taxonomyFiles {
+			f, err := os.Open(file)
+			if err != nil {
+				sugar.Errorf("Failed to open file: %v", err)
+				continue
+			}
+			defer f.Close()
+
+			decoder := yaml.NewDecoder(f)
+			var data map[string]interface{}
+			if err := decoder.Decode(&data); err != nil {
+				sugar.Errorf("Failed to decode YAML file: %v", err)
+				continue
+			}
+
+			if seedExamples, ok := data["seed_examples"].([]interface{}); ok && len(seedExamples) > w.maxSeed {
+				originalCount := len(seedExamples)
+				data["seed_examples"] = seedExamples[:w.maxSeed]
+				outputData, err := yaml.Marshal(data)
+				if err != nil {
+					sugar.Errorf("Failed to re-marshal filtered YAML data: %v", err)
+					continue
+				}
+
+				// Write the modified content back to a new file to pass to datagenSvc instead of the original diff
+				filteredQNA, err := os.CreateTemp("", "filtered-*.yaml")
+				if err != nil {
+					sugar.Errorf("Failed to create temporary file: %v", err)
+					continue
+				}
+				defer filteredQNA.Close()
+
+				if _, err = filteredQNA.Write(outputData); err != nil {
+					sugar.Errorf("Failed to write filtered data to the new QNA file: %v", err)
+					continue
+				}
+				sugar.Infof("Trimmed %s from %d to %d Q&A pairs", file, originalCount, w.maxSeed)
+
+				filteredFiles = append(filteredFiles, filteredQNA.Name())
+			} else {
+				// No filtering needed, use the original file
+				filteredFiles = append(filteredFiles, file)
+			}
+		}
+
+		// Generate data with potentially filtered files
+		outputFiles, err := w.datagenSvc(filteredFiles, outputDir, NumInstructions)
 		if err != nil {
 			sugar.Errorf("Failed to generate data: %v", err)
 			w.reportJobError(err)
