@@ -19,15 +19,18 @@ const (
 	CheckStatusError   = "error"
 	CheckStatusPending = "pending"
 
-	TriageReadinessCheck = "Triage Readiness Check"
-	PrecheckCheck        = "Precheck Check"
-	GenerateLocalCheck   = "Generate Local Check"
-	GenerateSDGCheck     = "Generate SDG Check"
+	BotReadyStatus    = "InstructLab Bot"
+	BotReadyStatusMsg = "InstructLab bot is ready to assist!!"
 
-	TriageReadinessStatus = "Triage Readiness Status"
-	PrecheckStatus        = "Precheck Status"
-	GenerateLocalStatus   = "Generate Local Status"
-	GenerateSDGStatus     = "Generate SDG Status"
+	PrecheckCheck      = "Precheck Check"
+	GenerateLocalCheck = "Generate Local Check"
+	GenerateSDGCheck   = "Generate SDG Check"
+
+	PrecheckStatus      = "Precheck Status"
+	GenerateLocalStatus = "Generate Local Status"
+	GenerateSDGStatus   = "Generate SDG Status"
+
+	InstructLabBotUrl = "https://github.com/instructlab/instructlab-bot"
 )
 
 type PullRequestStatusParams struct {
@@ -37,6 +40,7 @@ type PullRequestStatusParams struct {
 	CheckSummary string
 	CheckDetails string
 	Comment      string
+	StatusDesc   string
 
 	JobType string
 	JobID   string
@@ -106,4 +110,59 @@ func PostPullRequestCheck(ctx context.Context, client *github.Client, params Pul
 		return err
 	}
 	return nil
+}
+
+func PostPullRequestStatus(ctx context.Context, client *github.Client, params PullRequestStatusParams) error {
+	status := &github.RepoStatus{
+		State:       github.String(params.Conclusion), // Status state: success, failure, error, or pending
+		Description: github.String(params.StatusDesc), // Status description
+		Context:     github.String(params.CheckName),  // Status context
+		TargetURL:   github.String(InstructLabBotUrl), // Target URL to redirect
+	}
+	_, _, err := client.Repositories.CreateStatus(ctx, params.RepoOwner, params.RepoName, params.PrSha, status)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func PostBotWelcomeMessage(ctx context.Context, client *github.Client, repoOwner string, repoName string, prNum int, prSha string, botName string, maintainers []string) error {
+	params := PullRequestStatusParams{
+		CheckName: BotReadyStatus,
+		RepoOwner: repoOwner,
+		RepoName:  repoName,
+		PrNum:     prNum,
+		PrSha:     prSha,
+	}
+	detailsMsg := fmt.Sprintf("Beep, boop 🤖, Hi, I'm %s and I'm going to help you"+
+		" with your pull request. Thanks for you contribution! 🎉\n\n", botName)
+	detailsMsg += fmt.Sprintf("I support the following commands:\n\n"+
+		"* `%s precheck` -- Check existing model behavior using the questions in this proposed change.\n"+
+		"* `%s generate` -- Generate a sample of synthetic data using the synthetic data generation backend infrastructure.\n"+
+		"* `%s generate-local` -- Generate a sample of synthetic data using a local model.\n"+
+		"* `%s help` -- Print this help message again.\n"+
+		"> [!NOTE] \n > **Results or Errors of these commands will be posted as a pull request check in the Checks section below**\n\n",
+		botName, botName, botName, botName)
+
+	if len(maintainers) > 0 {
+		detailsMsg += fmt.Sprintf("> [!NOTE] \n > **Currently only maintainers belongs to [%v] teams are allowed to run these commands**.\n", maintainers)
+	}
+	params.Status = CheckComplete
+	params.Conclusion = CheckStatusSuccess
+	params.CheckSummary = BotReadyStatusMsg
+	params.CheckDetails = detailsMsg
+	params.Comment = detailsMsg
+	params.StatusDesc = BotReadyStatusMsg
+
+	err := PostPullRequestComment(ctx, client, params)
+	if err != nil {
+		return err
+	}
+
+	err = PostPullRequestStatus(ctx, client, params)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }

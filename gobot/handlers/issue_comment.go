@@ -110,6 +110,8 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	prComment.labels = pr.Labels
 
 	switch words[1] {
+	case "help":
+		return h.helpCommand(ctx, client, &prComment)
 	case "enable":
 		return h.enableCommand(ctx, client, &prComment)
 	case "generate-local":
@@ -204,9 +206,6 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	case "sdg-svc":
 		checkName = util.GenerateSDGCheck
 		statusName = util.GenerateSDGStatus
-	case "enable":
-		checkName = util.TriageReadinessCheck
-		statusName = util.TriageReadinessStatus
 	default:
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
@@ -275,6 +274,17 @@ func (h *PRCommentHandler) checkAuthorPermission(ctx context.Context, client *gi
 		}
 	}
 	return isAllowed
+}
+
+func (h *PRCommentHandler) helpCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("Help command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+	err := util.PostBotWelcomeMessage(ctx, client, prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.prSha, h.BotUsername, h.Maintainers)
+	if err != nil {
+		h.Logger.Errorf("Failed to post welcome message on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
+		return err
+	}
+	return nil
 }
 
 func (h *PRCommentHandler) enableCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
