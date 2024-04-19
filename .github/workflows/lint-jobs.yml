@@ -71,4 +71,4 @@ jobs:
           go-version-file: gobot/go.mod
       - name: Go Format
         run: |
-          [ -z "$(gofmt -l .)" ] || (echo "$(gofmt -l .)" && exit 1)
+          [ -z "$(gofmt -l .)" ] || (gofmt -l . && exit 1)
