@@ -28,6 +28,13 @@ pull_request_rules:
     - check-success=Shellcheck
     - check-success=markdown-lint
     - check-success=DCO
+    # If files are changed in .github/, the actionlint check must pass
+    - or:
+      - and:
+        # regex should match the one in .github/workflows/actionlint.yml
+        - files~=.github/.*$
+        - check-success=actionlint
+      - -files~=.github/.*$
   actions:
     merge:
       method: merge
