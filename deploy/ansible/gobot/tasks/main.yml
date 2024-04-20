@@ -20,5 +20,5 @@
       ILBOT_REDIS: "{{ redis_ip }}:6379"
       ILBOT_HTTP_ADDRESS: "127.0.0.1"
       ILBOT_HTTP_PORT: "8080"
-      ILBOT_MAINTAINERS: "taxonomy-triagers taxonomy-approvers taxonomy-maintainers labrador-org-maintainers instruct-lab-bot-maintainers"
-      ILBOT_REQUIRED_LABELS: "skill knowledge"
+      ILBOT_MAINTAINERS: "taxonomy-triagers,taxonomy-approvers,taxonomy-maintainers,labrador-org-maintainers,instruct-lab-bot-maintainers"
+      ILBOT_REQUIRED_LABELS: "skill,knowledge"
