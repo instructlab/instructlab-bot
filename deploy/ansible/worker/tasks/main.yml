@@ -44,22 +44,41 @@
         bot_repo != None and
         bot_repo | trim != ''
 
-- name: Append args for endpoint_url
+- name: Append args for precheck_endpoint_url
   ansible.builtin.set_fact:
-    worker_args: "{{ worker_args }} --endpoint-url {{ endpoint_url }}"
-  when: endpoint_url is defined and
-        endpoint_url != None and
-        endpoint_url | trim != ''
+    worker_args: "{{ worker_args }} --precheck-endpoint-url {{ precheck_endpoint_url }}"
+  when: precheck_endpoint_url is defined and
+        precheck_endpoint_url != None and
+        precheck_endpoint_url | trim != ''
 
 - name: Set args for sdg_endpoint_url
   ansible.builtin.set_fact:
-    worker_args: "{{ worker_args }} --sdg-endpoint-url {{ sdg_endpoint_url }} \
-    --tls-client-cert \"{{ tls_client_cert }}\" \
+    worker_args: "{{ worker_args }} --sdg-endpoint-url {{ sdg_endpoint_url }}"
+  when: sdg_endpoint_url is defined and
+        sdg_endpoint_url != None and
+        sdg_endpoint_url | trim != ''
+
+- name: Set tls-insecure if enabled
+  ansible.builtin.set_fact:
+    worker_args: "{{ worker_args }} --tls-insecure"
+  when: sdg_endpoint_url is defined and
+        sdg_endpoint_url != None and
+        sdg_endpoint_url | trim != '' and
+        tls_insecure is defined and
+        tls_insecure == "true" and
+        tls_insecure | trim != ''
+
+- name: Set certs for sdg_endpoint_url if provided
+  ansible.builtin.set_fact:
+    worker_args: "{{ worker_args }} --tls-client-cert \"{{ tls_client_cert }}\" \
     --tls-client-key \"{{ tls_client_key }}\" \
     --tls-server-ca-cert \"{{ tls_server_ca_cert }}\""
   when: sdg_endpoint_url is defined and
         sdg_endpoint_url != None and
-        sdg_endpoint_url | trim != ''
+        sdg_endpoint_url | trim != '' and
+        tls_insecure is defined and
+        tls_insecure != "true" and
+        tls_insecure | trim != ''
 
 - name: Dump the args
   ansible.builtin.debug:

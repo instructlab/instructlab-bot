@@ -14,8 +14,9 @@ OS=""
 REDIS_IP=${REDIS_IP:-"127.0.0.1"}
 WORK_DIR=${WORK_DIR:-"${HOME}/instructlab-bot"}
 
-ENDPOINT_URL=${ENDPOINT_URL:-"http://localhost:8000/v1"}
+PRECHECK_ENDPOINT_URL=${PRECHECK_ENDPOINT_URL:-"http://localhost:8000/v1"}
 SDG_ENDPOINT_URL=${SDG_ENDPOINT_URL:-""}
+TLS_INSECURE=${TLS_INSECURE:-"true"}
 
 TLS_CLIENT_KEY=${TLS_CLIENT_KEY:-""}
 TLS_CLIENT_CERT=${TLS_CLIENT_CERT:-""}
@@ -52,11 +53,12 @@ usage() {
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
     echo "  --redis-ip IP: Optionally the IP address of the Redis server. Default: ${REDIS_IP}"
     echo "  --work-dir DIR: Optionally the directory to use for the worker. Default: ${WORK_DIR}"
-    echo "  --endpoint-url URL: The endpoint URL for the icli precheck. Default: http://localhost:8000/v1"
-    echo "  --sdg-endpoint-url URL: The endpoint URL for the icli sdg-svc. Default: "
-    echo "  --tls-client-key KEY: The TLS client key for icli sdg-svc"
-    echo "  --tls-client-cert CERT: The TLS client certificate for icli sdg-svc"
-    echo "  --tls-server-ca-cert CERT: The TLS server CA cert for icli sdg-svc"
+    echo "  --precheck-endpoint-url URL: The endpoint URL for the ilab precheck. Default: http://localhost:8000/v1"
+    echo "  --sdg-endpoint-url URL: The endpoint URL for the ilab sdg-svc. Default: "
+    echo "  --tls-insecure BOOL: Use insecure TLS connection. Default: ${TLS_INSECURE}"
+    echo "  --tls-client-key KEY: The TLS client key for ilab sdg-svc"
+    echo "  --tls-client-cert CERT: The TLS client certificate for ilab sdg-svc"
+    echo "  --tls-server-ca-cert CERT: The TLS server CA cert for ilab sdg-svc"
     echo "  --tls-secrets-dir DIR: Directory to store TLS secrets. Default: ${TLS_SECRETS_DIR}"
     echo
     supported_envs
@@ -269,14 +271,24 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
-    # Check if ENDPOINT_URL is set
-    if [ -n "${ENDPOINT_URL}" ]; then
-        EXTRA_ARGS="${EXTRA_ARGS} --endpoint-url ${ENDPOINT_URL}"
+    # Check if PRECHECK_ENDPOINT_URL is set
+    if [ -n "${PRECHECK_ENDPOINT_URL}" ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --precheck-endpoint-url ${PRECHECK_ENDPOINT_URL}"
     fi
 
     # Check if SDG_ENDPOINT_URL is set and TLS_SECRETS_EXISTS is true
-    if [ -n "${SDG_ENDPOINT_URL}" ] && [ "${TLS_SECRETS_EXISTS}" -eq 1 ]; then
-        EXTRA_ARGS="${EXTRA_ARGS} --sdg-endpoint-url ${SDG_ENDPOINT_URL} --tls-client-key ${TLS_SECRETS_DIR}/tls-client.key --tls-client-cert ${TLS_SECRETS_DIR}/tls-cert.key --tls-server-ca-cert ${TLS_SECRETS_DIR}/tls-server-ca.crt"
+    if [ -n "${SDG_ENDPOINT_URL}" ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --sdg-endpoint-url ${SDG_ENDPOINT_URL} "
+    fi
+
+    # Check if TLS_INSECURE is set to true
+    if [ "${TLS_INSECURE}" == "true" ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --tls-insecure"
+    fi
+
+    # Check if tls cert and key are set
+    if [ "${TLS_SECRETS_EXISTS}" -eq 1 ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --tls-client-key ${TLS_SECRETS_DIR}/tls-client.key --tls-client-cert ${TLS_SECRETS_DIR}/tls-cert.key --tls-server-ca-cert ${TLS_SECRETS_DIR}/tls-server-ca.crt"
     fi
 
     cat << EOF > labbotworker.service
@@ -376,12 +388,16 @@ while [ $# -gt 0 ]; do
             WORK_DIR="$2"
             shift
             ;;
-        --endpoint-url)
-            ENDPOINT_URL="$2"
+        --precheck-endpoint-url)
+            PRECHECK_ENDPOINT_URL="$2"
             shift
             ;;
         --sdg-endpoint-url)
             SDG_ENDPOINT_URL="$2"
+            shift
+            ;;
+        --tls-insecure)
+            TLS_INSECURE="$2"
             shift
             ;;
         --tls-client-key)
