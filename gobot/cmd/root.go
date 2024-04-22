@@ -299,13 +299,33 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 				continue
 			}
 
+			requestTimeStr, err := r.Get("jobs:" + result + ":request_time").Result()
+			if err != nil || repoName == "" {
+				logger.Errorf("No request time found for job %s", result)
+				continue
+			}
+
+			requestTime, err := strconv.ParseInt(requestTimeStr, 10, 64)
+			if err != nil {
+				logger.Errorf("Error parsing request time for job %s: %v", result, err)
+				continue
+			}
+			totalTime := time.Now().Unix() - requestTime
+
 			prURL := fmt.Sprintf("https://github.com/%s/%s/pull/%s", repoOwner, repoName, prNumber)
 
 			jobDuration, err := r.Get("jobs:" + result + ":duration").Result()
 			if err != nil || jobDuration == "" {
-				logger.Infof("Processing result for %s/%s#%s, job ID: %s, GitHub URL: %s (No job duration time found for job)", repoOwner, repoName, prNumber, result, prURL)
+				logger.Infof("Job result for %s/%s#%s, job ID: %s, GitHub URL: %s (No job duration time found for job)", repoOwner, repoName, prNumber, result, prURL)
 			} else {
-				logger.Infof("Processing result for %s/%s#%s, job ID: %s, job duration: %s, URL: %s", repoOwner, repoName, prNumber, result, jobDuration, prURL)
+
+				jobDurationInt, err := strconv.ParseInt(jobDuration, 10, 64)
+				if err != nil {
+					logger.Errorf("Error parsing duration time for job %s: %v", result, err)
+					continue
+				}
+				queueTime := totalTime - jobDurationInt
+				logger.Infof("Job result for %s/%s#%s, job ID: %s, job duration: %s, queue time: %d URL: %s", repoOwner, repoName, prNumber, result, jobDuration, queueTime, prURL)
 			}
 
 			var statusContext string

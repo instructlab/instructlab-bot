@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/go-github/v60/github"
@@ -181,8 +182,14 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		return err
 	}
 
+	err = setJobKey(r, jobNumber, "request_time", strconv.FormatInt(time.Now().Unix(), 10))
+	if err != nil {
+		return err
+	}
+
 	err = r.LPush(ctx, "generate", strconv.FormatInt(jobNumber, 10)).Err()
 	if err != nil {
+		h.Logger.Errorf("Failed to LPUSH job %d to redis %v", jobNumber, err)
 		return err
 	}
 
