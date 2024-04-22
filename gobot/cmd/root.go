@@ -257,14 +257,13 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 			if result == "" {
 				continue
 			}
-
-			prNumber, err := r.Get("jobs:" + result + ":pr_number").Result()
+			prNumber, err := r.Get(buildRedisKey(result, handlers.RedisKeyPRNumber)).Result()
 			if err != nil || prNumber == "" {
 				logger.Errorf("No PR number found for job %s", result)
 				continue
 			}
 
-			installID, err := r.Get("jobs:" + result + ":installation_id").Result()
+			installID, err := r.Get(buildRedisKey(result, handlers.RedisKeyInstallationID)).Result()
 			if err != nil || installID == "" {
 				logger.Errorf("No installation ID found for job %s", result)
 				continue
@@ -275,37 +274,57 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 				continue
 			}
 
-			repoOwner, err := r.Get("jobs:" + result + ":repo_owner").Result()
+			repoOwner, err := r.Get(buildRedisKey(result, handlers.RedisKeyRepoOwner)).Result()
 			if err != nil || repoOwner == "" {
 				logger.Errorf("No repo owner found for job %s", result)
 				continue
 			}
 
-			repoName, err := r.Get("jobs:" + result + ":repo_name").Result()
+			repoName, err := r.Get(buildRedisKey(result, handlers.RedisKeyRepoName)).Result()
 			if err != nil || repoName == "" {
 				logger.Errorf("No repo name found for job %s", result)
 				continue
 			}
 
-			jobType, err := r.Get("jobs:" + result + ":job_type").Result()
-			if err != nil || repoName == "" {
+			jobType, err := r.Get(buildRedisKey(result, handlers.RedisKeyJobType)).Result()
+			if err != nil || jobType == "" {
 				logger.Errorf("No job type found for job %s", result)
 				continue
 			}
 
-			prSha, err := r.Get("jobs:" + result + ":pr_sha").Result()
-			if err != nil || repoName == "" {
-				logger.Errorf("No pr sha found for job %s", result)
+			prSha, err := r.Get(buildRedisKey(result, handlers.RedisKeyPRSHA)).Result()
+			if err != nil || prSha == "" {
+				logger.Errorf("No PR SHA found for job %s", result)
 				continue
 			}
 
-			jobDuration, err := r.Get("jobs:" + result + ":duration").Result()
-			if err != nil || jobDuration == "" {
-				// Do not break out of the current iteration since the job could have failed without a duration
-				logger.Warnf("No job duration time found for job %s", result)
+			requestTimeStr, err := r.Get(buildRedisKey(result, handlers.RedisKeyRequestTime)).Result()
+			if err != nil || requestTimeStr == "" {
+				logger.Errorf("No request time found for job %s", result)
+				continue
 			}
+			requestTime, err := strconv.ParseInt(requestTimeStr, 10, 64)
+			if err != nil {
+				logger.Errorf("Error parsing request time for job %s: %v", result, err)
+				continue
+			}
+			totalTime := time.Now().Unix() - requestTime
 
-			logger.Infof("Processing result for %s/%s#%s, job ID: %s ", repoOwner, repoName, prNumber, result)
+			prURL := fmt.Sprintf("https://github.com/%s/%s/pull/%s", repoOwner, repoName, prNumber)
+
+			jobDuration, err := r.Get(buildRedisKey(result, handlers.RedisKeyDuration)).Result()
+			if err != nil || jobDuration == "" {
+				logger.Infof("Job result for %s/%s#%s, job ID: %s, GitHub URL: %s (No job duration time found for job)", repoOwner, repoName, prNumber, result, prURL)
+			} else {
+
+				jobDurationInt, err := strconv.ParseInt(jobDuration, 10, 64)
+				if err != nil {
+					logger.Errorf("Error parsing duration time for job %s: %v", result, err)
+					continue
+				}
+				queueTime := totalTime - jobDurationInt
+				logger.Infof("Job result for %s/%s#%s, job ID: %s, job duration: %s, queue time: %d URL: %s", repoOwner, repoName, prNumber, result, jobDuration, queueTime, prURL)
+			}
 
 			var statusContext string
 			switch jobType {
@@ -411,4 +430,9 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 			}
 		}
 	}
+}
+
+// buildRedisKey constructs a Redis key for job attributes.
+func buildRedisKey(jobID, keyType string) string {
+	return fmt.Sprintf("%s:%s:%s", handlers.RedisKeyJobs, jobID, keyType)
 }
