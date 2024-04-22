@@ -1,0 +1,36 @@
+# Stage 1: Build the worker binary
+FROM golang:1.22 as builder
+
+ENV WORK_DIR /app
+
+WORKDIR ${WORK_DIR}
+
+COPY . ${WORK_DIR}/instructlab-bot
+
+# Build the worker binary
+WORKDIR ${WORK_DIR}/instructlab-bot/worker
+RUN go build -o instructlab-bot-worker main.go && \
+    chmod +x instructlab-bot-worker
+
+FROM fedora:latest as base
+
+RUN dnf install -y python openssh git python3-pip make automake gcc gcc-c++ python3-devel && \
+    mkdir ~/.ssh && ssh-keyscan github.com > ~/.ssh/known_hosts && \
+    python -m ensurepip && \
+    dnf install -y gcc cmake gcc-c++ && \
+    dnf update -y && \
+    dnf clean all
+
+RUN --mount=type=ssh,id=default \
+    python -m pip --no-cache-dir install git+https://github.com/instructlab/instructlab.git@stable
+
+# Final Stage: Setup the runtime environment
+FROM base as serve
+
+# Copy the Go binary from the builder stage
+COPY --from=builder /app/instructlab-bot/worker/instructlab-bot-worker /usr/local/bin/instructlab-bot-worker
+
+VOLUME [ "/data" ]
+WORKDIR /data
+ENTRYPOINT [ "ilab", "serve" ]
+CMD ["/bin/bash"]
