@@ -96,7 +96,6 @@ jobs:
           platforms: linux/amd64
           build-args: |
             GITHUB_USER=instructlab-bot
-            GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
           target: serve
           push: true
           tags: ${{ steps.labserve_meta.outputs.tags }}
