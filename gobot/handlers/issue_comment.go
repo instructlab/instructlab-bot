@@ -24,6 +24,20 @@ const (
 	BotEnabled        = "Bot is successfully enabled."
 )
 
+const (
+	RedisKeyJobs           = "jobs"
+	RedisKeyPRNumber       = "pr_number"
+	RedisKeyPRSHA          = "pr_sha"
+	RedisKeyAuthor         = "author"
+	RedisKeyInstallationID = "installation_id"
+	RedisKeyRepoOwner      = "repo_owner"
+	RedisKeyRepoName       = "repo_name"
+	RedisKeyJobType        = "job_type"
+	RedisKeyErrors         = "errors"
+	RedisKeyRequestTime    = "request_time"
+	RedisKeyDuration       = "duration"
+)
+
 type PRCommentHandler struct {
 	githubapp.ClientCreator
 	Logger         *zap.SugaredLogger
@@ -137,52 +151,52 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		DB:       0,  // use default DB
 	})
 
-	jobNumber, err := r.Incr(ctx, "jobs").Result()
+	jobNumber, err := r.Incr(ctx, RedisKeyJobs).Result()
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "pr_number", prComment.prNum)
+	err = setJobKey(r, jobNumber, RedisKeyPRNumber, prComment.prNum)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "pr_sha", prComment.prSha)
+	err = setJobKey(r, jobNumber, RedisKeyPRSHA, prComment.prSha)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "author", prComment.author)
+	err = setJobKey(r, jobNumber, RedisKeyAuthor, prComment.author)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "installation_id", prComment.installID)
+	err = setJobKey(r, jobNumber, RedisKeyInstallationID, prComment.installID)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "repo_owner", prComment.repoOwner)
+	err = setJobKey(r, jobNumber, RedisKeyRepoOwner, prComment.repoOwner)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "repo_name", prComment.repoName)
+	err = setJobKey(r, jobNumber, RedisKeyRepoName, prComment.repoName)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "job_type", jobType)
+	err = setJobKey(r, jobNumber, RedisKeyJobType, jobType)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "errors", "")
+	err = setJobKey(r, jobNumber, RedisKeyErrors, "")
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, "request_time", strconv.FormatInt(time.Now().Unix(), 10))
+	err = setJobKey(r, jobNumber, RedisKeyRequestTime, strconv.FormatInt(time.Now().Unix(), 10))
 	if err != nil {
 		return err
 	}
