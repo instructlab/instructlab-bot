@@ -299,13 +299,14 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 				continue
 			}
 
+			prURL := fmt.Sprintf("https://github.com/%s/%s/pull/%s", repoOwner, repoName, prNumber)
+
 			jobDuration, err := r.Get("jobs:" + result + ":duration").Result()
 			if err != nil || jobDuration == "" {
-				// Do not break out of the current iteration since the job could have failed without a duration
-				logger.Warnf("No job duration time found for job %s", result)
+				logger.Infof("Processing result for %s/%s#%s, job ID: %s, GitHub URL: %s (No job duration time found for job)", repoOwner, repoName, prNumber, result, prURL)
+			} else {
+				logger.Infof("Processing result for %s/%s#%s, job ID: %s, job duration: %s, URL: %s", repoOwner, repoName, prNumber, result, jobDuration, prURL)
 			}
-
-			logger.Infof("Processing result for %s/%s#%s, job ID: %s ", repoOwner, repoName, prNumber, result)
 
 			var statusContext string
 			switch jobType {
