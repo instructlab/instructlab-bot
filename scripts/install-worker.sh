@@ -283,7 +283,7 @@ EOF
 
     # Check if TLS_INSECURE is set to true
     if [ "${TLS_INSECURE}" == "true" ]; then
-        EXTRA_ARGS="${EXTRA_ARGS} --tls-insecure"
+        EXTRA_ARGS="${EXTRA_ARGS} --tls-insecure true"
     fi
 
     # Check if tls cert and key are set
