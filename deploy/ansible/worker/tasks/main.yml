@@ -60,7 +60,7 @@
 
 - name: Set tls-insecure if enabled
   ansible.builtin.set_fact:
-    worker_args: "{{ worker_args }} --tls-insecure"
+    worker_args: "{{ worker_args }} --tls-insecure \"true\""
   when: sdg_endpoint_url is defined and
         sdg_endpoint_url != None and
         sdg_endpoint_url | trim != '' and
