@@ -4,8 +4,8 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
 COMMAND=""
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
-TAXONOMY_REPO=${TAXONOMY_REPO:-"https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/taxonomy.git"}
-BOT_REPO=${BOT_REPO:-"https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab-bot.git"}
+TAXONOMY_REPO=${TAXONOMY_REPO:-"https://github.com/instructlab/taxonomy.git"}
+BOT_REPO=${BOT_REPO:-"https://github.com/instructlab/instructlab-bot.git"}
 GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 
 GPU_TYPE=${GPU_TYPE:-""}
@@ -239,7 +239,7 @@ install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     # Always attempt to install instructlab to make sure bot is running the latest version of stable branch.
 
-    sudo pip install --upgrade --force-reinstall "git+https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable"
+    sudo pip install --upgrade --force-reinstall "git+https://github.com/instructlab/instructlab.git@stable"
     if [ "${GPU_TYPE}" = "cuda" ]; then
         CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
     elif [ -n "${GPU_TYPE}" ]; then
