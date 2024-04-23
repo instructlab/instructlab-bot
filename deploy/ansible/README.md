@@ -117,10 +117,18 @@ This playbook installs all the components in the containers.
 ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-bot-stack.yml
 ```
 
-## Install or reconfigure the Worker stack
+## Install the Worker stack (first time installation)
 
 This playbook installs all the required component on the host itself
 
 ```console
 ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-worker-stack.yml
+```
+
+## Reconfigure the existing Worker stack
+
+To reconfigure the existing running worker stack, run the following command. This will reconfigure the worker stack with the latest changes and skip all the steps that only required for the first time installation.
+
+```console
+ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-worker-stack.yml --extra-vars "reconfigure_worker=true"
 ```

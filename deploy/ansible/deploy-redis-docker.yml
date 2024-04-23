@@ -1,5 +1,5 @@
 - name: Deploy Redis in container
-  hosts: labNodes
+  hosts: botNode
   roles:
     - role: redis-docker
       become: true
