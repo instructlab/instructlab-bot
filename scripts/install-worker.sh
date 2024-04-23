@@ -235,7 +235,7 @@ EOF
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     if ! command_exists "ilab"; then
-        sudo pip install "git+https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab#egg=cli"
+        sudo pip install "git+https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable"
         if [ "${GPU_TYPE}" = "cuda" ]; then
             CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
         elif [ -n "${GPU_TYPE}" ]; then
