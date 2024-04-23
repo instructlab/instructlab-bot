@@ -1,5 +1,5 @@
 - name: Deploy Redis
-  hosts: labNodes
+  hosts: botNode
   roles:
     - role: grafana
       become: true

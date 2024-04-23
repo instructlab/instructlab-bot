@@ -16,7 +16,7 @@ WORK_DIR=${WORK_DIR:-"${HOME}/instructlab-bot"}
 
 PRECHECK_ENDPOINT_URL=${PRECHECK_ENDPOINT_URL:-"http://localhost:8000/v1"}
 SDG_ENDPOINT_URL=${SDG_ENDPOINT_URL:-""}
-TLS_INSECURE=${TLS_INSECURE:-"true"}
+TLS_INSECURE=${TLS_INSECURE:-"false"}
 
 TLS_CLIENT_KEY=${TLS_CLIENT_KEY:-""}
 TLS_CLIENT_CERT=${TLS_CLIENT_CERT:-""}
@@ -25,6 +25,9 @@ TLS_SERVER_CA_CERT=${TLS_SERVER_CA_CERT:-""}
 TLS_SECRETS_DIR=${TLS_SECRETS_DIR:-"${HOME}/instructlab-bot"}
 TLS_SECRETS_EXISTS=0
 
+readonly TLS_CLIENT_KEY_FILE="client-tls-key.pem2"
+readonly TLS_CLIENT_CERT_FILE="client-tls-crt.pem2"
+readonly TLS_SERVER_CA_CERT_FILE="server-ca-crt.pem2"
 EXTRA_ARGS=""
 
 # Export CUDA environment variables
@@ -188,12 +191,12 @@ install_nexodus() {
 install_tls_secrets() {
     if [ -n "${TLS_CLIENT_KEY}" ] && [ -n "${TLS_CLIENT_CERT}" ] && [ -n "${TLS_SERVER_CA_CERT}" ]; then
         sudo mkdir -p "${TLS_SECRETS_DIR}"
-        sudo echo "${TLS_CLIENT_KEY}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/tls-client.key"
-        sudo echo "${TLS_CLIENT_CERT}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/tls-cert.key"
-        sudo echo "${TLS_SERVER_CA_CERT}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/tls-server-ca.crt"
+        sudo echo "${TLS_CLIENT_KEY}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/$TLS_CLIENT_KEY_FILE"
+        sudo echo "${TLS_CLIENT_CERT}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/$TLS_CLIENT_CERT_FILE"
+        sudo echo "${TLS_SERVER_CA_CERT}" | sudo install -m 0644 -D /dev/stdin "${TLS_SECRETS_DIR}/$TLS_SERVER_CA_CERT_FILE"
         TLS_SECRETS_EXISTS=1
     elif
-      [ -f "${TLS_SECRETS_DIR}/tls-client.key" ] && [ -f "${TLS_SECRETS_DIR}/tls-cert.key" ] && [ -f "${TLS_SECRETS_DIR}/tls-server-ca.crt" ]; then
+      [ -f "${TLS_SECRETS_DIR}/$TLS_CLIENT_KEY_FILE" ] && [ -f "${TLS_SECRETS_DIR}/$TLS_CLIENT_CERT_FILE" ] && [ -f "${TLS_SECRETS_DIR}/$TLS_SERVER_CA_CERT_FILE" ]; then
         echo "TLS secrets already exist in ${TLS_SECRETS_DIR}"
         TLS_SECRETS_EXISTS=1
     fi
@@ -234,14 +237,14 @@ EOF
 
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
-    if ! command_exists "ilab"; then
-        sudo pip install "git+https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable"
-        if [ "${GPU_TYPE}" = "cuda" ]; then
-            CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
-        elif [ -n "${GPU_TYPE}" ]; then
-            echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
-            exit 1
-        fi
+    # Always attempt to install instructlab to make sure bot is running the latest version of stable branch.
+
+    sudo pip install --upgrade --force-reinstall "git+https://instructlab-bot:${GITHUB_TOKEN}@github.com/instructlab/instructlab.git@stable"
+    if [ "${GPU_TYPE}" = "cuda" ]; then
+        CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
+    elif [ -n "${GPU_TYPE}" ]; then
+        echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
+        exit 1
     fi
     if [ ! -f config.yaml ]; then
         ilab init --non-interactive
@@ -276,7 +279,7 @@ EOF
         EXTRA_ARGS="${EXTRA_ARGS} --precheck-endpoint-url ${PRECHECK_ENDPOINT_URL}"
     fi
 
-    # Check if SDG_ENDPOINT_URL is set and TLS_SECRETS_EXISTS is true
+    # Check if SDG_ENDPOINT_URL is set
     if [ -n "${SDG_ENDPOINT_URL}" ]; then
         EXTRA_ARGS="${EXTRA_ARGS} --sdg-endpoint-url ${SDG_ENDPOINT_URL} "
     fi
@@ -288,7 +291,7 @@ EOF
 
     # Check if tls cert and key are set
     if [ "${TLS_SECRETS_EXISTS}" -eq 1 ]; then
-        EXTRA_ARGS="${EXTRA_ARGS} --tls-client-key ${TLS_SECRETS_DIR}/tls-client.key --tls-client-cert ${TLS_SECRETS_DIR}/tls-cert.key --tls-server-ca-cert ${TLS_SECRETS_DIR}/tls-server-ca.crt"
+        EXTRA_ARGS="${EXTRA_ARGS} --tls-client-key ${TLS_SECRETS_DIR}/$TLS_CLIENT_KEY_FILE --tls-client-cert ${TLS_SECRETS_DIR}/$TLS_CLIENT_CERT_FILE --tls-server-ca-cert ${TLS_SECRETS_DIR}/$TLS_SERVER_CA_CERT_FILE"
     fi
 
     cat << EOF > labbotworker.service
