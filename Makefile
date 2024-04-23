@@ -96,6 +96,10 @@ worker-test-image: worker/Containerfile.test ## Build container image for a test
 	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.test\n" "[PODMAN]"
 	$(CMD_PREFIX) podman build -f worker/Containerfile.test -t ghcr.io/instructlab/instructlab-bot/instructlab-serve:main .
 
+ilabserve-base-image: worker/Containerfile.servebase ## Build container image for ilab serve
+	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.servebase\n" "[PODMAN]"
+	$(CMD_PREFIX) podman build -f worker/Containerfile.servebase -t ghcr.io/instructlab/instructlab-bot/instructlab-serve-base:main .
+
 .PHONY: gobot
 gobot: gobot/gobot ## Build gobot
 
