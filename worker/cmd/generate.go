@@ -153,21 +153,19 @@ var generateCmd = &cobra.Command{
 		svc := s3.NewFromConfig(cfg)
 
 		sigChan := make(chan os.Signal, 1)
-		jobChan := make(chan string)
 		stopChan := make(chan struct{})
 
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		go func(jobChan chan<- string, stopChan <-chan struct{}) {
+		go func(stopChan <-chan struct{}) {
 			defer wg.Done()
 			timer := time.NewTicker(1 * time.Second)
 			for {
 				select {
 				case <-stopChan:
 					sugar.Info("Shutting down job listener")
-					close(jobChan)
 					return
 				case <-timer.C:
 					conn := pool.Get()
@@ -179,10 +177,16 @@ var generateCmd = &cobra.Command{
 						sugar.Errorf("Could not pop from redis queue: %v", err)
 						continue
 					}
-					jobChan <- job
+					NewJobProcessor(ctx, pool, svc, sugar, job,
+						PreCheckEndpointURL,
+						SdgEndpointURL,
+						TlsClientCertPath,
+						TlsClientKeyPath,
+						TlsServerCaCertPath,
+						MaxSeed).processJob()
 				}
 			}
-		}(jobChan, stopChan)
+		}(stopChan)
 
 		wg.Add(1)
 		go func(ch <-chan os.Signal) {
@@ -191,15 +195,6 @@ var generateCmd = &cobra.Command{
 			sugar.Info("Shutting down")
 			close(stopChan)
 		}(sigChan)
-
-		wg.Add(1)
-		go func(ch <-chan string) {
-			defer wg.Done()
-			for job := range ch {
-				jp := NewJobProcessor(ctx, pool, svc, sugar, job, PreCheckEndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath, MaxSeed)
-				jp.processJob()
-			}
-		}(jobChan)
 
 		wg.Wait()
 	},
@@ -406,6 +401,8 @@ func (w *Worker) processJob() {
 
 	// If in test mode, immediately post to the results queue
 	if TestMode {
+		//sleep to simulate processing time
+		time.Sleep(10 * time.Second)
 		w.postJobResults("https://example.com", jobType)
 		sugar.Info("Job done (test mode)")
 		return
