@@ -147,7 +147,7 @@ func generateFormattedJSON(ctx context.Context, outputDir, filename string, svc 
    document.addEventListener("DOMContentLoaded", function() {
        var container = document.getElementById('json-editor');
        var options = {
-           mode: 'preview',
+           mode: 'view',
            modes: ['code', 'form', 'text', 'tree', 'view', 'preview']
        };
        var editor = new JSONEditor(container, options);
