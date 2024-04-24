@@ -1087,6 +1087,13 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 				})
 			}
 
+			var contentType string
+			if strings.HasSuffix(filename, ".json") || strings.Contains(filename, "json-viewer.html") {
+				contentType = "application/json-lines+json"
+			} else {
+				contentType = "text/plain"
+			}
+
 			// Upload the job file and add it to the publicFiles list
 			file, err := os.Open(fullPath)
 			if err != nil {
@@ -1100,7 +1107,7 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 				Bucket:      aws.String(S3Bucket),
 				Key:         aws.String(upKey),
 				Body:        file,
-				ContentType: aws.String("application/json-lines+json"),
+				ContentType: aws.String(contentType),
 			})
 			if err != nil {
 				sugar.Errorf("Could not upload file to S3: %v", err)
