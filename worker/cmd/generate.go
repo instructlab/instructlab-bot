@@ -132,7 +132,9 @@ var generateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := initLogger(Debug)
 		sugar := logger.Sugar()
-		ctx := cmd.Context()
+
+		ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
+		defer cancel()
 
 		sugar.Info("Starting generate worker")
 
@@ -916,7 +918,7 @@ func (w *Worker) datagenSvc(taxonomyFiles []string, outputDir string, numSamples
 			requestURL = strings.Replace(requestURL, "skill", "knowledge", -1)
 		}
 
-		request, err := http.NewRequest("POST", requestURL, bytes.NewBuffer(jsonData))
+		request, err := http.NewRequestWithContext(w.ctx, "POST", requestURL, bytes.NewBuffer(jsonData))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
