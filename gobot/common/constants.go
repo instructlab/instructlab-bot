@@ -24,3 +24,18 @@ const (
 
 	InstructLabBotUrl = "https://github.com/instructlab/instructlab-bot"
 )
+
+const (
+	RedisKeyJobs           = "jobs"
+	RedisKeyPRNumber       = "pr_number"
+	RedisKeyPRSHA          = "pr_sha"
+	RedisKeyAuthor         = "author"
+	RedisKeyInstallationID = "installation_id"
+	RedisKeyRepoOwner      = "repo_owner"
+	RedisKeyRepoName       = "repo_name"
+	RedisKeyJobType        = "job_type"
+	RedisKeyErrors         = "errors"
+	RedisKeyRequestTime    = "request_time"
+	RedisKeyDuration       = "duration"
+	RedisKeyStatus         = "status"
+)

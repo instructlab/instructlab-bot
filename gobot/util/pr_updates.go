@@ -92,9 +92,9 @@ func PostPullRequestCheck(ctx context.Context, client *github.Client, params Pul
 
 func PostPullRequestStatus(ctx context.Context, client *github.Client, params PullRequestStatusParams) error {
 	status := &github.RepoStatus{
-		State:       github.String(params.Conclusion), // Status state: success, failure, error, or pending
-		Description: github.String(params.StatusDesc), // Status description
-		Context:     github.String(params.CheckName),  // Status context
+		State:       github.String(params.Conclusion),        // Status state: success, failure, error, or pending
+		Description: github.String(params.StatusDesc),        // Status description
+		Context:     github.String(params.CheckName),         // Status context
 		TargetURL:   github.String(common.InstructLabBotUrl), // Target URL to redirect
 	}
 	_, _, err := client.Repositories.CreateStatus(ctx, params.RepoOwner, params.RepoName, params.PrSha, status)
