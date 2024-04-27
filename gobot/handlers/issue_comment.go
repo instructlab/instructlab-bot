@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/go-github/v60/github"
+	"github.com/instructlab/instructlab-bot/gobot/common"
 	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
@@ -69,6 +70,12 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	var event github.IssueCommentEvent
 	if err := json.Unmarshal(payload, &event); err != nil {
 		return errors.Wrap(err, "failed to parse issue comment event payload")
+	}
+
+	if event.GetRepo().GetName() != common.RepoName {
+		h.Logger.Warnf("Received unexpected event %s from %s/%s repo. Skipping the event.",
+			eventType, event.GetOrganization().GetLogin(), event.GetRepo().GetName())
+		return nil
 	}
 
 	if !event.GetIssue().IsPullRequest() {
@@ -225,20 +232,20 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	var statusName string
 	switch jobType {
 	case "generate":
-		checkName = util.GenerateLocalCheck
-		statusName = util.GenerateLocalStatus
+		checkName = common.GenerateLocalCheck
+		statusName = common.GenerateLocalStatus
 	case "precheck":
-		checkName = util.PrecheckCheck
-		statusName = util.PrecheckStatus
+		checkName = common.PrecheckCheck
+		statusName = common.PrecheckStatus
 	case "sdg-svc":
-		checkName = util.GenerateSDGCheck
-		statusName = util.GenerateSDGStatus
+		checkName = common.GenerateSDGCheck
+		statusName = common.GenerateSDGStatus
 	default:
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
 
 	params := util.PullRequestStatusParams{
-		Status:       util.CheckInProgress,
+		Status:       common.CheckInProgress,
 		CheckSummary: summaryMsg,
 		CheckDetails: detailsMsg,
 		Comment:      commentMsg,
@@ -340,9 +347,9 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:     util.CheckComplete,
-		Conclusion: util.CheckStatusFailure,
-		CheckName:  util.GenerateLocalCheck,
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.GenerateLocalCheck,
 		RepoOwner:  prComment.repoOwner,
 		RepoName:   prComment.repoName,
 		PrNum:      prComment.prNum,
@@ -387,9 +394,9 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:     util.CheckComplete,
-		Conclusion: util.CheckStatusFailure,
-		CheckName:  util.PrecheckCheck,
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.PrecheckCheck,
 		RepoOwner:  prComment.repoOwner,
 		RepoName:   prComment.repoName,
 		PrNum:      prComment.prNum,
@@ -433,9 +440,9 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:     util.CheckComplete,
-		Conclusion: util.CheckStatusFailure,
-		CheckName:  util.GenerateSDGCheck,
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.GenerateSDGCheck,
 		RepoOwner:  prComment.repoOwner,
 		RepoName:   prComment.repoName,
 		PrNum:      prComment.prNum,

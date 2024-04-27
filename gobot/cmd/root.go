@@ -16,6 +16,7 @@ import (
 	gosmee "github.com/chmouel/gosmee/gosmee"
 	"github.com/go-redis/redis"
 	"github.com/gregjones/httpcache"
+	"github.com/instructlab/instructlab-bot/gobot/common"
 	"github.com/instructlab/instructlab-bot/gobot/handlers"
 	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
@@ -329,11 +330,11 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 			var statusContext string
 			switch jobType {
 			case "generate":
-				statusContext = util.GenerateLocalCheck
+				statusContext = common.GenerateLocalCheck
 			case "precheck":
-				statusContext = util.PrecheckCheck
+				statusContext = common.PrecheckCheck
 			case "sdg-svc":
-				statusContext = util.GenerateSDGCheck
+				statusContext = common.GenerateSDGCheck
 			default:
 				logger.Errorf("Unknown job type: %s", jobType)
 			}
@@ -356,8 +357,8 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 				errCommentBody := fmt.Sprintf("An error occurred while processing your request, please review the following log for job id %s :\n\n```\n%s\n```", result, prErrors)
 
 				params := util.PullRequestStatusParams{
-					Status:       util.CheckComplete,
-					Conclusion:   util.CheckStatusFailure,
+					Status:       common.CheckComplete,
+					Conclusion:   common.CheckStatusFailure,
 					CheckName:    statusContext,
 					CheckSummary: JobFailed,
 					CheckDetails: errCommentBody,
@@ -405,8 +406,8 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 			summaryMsg := fmt.Sprintf("Job ID: %s completed successfully. Check Details.", result)
 
 			params := util.PullRequestStatusParams{
-				Status:       util.CheckComplete,
-				Conclusion:   util.CheckStatusSuccess,
+				Status:       common.CheckComplete,
+				Conclusion:   common.CheckStatusSuccess,
 				JobID:        result,
 				JobType:      jobType,
 				CheckName:    statusContext,

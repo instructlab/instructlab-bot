@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/go-github/v60/github"
+	"github.com/instructlab/instructlab-bot/gobot/common"
 	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
@@ -27,6 +28,12 @@ func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID s
 	var event github.PullRequestEvent
 	if err := json.Unmarshal(payload, &event); err != nil {
 		return errors.Wrap(err, "failed to parse issue comment event payload")
+	}
+
+	if event.GetRepo().GetName() != common.RepoName {
+		h.Logger.Warnf("Received unexpected event %s from %s/%s repo. Skipping the event.",
+			eventType, event.GetOrganization().GetLogin(), event.GetRepo().GetName())
+		return nil
 	}
 
 	if event.GetAction() != "labeled" {
@@ -62,7 +69,7 @@ func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID s
 	}
 
 	params := util.PullRequestStatusParams{
-		CheckName: util.BotReadyStatus,
+		CheckName: common.BotReadyStatus,
 		RepoOwner: repoOwner,
 		RepoName:  repoName,
 		PrNum:     prNum,
@@ -70,7 +77,7 @@ func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID s
 	}
 
 	// Check if the bot readiness status already exists
-	enable, err := util.StatusExist(ctx, client, params, util.BotReadyStatus)
+	enable, err := util.StatusExist(ctx, client, params, common.BotReadyStatus)
 	if err != nil {
 		h.Logger.Errorf("Failed to check bot enable status: %v", err)
 		return nil
