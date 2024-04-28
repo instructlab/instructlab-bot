@@ -158,6 +158,7 @@ func TestFetchModelName(t *testing.T) {
 		"dummy-client-key-path.pem",
 		"dummy-ca-cert-path.pem",
 		20,
+		"immediate",
 	)
 
 	modelName, err := w.fetchModelName(false)
@@ -219,6 +220,7 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 		"dummy-client-key-path.pem",
 		"dummy-ca-cert-path.pem",
 		20,
+		"lazy",
 	)
 	modelName, err := w.fetchModelName(false)
 
