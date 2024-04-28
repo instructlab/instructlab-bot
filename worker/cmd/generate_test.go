@@ -101,8 +101,25 @@ func TestGenerateIndexHTML(t *testing.T) {
 	<ul>
 		<li><a href="http://example.com/file1">file1</a></li>
 		<li><a href="http://example.com/file2">file2</a></li>
+		<li><a href="#" id="openAllTabs">open all tabs</a></li>
 	</ul>
 </body>
+<script>
+	document.getElementById("openAllTabs").addEventListener("click", function(event) {
+        event.preventDefault();
+        var urls = [
+			"http://example.com/file1",
+			"http://example.com/file2",
+		]
+        urls.forEach(function(url) {
+            var newTab = window.open(url, '_blank');
+            if (!newTab || newTab.closed || typeof newTab.closed == 'undefined') {
+                alert("It seems that your ad blocker is preventing some tabs from opening. Please disable it for this site to open all tabs.");
+                return;
+            }
+        });
+    });
+</script>
 </html>`
 
 	normalizedExpected := normalizeHTML(expected)

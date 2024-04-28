@@ -82,8 +82,26 @@ func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map
 	{{- range .Files}}
 		<li><a href="{{ .url }}">{{ .name }}</a></li>
 	{{- end }}
+		<li><a href="#" id="openAllTabs">open all tabs</a></li>
 	</ul>
 </body>
+<script>
+	document.getElementById("openAllTabs").addEventListener("click", function(event) {
+        event.preventDefault();
+        var urls = [
+		{{- range .Files}}
+			"{{ .url }}",
+		{{- end }}
+		]
+        urls.forEach(function(url) {
+            var newTab = window.open(url, '_blank');
+            if (!newTab || newTab.closed || typeof newTab.closed == 'undefined') {
+                alert("It seems that your ad blocker is preventing some tabs from opening. Please disable it for this site to open all tabs.");
+                return;
+            }
+        });
+    });
+</script>
 </html>`
 
 	tmpl, err := template.New("index").Parse(INDEX_HTML)
