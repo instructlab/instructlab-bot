@@ -1,0 +1,10 @@
+name: Check for at command
+
+on: [push, pull_request]
+
+jobs:
+  check-at-command:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for at command
+        run: dpkg-query -l at
