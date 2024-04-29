@@ -12,3 +12,10 @@ models
 generated
 .idea
 .DS_Store
+
+# UI assets
+**/node_modules
+dist
+yarn-error.log
+yarn.lock
+stats.json
