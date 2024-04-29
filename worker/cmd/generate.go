@@ -66,6 +66,13 @@ const (
 	jsonViewerFilenameSuffix = "-viewer.html"
 )
 
+const (
+	jobStatusSuccess = "success"
+	jobStatusError   = "error"
+	jobStatusRunning = "running"
+	jobStatusPending = "pending"
+)
+
 // Worker encapsulates dependencies and methods to process jobs
 type Worker struct {
 	ctx                 context.Context
@@ -383,6 +390,12 @@ func (w *Worker) processJob() {
 	// Get a new Redis connection from the pool for this operation
 	conn := w.pool.Get()
 	defer conn.Close()
+
+	// Set job status to 'pending'
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:status", w.job), jobStatusRunning); err != nil {
+		sugar.Errorf("Could not set job status to pending in redis: %v", err)
+		return
+	}
 
 	prNumber, err := redis.String(conn.Do("GET", fmt.Sprintf("jobs:%s:pr_number", w.job)))
 	if err != nil {
@@ -737,6 +750,10 @@ func (w *Worker) postJobResults(URL, jobType string) {
 		w.logger.Errorf("Could not set job duration in redis: %v", err)
 	}
 
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:status", w.job), jobStatusSuccess); err != nil {
+		w.logger.Errorf("Could not set job status in redis: %v", err)
+	}
+
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", w.job), URL); err != nil {
 		w.logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
@@ -846,8 +863,12 @@ func (w *Worker) reportJobError(err error) {
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:errors", w.job), err.Error()); err != nil {
 		w.logger.Errorf("Failed to set the error for job %s: %v", w.job, err)
 		return
-
 	}
+
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:status", w.job), jobStatusError); err != nil {
+		w.logger.Errorf("Could not set job status in redis: %v", err)
+	}
+
 	if _, err := conn.Do("LPUSH", "results", w.job); err != nil {
 		w.logger.Errorf("Could not push error results to redis queue: %v", err)
 		return

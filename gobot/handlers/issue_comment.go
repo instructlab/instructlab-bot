@@ -36,6 +36,7 @@ const (
 	RedisKeyErrors         = "errors"
 	RedisKeyRequestTime    = "request_time"
 	RedisKeyDuration       = "duration"
+	RedisKeyStatus         = "status"
 )
 
 type PRCommentHandler struct {
@@ -192,6 +193,11 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	}
 
 	err = setJobKey(r, jobNumber, RedisKeyErrors, "")
+	if err != nil {
+		return err
+	}
+
+	err = setJobKey(r, jobNumber, RedisKeyStatus, util.CheckStatusPending)
 	if err != nil {
 		return err
 	}
