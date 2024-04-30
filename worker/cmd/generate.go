@@ -796,7 +796,6 @@ func (w *Worker) fetchModelName(fullName bool) (string, error) {
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout = 10 * time.Second
-	http.DefaultTransport.(*http.Transport).ResponseHeaderTimeout = 10 * time.Second
 	http.DefaultTransport.(*http.Transport).ExpectContinueTimeout = 1 * time.Second
 
 	req, err := http.NewRequestWithContext(w.ctx, "GET", endpoint, nil)
@@ -997,7 +996,6 @@ func (w *Worker) createTLSHttpClient() (*http.Client, error) {
 		Transport: &http.Transport{
 			TLSClientConfig:       tlsConfig,
 			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: 10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}

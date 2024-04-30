@@ -14,7 +14,7 @@ import (
 	"time"
 
 	gosmee "github.com/chmouel/gosmee/gosmee"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gregjones/httpcache"
 	"github.com/instructlab/instructlab-bot/gobot/common"
 	"github.com/instructlab/instructlab-bot/gobot/handlers"
@@ -28,7 +28,9 @@ import (
 )
 
 const (
-	JobFailed = "Command execution failed. Check details."
+	JobFailed          = "Command execution failed. Check details."
+	redisQueueResults  = "results"
+	redisQueueArchived = "archived"
 )
 
 var (
@@ -228,7 +230,6 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) {
 }
 
 func receiveResults(ctx context.Context, redisHostPort string, logger *zap.SugaredLogger, cc githubapp.ClientCreator) {
-
 	r := redis.NewClient(&redis.Options{
 		Addr:     redisHostPort,
 		Password: "", // no password set
@@ -238,33 +239,42 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Info("Context cancelled, stopping receiveResults")
 			return
 		default:
-			count, err := r.LLen("results").Result()
+			count, err := r.LLen(ctx, redisQueueResults).Result()
 			if err != nil {
 				logger.Errorf("Redis Client Error: %v", err)
 				continue
 			}
 			if count == 0 {
+				logger.Debugf("No jobs in results, sleeping for 5 seconds")
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			result, err := r.RPop("results").Result()
+
+			// Use LMove to move the job from "results" to the "archived" list
+			result, err := r.LMove(ctx, redisQueueResults, redisQueueArchived, "RIGHT", "LEFT").Result()
 			if err != nil {
-				logger.Errorf("Redis Client Error: %v", err)
+				logger.Errorf("Redis Client Error during LMove: %v", err)
 				continue
 			}
 
 			if result == "" {
+				logger.Info("No job moved, possibly due to an empty 'results' list")
 				continue
 			}
-			prNumber, err := r.Get(buildRedisKey(result, common.RedisKeyPRNumber)).Result()
+
+			// Log that the job has been archived successfully
+			logger.Debugf("Job %s moved to archive queue successfully.", result)
+
+			prNumber, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyPRNumber)).Result()
 			if err != nil || prNumber == "" {
 				logger.Errorf("No PR number found for job %s", result)
 				continue
 			}
 
-			installID, err := r.Get(buildRedisKey(result, common.RedisKeyInstallationID)).Result()
+			installID, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyInstallationID)).Result()
 			if err != nil || installID == "" {
 				logger.Errorf("No installation ID found for job %s", result)
 				continue
@@ -275,31 +285,31 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 				continue
 			}
 
-			repoOwner, err := r.Get(buildRedisKey(result, common.RedisKeyRepoOwner)).Result()
+			repoOwner, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyRepoOwner)).Result()
 			if err != nil || repoOwner == "" {
 				logger.Errorf("No repo owner found for job %s", result)
 				continue
 			}
 
-			repoName, err := r.Get(buildRedisKey(result, common.RedisKeyRepoName)).Result()
+			repoName, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyRepoName)).Result()
 			if err != nil || repoName == "" {
 				logger.Errorf("No repo name found for job %s", result)
 				continue
 			}
 
-			jobType, err := r.Get(buildRedisKey(result, common.RedisKeyJobType)).Result()
+			jobType, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyJobType)).Result()
 			if err != nil || jobType == "" {
 				logger.Errorf("No job type found for job %s", result)
 				continue
 			}
 
-			prSha, err := r.Get(buildRedisKey(result, common.RedisKeyPRSHA)).Result()
+			prSha, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyPRSHA)).Result()
 			if err != nil || prSha == "" {
 				logger.Errorf("No PR SHA found for job %s", result)
 				continue
 			}
 
-			requestTimeStr, err := r.Get(buildRedisKey(result, common.RedisKeyRequestTime)).Result()
+			requestTimeStr, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyRequestTime)).Result()
 			if err != nil || requestTimeStr == "" {
 				logger.Errorf("No request time found for job %s", result)
 				continue
@@ -313,7 +323,8 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 
 			prURL := fmt.Sprintf("https://github.com/%s/%s/pull/%s", repoOwner, repoName, prNumber)
 
-			jobDuration, err := r.Get(buildRedisKey(result, common.RedisKeyDuration)).Result()
+			jobDuration, err := r.Get(ctx, buildRedisKey(result, common.RedisKeyDuration)).Result()
+
 			if err != nil || jobDuration == "" {
 				logger.Infof("Job result for %s/%s#%s, job ID: %s, GitHub URL: %s (No job duration time found for job)", repoOwner, repoName, prNumber, result, prURL)
 			} else {
@@ -352,7 +363,7 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 			}
 
 			// check for errors prior to checking for an S3 url and models since that will not get produced on a failure
-			prErrors, _ := r.Get("jobs:" + result + ":errors").Result()
+			prErrors, _ := r.Get(ctx, "jobs:"+result+":errors").Result()
 			if prErrors != "" {
 				errCommentBody := fmt.Sprintf("An error occurred while processing your request, please review the following log for job id %s :\n\n```\n%s\n```", result, prErrors)
 
@@ -385,13 +396,13 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 				continue
 			}
 
-			s3Url, err := r.Get("jobs:" + result + ":s3_url").Result()
+			s3Url, err := r.Get(ctx, "jobs:"+result+":s3_url").Result()
 			if err != nil || s3Url == "" {
 				logger.Errorf("No S3 URL found for job %s", result)
 				continue
 			}
 
-			modelName, err := r.Get("jobs:" + result + ":model_name").Result()
+			modelName, err := r.Get(ctx, "jobs:"+result+":model_name").Result()
 			if err != nil || modelName == "" || modelName == "unknown" {
 				logger.Infof("No specific model name found for job %s, using generic message.", result)
 				modelName = ""
@@ -444,19 +455,19 @@ func buildRedisKey(jobID, keyType string) string {
 }
 
 //lint:ignore U1000
-func cleanupRedisKeys(logger *zap.SugaredLogger, r *redis.Client, jobID string) {
+func cleanupRedisKeys(ctx context.Context, logger *zap.SugaredLogger, r *redis.Client, jobID string) {
 	matchKey := fmt.Sprintf("%s:%s:*", common.RedisKeyJobs, jobID)
 	var cursor uint64 = 0
 
 	for {
-		keys, nextCursor, err := r.Scan(cursor, matchKey, 0).Result()
+		keys, nextCursor, err := r.Scan(ctx, cursor, matchKey, 0).Result()
 		if err != nil {
 			logger.Errorf("Error scanning keys matching to %s: %v", matchKey, err)
 			return
 		}
 
 		for _, key := range keys {
-			err := r.Del(key).Err()
+			err := r.Del(ctx, key).Err()
 			if err != nil {
 				logger.Warnf("Error deleting key %s: %v", key, err)
 			}
