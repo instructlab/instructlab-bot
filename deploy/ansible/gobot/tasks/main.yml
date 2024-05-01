@@ -13,12 +13,13 @@
     state: started
     pull: always
     env:
-      ILBOT_GITHUB_INTEGRATION_ID: "{{ app_id }}"
-      ILBOT_GITHUB_APP_PRIVATE_KEY: "{{ private_key }}"
-      ILBOT_GITHUB_WEBHOOK_SECRET: "{{ webhook_secret }}"
-      ILBOT_WEBHOOK_PROXY_URL: "{{ webhook_proxy_url }}"
-      ILBOT_REDIS: "{{ redis_ip }}:6379"
-      ILBOT_HTTP_ADDRESS: "127.0.0.1"
-      ILBOT_HTTP_PORT: "8080"
+      ILBOT_GITHUB_INTEGRATION_ID: "{{ app_id }}"  # Github App Id after bot's registration.
+      ILBOT_GITHUB_APP_PRIVATE_KEY: "{{ private_key }}"  # Private key generate for the bot app
+      ILBOT_GITHUB_WEBHOOK_SECRET: "{{ webhook_secret }}"  # Webhook secret created during bot registration
+      ILBOT_WEBHOOK_PROXY_URL: "{{ webhook_proxy_url }}"  # Webhook URL set for the bot application to receive webhook events
+      ILBOT_REDIS: "{{ redis_ip }}:6379"  # Redis address to push and pull the jobs and results
+      ILBOT_HTTP_ADDRESS: "127.0.0.1"  # Bot's local http server ip address
+      ILBOT_HTTP_PORT: "8080"  # Bot's local http server port
+      # List of teams that are allowed to run bot commands on the PR
       ILBOT_MAINTAINERS: "taxonomy-triagers,taxonomy-approvers,taxonomy-maintainers,labrador-org-maintainers,instruct-lab-bot-maintainers"
-      ILBOT_REQUIRED_LABELS: "skill,knowledge"
+      ILBOT_REQUIRED_LABELS: "skill,knowledge"  # Labels required on each PR to run any bot command.
