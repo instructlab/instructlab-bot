@@ -4,7 +4,6 @@ go 1.21
 
 require (
 	github.com/chmouel/gosmee v0.21.0
-	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/google/go-github/v60 v60.0.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
