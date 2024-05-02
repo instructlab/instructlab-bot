@@ -14,7 +14,7 @@ RUN go build -o instructlab-bot-worker main.go && \
 
 FROM fedora:latest as base
 
-RUN dnf install -y python openssh git python3-pip make automake gcc gcc-c++ python3-devel && \
+RUN dnf install -y python openssh git python3-pip make automake gcc gcc-c++ python3-devel procps && \
     mkdir ~/.ssh && ssh-keyscan github.com > ~/.ssh/known_hosts && \
     python -m ensurepip && \
     dnf install -y gcc cmake gcc-c++ && \

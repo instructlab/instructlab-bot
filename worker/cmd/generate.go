@@ -87,6 +87,7 @@ type Worker struct {
 	tlsClientKeyPath    string
 	tlsServerCaCertPath string
 	maxSeed             int
+	cmdRun              string
 }
 
 func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
@@ -322,28 +323,33 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				continue
 			}
 
-			chatArgs := []string{"chat", "--quick-question", question}
 			context, hasContext := example["context"].(string)
+			// Slicing args breaks ilab chat for context, use Sprintf to control spacing
 			if hasContext {
-				chatArgs = append(chatArgs, "--context", context)
+				// Append the context to the question with a specific format
+				question = fmt.Sprintf("%s Answer this based on the following context: %s.", question, context)
 			}
+			commandStr := fmt.Sprintf("chat --quick-question %s", question)
 			if TlsInsecure {
-				chatArgs = append(chatArgs, "--tls-insecure")
+				commandStr += " --tls-insecure"
 			}
 			if PreCheckEndpointURL != localEndpoint && modelName != "unknown" {
-				chatArgs = append(chatArgs, "--endpoint-url", PreCheckEndpointURL, "--model", modelName)
+				commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, modelName)
 			}
-
-			cmd := exec.Command(lab, chatArgs...)
+			cmdArgs := strings.Fields(commandStr)
+			cmd := exec.Command(lab, cmdArgs...)
+			w.cmdRun = cmd.String()
 			w.logger.Infof("Running the precheck command: %s", cmd.String())
+
 			cmd.Dir = workDir
 			cmd.Env = os.Environ()
-			cmd.Stderr = os.Stderr
 			var out bytes.Buffer
+			var errOut bytes.Buffer
 			cmd.Stdout = &out
+			cmd.Stderr = &errOut
 			err = cmd.Run()
 			if err != nil {
-				w.logger.Error(err)
+				w.logger.Errorf("Precheck command failed with error: %v; stderr: %s", err, errOut.String())
 				continue
 			}
 
@@ -755,6 +761,10 @@ func (w *Worker) postJobResults(URL, jobType string) {
 
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:s3_url", w.job), URL); err != nil {
 		w.logger.Errorf("Could not set s3_url in redis: %v", err)
+	}
+
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:cmd", w.job), w.cmdRun); err != nil {
+		w.logger.Errorf("Could not set cmd in redis: %v", err)
 	}
 
 	modelName := w.determineModelName(jobType)
