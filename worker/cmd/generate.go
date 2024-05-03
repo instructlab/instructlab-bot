@@ -87,6 +87,7 @@ type Worker struct {
 	tlsClientKeyPath    string
 	tlsServerCaCertPath string
 	maxSeed             int
+	cmdRun              string
 }
 
 func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
@@ -139,7 +140,9 @@ var generateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := initLogger(Debug)
 		sugar := logger.Sugar()
-		ctx := cmd.Context()
+
+		ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
+		defer cancel()
 
 		sugar.Info("Starting generate worker")
 
@@ -160,21 +163,19 @@ var generateCmd = &cobra.Command{
 		svc := s3.NewFromConfig(cfg)
 
 		sigChan := make(chan os.Signal, 1)
-		jobChan := make(chan string)
 		stopChan := make(chan struct{})
 
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		go func(jobChan chan<- string, stopChan <-chan struct{}) {
+		go func(stopChan <-chan struct{}) {
 			defer wg.Done()
 			timer := time.NewTicker(1 * time.Second)
 			for {
 				select {
 				case <-stopChan:
 					sugar.Info("Shutting down job listener")
-					close(jobChan)
 					return
 				case <-timer.C:
 					conn := pool.Get()
@@ -186,10 +187,16 @@ var generateCmd = &cobra.Command{
 						sugar.Errorf("Could not pop from redis queue: %v", err)
 						continue
 					}
-					jobChan <- job
+					NewJobProcessor(ctx, pool, svc, sugar, job,
+						PreCheckEndpointURL,
+						SdgEndpointURL,
+						TlsClientCertPath,
+						TlsClientKeyPath,
+						TlsServerCaCertPath,
+						MaxSeed).processJob()
 				}
 			}
-		}(jobChan, stopChan)
+		}(stopChan)
 
 		wg.Add(1)
 		go func(ch <-chan os.Signal) {
@@ -198,15 +205,6 @@ var generateCmd = &cobra.Command{
 			sugar.Info("Shutting down")
 			close(stopChan)
 		}(sigChan)
-
-		wg.Add(1)
-		go func(ch <-chan string) {
-			defer wg.Done()
-			for job := range ch {
-				jp := NewJobProcessor(ctx, pool, svc, sugar, job, PreCheckEndpointURL, SdgEndpointURL, TlsClientCertPath, TlsClientKeyPath, TlsServerCaCertPath, MaxSeed)
-				jp.processJob()
-			}
-		}(jobChan)
 
 		wg.Wait()
 	},
@@ -325,28 +323,33 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				continue
 			}
 
-			chatArgs := []string{"chat", "--quick-question", question}
 			context, hasContext := example["context"].(string)
+			// Slicing args breaks ilab chat for context, use Sprintf to control spacing
 			if hasContext {
-				chatArgs = append(chatArgs, "--context", context)
+				// Append the context to the question with a specific format
+				question = fmt.Sprintf("%s Answer this based on the following context: %s.", question, context)
 			}
+			commandStr := fmt.Sprintf("chat --quick-question %s", question)
 			if TlsInsecure {
-				chatArgs = append(chatArgs, "--tls-insecure")
+				commandStr += " --tls-insecure"
 			}
 			if PreCheckEndpointURL != localEndpoint && modelName != "unknown" {
-				chatArgs = append(chatArgs, "--endpoint-url", PreCheckEndpointURL, "--model", modelName)
+				commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, modelName)
 			}
-
-			cmd := exec.Command(lab, chatArgs...)
+			cmdArgs := strings.Fields(commandStr)
+			cmd := exec.Command(lab, cmdArgs...)
+			w.cmdRun = cmd.String()
 			w.logger.Infof("Running the precheck command: %s", cmd.String())
+
 			cmd.Dir = workDir
 			cmd.Env = os.Environ()
-			cmd.Stderr = os.Stderr
 			var out bytes.Buffer
+			var errOut bytes.Buffer
 			cmd.Stdout = &out
+			cmd.Stderr = &errOut
 			err = cmd.Run()
 			if err != nil {
-				w.logger.Error(err)
+				w.logger.Errorf("Precheck command failed with error: %v; stderr: %s", err, errOut.String())
 				continue
 			}
 
@@ -419,6 +422,8 @@ func (w *Worker) processJob() {
 
 	// If in test mode, immediately post to the results queue
 	if TestMode {
+		//sleep to simulate processing time
+		time.Sleep(10 * time.Second)
 		w.postJobResults("https://example.com", jobType)
 		sugar.Info("Job done (test mode)")
 		return
@@ -758,6 +763,10 @@ func (w *Worker) postJobResults(URL, jobType string) {
 		w.logger.Errorf("Could not set s3_url in redis: %v", err)
 	}
 
+	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:cmd", w.job), w.cmdRun); err != nil {
+		w.logger.Errorf("Could not set cmd in redis: %v", err)
+	}
+
 	modelName := w.determineModelName(jobType)
 
 	if _, err := conn.Do("SET", fmt.Sprintf("jobs:%s:model_name", w.job), modelName); err != nil {
@@ -796,6 +805,8 @@ func (w *Worker) fetchModelName(fullName bool) (string, error) {
 	endpoint += "models"
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout = 10 * time.Second
+	http.DefaultTransport.(*http.Transport).ExpectContinueTimeout = 1 * time.Second
 
 	req, err := http.NewRequestWithContext(w.ctx, "GET", endpoint, nil)
 	if err != nil {
@@ -940,7 +951,7 @@ func (w *Worker) datagenSvc(taxonomyFiles []string, outputDir string, numSamples
 			requestURL = strings.Replace(requestURL, "skill", "knowledge", -1)
 		}
 
-		request, err := http.NewRequest("POST", requestURL, bytes.NewBuffer(jsonData))
+		request, err := http.NewRequestWithContext(w.ctx, "POST", requestURL, bytes.NewBuffer(jsonData))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
@@ -992,7 +1003,11 @@ func (w *Worker) createTLSHttpClient() (*http.Client, error) {
 		InsecureSkipVerify: true,
 	}
 	httpClient := &http.Client{
-		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		Transport: &http.Transport{
+			TLSClientConfig:       tlsConfig,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
 	}
 	return httpClient, nil
 }

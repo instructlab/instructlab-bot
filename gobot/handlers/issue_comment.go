@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/go-github/v60/github"
+	"github.com/instructlab/instructlab-bot/gobot/common"
 	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
@@ -22,21 +23,6 @@ const (
 	AccessCheckFailed = "Access check failed."
 	LabelsNotFound    = "Required labels not found."
 	BotEnabled        = "Bot is successfully enabled."
-)
-
-const (
-	RedisKeyJobs           = "jobs"
-	RedisKeyPRNumber       = "pr_number"
-	RedisKeyPRSHA          = "pr_sha"
-	RedisKeyAuthor         = "author"
-	RedisKeyInstallationID = "installation_id"
-	RedisKeyRepoOwner      = "repo_owner"
-	RedisKeyRepoName       = "repo_name"
-	RedisKeyJobType        = "job_type"
-	RedisKeyErrors         = "errors"
-	RedisKeyRequestTime    = "request_time"
-	RedisKeyDuration       = "duration"
-	RedisKeyStatus         = "status"
 )
 
 type PRCommentHandler struct {
@@ -69,6 +55,12 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 	var event github.IssueCommentEvent
 	if err := json.Unmarshal(payload, &event); err != nil {
 		return errors.Wrap(err, "failed to parse issue comment event payload")
+	}
+
+	if event.GetRepo().GetName() != common.RepoName {
+		h.Logger.Warnf("Received unexpected event %s from %s/%s repo. Skipping the event.",
+			eventType, event.GetOrganization().GetLogin(), event.GetRepo().GetName())
+		return nil
 	}
 
 	if !event.GetIssue().IsPullRequest() {
@@ -152,57 +144,57 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		DB:       0,  // use default DB
 	})
 
-	jobNumber, err := r.Incr(ctx, RedisKeyJobs).Result()
+	jobNumber, err := r.Incr(ctx, common.RedisKeyJobs).Result()
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyPRNumber, prComment.prNum)
+	err = setJobKey(r, jobNumber, common.RedisKeyPRNumber, prComment.prNum)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyPRSHA, prComment.prSha)
+	err = setJobKey(r, jobNumber, common.RedisKeyPRSHA, prComment.prSha)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyAuthor, prComment.author)
+	err = setJobKey(r, jobNumber, common.RedisKeyAuthor, prComment.author)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyInstallationID, prComment.installID)
+	err = setJobKey(r, jobNumber, common.RedisKeyInstallationID, prComment.installID)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyRepoOwner, prComment.repoOwner)
+	err = setJobKey(r, jobNumber, common.RedisKeyRepoOwner, prComment.repoOwner)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyRepoName, prComment.repoName)
+	err = setJobKey(r, jobNumber, common.RedisKeyRepoName, prComment.repoName)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyJobType, jobType)
+	err = setJobKey(r, jobNumber, common.RedisKeyJobType, jobType)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyErrors, "")
+	err = setJobKey(r, jobNumber, common.RedisKeyErrors, "")
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyStatus, util.CheckStatusPending)
+	err = setJobKey(r, jobNumber, common.RedisKeyStatus, common.CheckStatusPending)
 	if err != nil {
 		return err
 	}
 
-	err = setJobKey(r, jobNumber, RedisKeyRequestTime, strconv.FormatInt(time.Now().Unix(), 10))
+	err = setJobKey(r, jobNumber, common.RedisKeyRequestTime, strconv.FormatInt(time.Now().Unix(), 10))
 	if err != nil {
 		return err
 	}
@@ -225,20 +217,20 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	var statusName string
 	switch jobType {
 	case "generate":
-		checkName = util.GenerateLocalCheck
-		statusName = util.GenerateLocalStatus
+		checkName = common.GenerateLocalCheck
+		statusName = common.GenerateLocalStatus
 	case "precheck":
-		checkName = util.PrecheckCheck
-		statusName = util.PrecheckStatus
+		checkName = common.PrecheckCheck
+		statusName = common.PrecheckStatus
 	case "sdg-svc":
-		checkName = util.GenerateSDGCheck
-		statusName = util.GenerateSDGStatus
+		checkName = common.GenerateSDGCheck
+		statusName = common.GenerateSDGStatus
 	default:
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
 
 	params := util.PullRequestStatusParams{
-		Status:       util.CheckInProgress,
+		Status:       common.CheckInProgress,
 		CheckSummary: summaryMsg,
 		CheckDetails: detailsMsg,
 		Comment:      commentMsg,
@@ -340,9 +332,9 @@ func (h *PRCommentHandler) generateCommand(ctx context.Context, client *github.C
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:     util.CheckComplete,
-		Conclusion: util.CheckStatusFailure,
-		CheckName:  util.GenerateLocalCheck,
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.GenerateLocalCheck,
 		RepoOwner:  prComment.repoOwner,
 		RepoName:   prComment.repoName,
 		PrNum:      prComment.prNum,
@@ -387,9 +379,9 @@ func (h *PRCommentHandler) precheckCommand(ctx context.Context, client *github.C
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:     util.CheckComplete,
-		Conclusion: util.CheckStatusFailure,
-		CheckName:  util.PrecheckCheck,
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.PrecheckCheck,
 		RepoOwner:  prComment.repoOwner,
 		RepoName:   prComment.repoName,
 		PrNum:      prComment.prNum,
@@ -433,9 +425,9 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
 
 	params := util.PullRequestStatusParams{
-		Status:     util.CheckComplete,
-		Conclusion: util.CheckStatusFailure,
-		CheckName:  util.GenerateSDGCheck,
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.GenerateSDGCheck,
 		RepoOwner:  prComment.repoOwner,
 		RepoName:   prComment.repoName,
 		PrNum:      prComment.prNum,

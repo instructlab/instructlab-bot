@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/go-github/v60/github"
+	"github.com/instructlab/instructlab-bot/gobot/common"
 )
 
 func CheckBotEnableStatus(ctx context.Context, client *github.Client, params PullRequestStatusParams) (bool, error) {
@@ -16,7 +17,7 @@ func CheckBotEnableStatus(ctx context.Context, client *github.Client, params Pul
 	if response.StatusCode == http.StatusOK {
 		for _, status := range checkStatus.CheckRuns {
 			if status.GetHeadSHA() == params.PrSha &&
-				status.GetConclusion() == CheckStatusSuccess &&
+				status.GetConclusion() == common.CheckStatusSuccess &&
 				status.GetName() == params.CheckName {
 				return true, nil
 			}

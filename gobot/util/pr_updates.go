@@ -8,29 +8,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v60/github"
-)
-
-const (
-	CheckComplete      = "completed"
-	CheckQueued        = "queued"
-	CheckInProgress    = "in_progress"
-	CheckStatusSuccess = "success"
-	CheckStatusFailure = "failure"
-	CheckStatusError   = "error"
-	CheckStatusPending = "pending"
-
-	BotReadyStatus    = "InstructLab Bot"
-	BotReadyStatusMsg = "InstructLab bot is ready to assist!!"
-
-	PrecheckCheck      = "Precheck Check"
-	GenerateLocalCheck = "Generate Local Check"
-	GenerateSDGCheck   = "Generate SDG Check"
-
-	PrecheckStatus      = "Precheck Status"
-	GenerateLocalStatus = "Generate Local Status"
-	GenerateSDGStatus   = "Generate SDG Status"
-
-	InstructLabBotUrl = "https://github.com/instructlab/instructlab-bot"
+	"github.com/instructlab/instructlab-bot/gobot/common"
 )
 
 type PullRequestStatusParams struct {
@@ -114,10 +92,10 @@ func PostPullRequestCheck(ctx context.Context, client *github.Client, params Pul
 
 func PostPullRequestStatus(ctx context.Context, client *github.Client, params PullRequestStatusParams) error {
 	status := &github.RepoStatus{
-		State:       github.String(params.Conclusion), // Status state: success, failure, error, or pending
-		Description: github.String(params.StatusDesc), // Status description
-		Context:     github.String(params.CheckName),  // Status context
-		TargetURL:   github.String(InstructLabBotUrl), // Target URL to redirect
+		State:       github.String(params.Conclusion),        // Status state: success, failure, error, or pending
+		Description: github.String(params.StatusDesc),        // Status description
+		Context:     github.String(params.CheckName),         // Status context
+		TargetURL:   github.String(common.InstructLabBotUrl), // Target URL to redirect
 	}
 	_, _, err := client.Repositories.CreateStatus(ctx, params.RepoOwner, params.RepoName, params.PrSha, status)
 	if err != nil {
@@ -128,7 +106,7 @@ func PostPullRequestStatus(ctx context.Context, client *github.Client, params Pu
 
 func PostBotWelcomeMessage(ctx context.Context, client *github.Client, repoOwner string, repoName string, prNum int, prSha string, botName string, maintainers []string) error {
 	params := PullRequestStatusParams{
-		CheckName: BotReadyStatus,
+		CheckName: common.BotReadyStatus,
 		RepoOwner: repoOwner,
 		RepoName:  repoName,
 		PrNum:     prNum,
@@ -147,12 +125,12 @@ func PostBotWelcomeMessage(ctx context.Context, client *github.Client, repoOwner
 	if len(maintainers) > 0 {
 		detailsMsg += fmt.Sprintf("> [!NOTE] \n > **Currently only maintainers belongs to [%v] teams are allowed to run these commands**.\n", maintainers)
 	}
-	params.Status = CheckComplete
-	params.Conclusion = CheckStatusSuccess
-	params.CheckSummary = BotReadyStatusMsg
+	params.Status = common.CheckComplete
+	params.Conclusion = common.CheckStatusSuccess
+	params.CheckSummary = common.BotReadyStatusMsg
 	params.CheckDetails = detailsMsg
 	params.Comment = detailsMsg
-	params.StatusDesc = BotReadyStatusMsg
+	params.StatusDesc = common.BotReadyStatusMsg
 
 	err := PostPullRequestComment(ctx, client, params)
 	if err != nil {
