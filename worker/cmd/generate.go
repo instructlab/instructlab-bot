@@ -338,6 +338,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			}
 			cmdArgs := strings.Fields(commandStr)
 			cmd := exec.Command(lab, cmdArgs...)
+			// Register the command for reporting/logging
 			w.cmdRun = cmd.String()
 			w.logger.Infof("Running the precheck command: %s", cmd.String())
 
@@ -959,6 +960,9 @@ func (w *Worker) datagenSvc(taxonomyFiles []string, outputDir string, numSamples
 		request.Header.Set("Accept", "application/json")
 
 		w.logger.Infof("SDG Post Details: %v", request)
+
+		// Register the body for reporting/logging
+		w.cmdRun = string(jsonData)
 
 		response, err := httpClient.Do(request)
 		if err != nil {
