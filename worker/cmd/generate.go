@@ -64,6 +64,7 @@ const (
 	jobPreCheck              = "precheck"
 	sdgModel                 = "mistralai/mixtral-8x7b-instruct-v0-1"
 	jsonViewerFilenameSuffix = "-viewer.html"
+	ctxPrompt                = "Answer this based on the following context:"
 )
 
 const (
@@ -324,10 +325,11 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			}
 
 			context, hasContext := example["context"].(string)
+			originalQuestion := question
 			// Slicing args breaks ilab chat for context, use Sprintf to control spacing
 			if hasContext {
 				// Append the context to the question with a specific format
-				question = fmt.Sprintf("%s Answer this based on the following context: %s.", question, context)
+				question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
 			}
 			commandStr := fmt.Sprintf("chat --quick-question %s", question)
 			if TlsInsecure {
@@ -356,10 +358,11 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 
 			logData := map[string]interface{}{
 				"input": map[string]string{
-					"question": question,
+					"question": originalQuestion,
 				},
 				"output": out.String(),
 			}
+
 			if hasContext {
 				logData["input"].(map[string]string)["context"] = context
 			}
@@ -1102,6 +1105,26 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 		if err != nil {
 			sugar.Errorf("Could not get info for file %s: %v", filename, err)
 			continue
+		}
+
+		// Strip the context prompt out from the question in the precheck logs
+		if info.ModTime().After(w.jobStart) && strings.HasSuffix(filename, ".log") {
+			content, err := os.ReadFile(fullPath)
+			if err != nil {
+				sugar.Errorf("Could not read file: %v", err)
+				continue
+			}
+			contentStr := string(content)
+			// Split into two parts, modifying only the first occurrence in the Q section
+			parts := strings.SplitN(contentStr, ctxPrompt, 2)
+			if len(parts) > 1 {
+				modifiedContent := parts[0] + "\n" + strings.SplitN(parts[1], "\n", 2)[1]
+				err = os.WriteFile(fullPath, []byte(modifiedContent), 0644)
+				if err != nil {
+					sugar.Errorf("Could not write modified content back to file: %v", err)
+					continue
+				}
+			}
 		}
 
 		// Only process files created after the job start time
