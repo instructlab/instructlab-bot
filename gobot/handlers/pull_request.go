@@ -36,9 +36,11 @@ func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID s
 		return nil
 	}
 
-	if event.GetAction() != "labeled" {
+	if event.GetPullRequest().GetState() != "open" || event.GetAction() != "labeled" {
 		return nil
 	}
+
+	h.Logger.Debugf("Received pull request event: %v", event)
 
 	installID := githubapp.GetInstallationIDFromEvent(&event)
 	repo := event.GetRepo()
