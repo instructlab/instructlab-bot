@@ -218,6 +218,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		workDir = WorkDir
 	}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
+	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
 
 	defer func() {
 		// Move everything from chatlogDir to outputDir
@@ -227,9 +228,39 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			return
 		}
 
+		var combinedLogs []map[string]interface{}
 		for _, file := range chatlogFiles {
+			if strings.HasSuffix(file.Name(), ".yaml") {
+				// Read individual YAML files
+				content, err := os.ReadFile(path.Join(chatlogDir, file.Name()))
+				if err != nil {
+					w.logger.Errorf("Could not read file %s: %v", file.Name(), err)
+					continue
+				}
+
+				var logData map[string]interface{}
+				if err := yaml.Unmarshal(content, &logData); err != nil {
+					w.logger.Errorf("Could not unmarshal file %s: %v", file.Name(), err)
+					continue
+				}
+				combinedLogs = append(combinedLogs, logData)
+			}
+
 			if err := os.Rename(path.Join(chatlogDir, file.Name()), path.Join(outputDir, file.Name())); err != nil {
-				w.logger.Errorf("Could not move file: %v", err)
+				w.logger.Errorf("Could not move file %s: %v", file.Name(), err)
+				continue
+			}
+		}
+
+		// write the combined YAML file
+		if len(combinedLogs) > 0 {
+			combinedYAML, err := yaml.Marshal(combinedLogs)
+			if err != nil {
+				w.logger.Errorf("Could not marshal combined YAML data: %v", err)
+				return
+			}
+			if err := os.WriteFile(combinedYAMLPath, combinedYAML, 0644); err != nil {
+				w.logger.Errorf("Could not write combined YAML file: %v", err)
 				return
 			}
 		}
@@ -298,7 +329,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		var data map[string]interface{}
 		err = yaml.Unmarshal(content, &data)
 		if err != nil {
-			// Odd are, the PR was not yaml-linted since its invalid yaml failing an unmarshall
+			// Odds are, the PR was not yaml-linted since its invalid yaml failing an unmarshall
 			err = fmt.Errorf("the original taxonomy yaml likely did not pass yaml-linting, here is the unmarshalling error: %v", err)
 			w.logger.Error(err)
 			return err
