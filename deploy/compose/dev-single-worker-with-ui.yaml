@@ -1,0 +1,54 @@
+version: "3.4"
+
+services:
+  redis:
+    container_name: redis
+    image: redis:latest
+    ports:
+      - 6379:6379
+
+  bot:
+    container_name: bot
+    image: ghcr.io/instructlab/instructlab-bot/instructlab-gobot:main
+    env_file:
+      - ../../.env
+    depends_on:
+      - redis
+
+  bot-ui:
+    container_name: ui
+    image: ghcr.io/instructlab/instructlab-bot/bot-ui:main
+    ports:
+      - 8080:8080
+
+  apiserver:
+    container_name: apiserver
+    image: ghcr.io/instructlab/instructlab-bot/apiserver:main
+    depends_on:
+      - redis
+    environment:
+      # Bind on all interface
+      LISTEN_ADDRESS: "${LISTEN_ADDRESS:-:3000}"
+      REDIS_SERVER: "${REDIS_SERVER:-redis:6379}"
+      API_USER: "${API_USER:-kitteh}"
+      API_PASS: "${API_PASS:-floofykittens}"
+      DEBUG_MODE: "${DEBUG_MODE:-true}"
+      TEST_MODE: "${TEST_MODE:-true}"
+    ports:
+      - 3000:3000
+
+  worker-test:
+    container_name: worker-test
+    image: ghcr.io/instructlab/instructlab-bot/instructlab-serve:main
+    depends_on:
+      - redis
+    env_file:
+      - ../../.env
+    command:
+      [
+        "/instructlab-bot-worker",
+        "--test",
+        "--redis",
+        "redis:6379",
+        "generate",
+      ]
