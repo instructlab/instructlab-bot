@@ -77,6 +77,44 @@ make run-dev
 
 This will check if the .env file exist and deploy the dev stack.
 
+To destroy the stack:
+
+```bash
+make stop-dev
+```
+
+## Setup local development deployment with UI components
+
+If you want to deploy the bot with the UI components, you need to do the following steps:
+
+1) Build the ui and apiserver images and set the `/ui/.env`. That .env file will be copied into the container at build time, it needs to be edited before building the image.
+
+    ```text
+    IL_UI_ADMIN_USERNAME=<ui-login-username>
+    IL_UI_ADMIN_PASSWORD=<ui-login-password>
+    IL_UI_API_SERVER_USERNAME=<api-server-username>
+    IL_UI_API_SERVER_PASSWORD=<api-server-password>
+    IL_UI_API_SERVER_URL=http://localhost:3000/jobs  # Keep this as is.
+    ```
+
+2) Build the images
+
+    ```bash
+    make all-images
+    ```
+
+3) Run the stack
+
+    ```bash
+    make run-dev-ui
+    ```
+
+To destroy the stack:
+
+```bash
+make stop-dev-ui
+```
+
 ## Setup testing deployment
 
 We use ansible for deploying this setup on the AWS cloud. To deploy this setup, you will need the following to be present on your local machine:
