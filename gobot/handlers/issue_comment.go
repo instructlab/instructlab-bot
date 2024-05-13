@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/google/go-github/v60/github"
+	"github.com/google/go-github/v61/github"
 	"github.com/instructlab/instructlab-bot/gobot/common"
 	"github.com/instructlab/instructlab-bot/gobot/util"
 	"github.com/palantir/go-githubapp/githubapp"
