@@ -20,7 +20,7 @@ jobs:
           go-version-file: worker/go.mod
           cache: false
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v5
+        uses: golangci/golangci-lint-action@v6
         with:
           version: v1.54
           working-directory: worker
@@ -33,7 +33,7 @@ jobs:
           go-version-file: gobot/go.mod
           cache: false
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v5
+        uses: golangci/golangci-lint-action@v6
         with:
           version: v1.54
           working-directory: gobot
@@ -44,7 +44,7 @@ jobs:
       - name: Install required collections and roles
         run: ansible-galaxy install -r ./deploy/ansible/requirements.yml --force
       - name: Run ansible-lint
-        uses: ansible/ansible-lint@v6
+        uses: ansible/ansible-lint@v24
         with:
           working-directory: deploy
   shellcheck:
