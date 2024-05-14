@@ -218,6 +218,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		workDir = WorkDir
 	}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
+	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
+	combinedLogPath := path.Join(outputDir, "combined_chatlogs.log")
 
 	defer func() {
 		// Move everything from chatlogDir to outputDir
@@ -227,11 +229,64 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			return
 		}
 
+		var combinedLogs []map[string]interface{}
+		var combinedLogsText strings.Builder
+
 		for _, file := range chatlogFiles {
+			if strings.HasSuffix(file.Name(), ".yaml") {
+				// Read individual YAML files
+				content, err := os.ReadFile(path.Join(chatlogDir, file.Name()))
+				if err != nil {
+					w.logger.Errorf("Could not read file %s: %v", file.Name(), err)
+					continue
+				}
+
+				var logData map[string]interface{}
+				if err := yaml.Unmarshal(content, &logData); err != nil {
+					w.logger.Errorf("Could not unmarshal file %s: %v", file.Name(), err)
+					continue
+				}
+				combinedLogs = append(combinedLogs, logData)
+			} else if strings.HasSuffix(file.Name(), ".log") {
+				// Read individual log files
+				content, err := os.ReadFile(path.Join(chatlogDir, file.Name()))
+				if err != nil {
+					w.logger.Errorf("Could not read log file %s: %v", file.Name(), err)
+					continue
+				}
+				// Add delimiter before each log
+				combinedLogsText.WriteString(fmt.Sprintf("\n\n----- %s -----\n\n\n", file.Name()))
+				combinedLogsText.Write(content)
+			}
+
+			// Move individual file to outputDir
 			if err := os.Rename(path.Join(chatlogDir, file.Name()), path.Join(outputDir, file.Name())); err != nil {
-				w.logger.Errorf("Could not move file: %v", err)
+				w.logger.Errorf("Could not move file %s: %v", file.Name(), err)
+				continue
+			}
+		}
+
+		// Write the combined YAML file
+		if len(combinedLogs) > 0 {
+			combinedYAML, err := yaml.Marshal(combinedLogs)
+			if err != nil {
+				w.logger.Errorf("Could not marshal combined YAML data: %v", err)
 				return
 			}
+			if err := os.WriteFile(combinedYAMLPath, combinedYAML, 0644); err != nil {
+				w.logger.Errorf("Could not write combined YAML file: %v", err)
+				return
+			}
+			w.logger.Infof("Combined YAML file written to %s", combinedYAMLPath)
+		}
+
+		// Write the combined log file
+		if combinedLogsText.Len() > 0 {
+			if err := os.WriteFile(combinedLogPath, []byte(combinedLogsText.String()), 0644); err != nil {
+				w.logger.Errorf("Could not write combined log file: %v", err)
+				return
+			}
+			w.logger.Infof("Combined log file written to %s", combinedLogPath)
 		}
 	}()
 
@@ -298,8 +353,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		var data map[string]interface{}
 		err = yaml.Unmarshal(content, &data)
 		if err != nil {
-			// Odd are, the PR was not yaml-linted since its invalid yaml failing an unmarshall
-			err = fmt.Errorf("the original taxonomy yaml likely did not pass yaml-linting, here is the unmarshalling error: %v", err)
+			// Odds are, the PR was not yaml-linted since it's invalid YAML failing unmarshalling
+			err = fmt.Errorf("the original taxonomy YAML likely did not pass yaml-linting, here is the unmarshalling error: %v", err)
 			w.logger.Error(err)
 			return err
 		}
@@ -373,12 +428,21 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				continue
 			}
 
-			// Generate uniquely timestamped filenames for the combined input/output yaml files
+			// Generate uniquely timestamped filenames for the combined input/output YAML files
 			timestamp := time.Now().Format("2006-01-02T15_04_05")
 			logFileName := fmt.Sprintf("chat_%s.yaml", timestamp)
 			err = os.WriteFile(path.Join(chatlogDir, logFileName), logYAML, 0644)
 			if err != nil {
 				w.logger.Errorf("Could not write chatlog to file: %v", err)
+				continue
+			}
+
+			// Create a combined .log file
+			logText := fmt.Sprintf("Input: %s\n\nOutput:\n%s\n", originalQuestion, out.String())
+			logFileName = fmt.Sprintf("chat_%s.log", timestamp)
+			err = os.WriteFile(path.Join(chatlogDir, logFileName), []byte(logText), 0644)
+			if err != nil {
+				w.logger.Errorf("Could not write chat log to file: %v", err)
 				continue
 			}
 
