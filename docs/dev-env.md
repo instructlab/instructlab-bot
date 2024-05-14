@@ -32,11 +32,13 @@ It will take you to the newly created app page. Scroll down, and click on Genera
 
 ### Install the GitHub App in the `taxonomy` repository fork
 
-Go to [GitHub App Installation](https://github.com/settings/apps/instructlab-bot-anil/installations) and it should list your account.
+Go to [Your Github Applications](https://github.com/settings/apps) and it find the `instructlab-bot-<your-github-username>` application we just created.
 
-Click on Install button to install the app in your account. Installation will ask you to select the repositories where you want to install the app.
+Click on the `Edit` button, and navigate down to the `Install` tab (third from the top) in the menu at the left hand side. Next to your personal user click `Install` to install the Github application we created into your personal user.
 
-Select the local fork of the `taxonomy` repository that you have created in your account.
+After authorizing the installation for your user, this should take you to a screen where you can view the Permission and Repo access for your installation of the Github application. Under `Repository Access` select the `Only select repositories` option, and from the `Select repositories` dropdown select your `Taxonomy` repo Fork we just created. Click `Save`.
+
+The last thing we need to do for our bot is to generate it a private key. Navigate back from the installation details of your app to its general settings, available at: `https://github.com/settings/apps/instructlab-bot-<your-github-username>` if you [followed the docs above](./dev-env.md#Register-the-instructlab-bot-GitHub-App-in-your-github-account). Alternatively you can navigate [all your apps](https://github.com/settings/apps) and find your bot from that list. Under the `General` tab, scroll down the `Private keys` section. Click `Generate a private key`, which will generate a private key and automatically download it. Feel free to copy the your Github App's private key into this repo, based on the [.gitignore rules](https://github.com/instructlab/instructlab-bot/blob/main/.gitignore#L3), will not get tracked. We will need this private key when properly configuring our `.env` file in the following section.
 
 ### Create a personal access token
 
