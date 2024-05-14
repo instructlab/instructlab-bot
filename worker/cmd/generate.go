@@ -219,7 +219,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 	}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
 	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
-	combinedLogPath := path.Join(outputDir, "combined_chatlogs.log")
+	combinedLogHTMLPath := path.Join(outputDir, "combined_chatlogs.html")
 
 	defer func() {
 		// Move everything from chatlogDir to outputDir
@@ -230,7 +230,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		}
 
 		var combinedLogs []map[string]interface{}
-		var combinedLogsText strings.Builder
+		var combinedLogsText []string
+		var fileNames []string
 
 		for _, file := range chatlogFiles {
 			if strings.HasSuffix(file.Name(), ".yaml") {
@@ -254,9 +255,10 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 					w.logger.Errorf("Could not read log file %s: %v", file.Name(), err)
 					continue
 				}
-				// Add delimiter before each log
-				combinedLogsText.WriteString(fmt.Sprintf("\n\n----- %s -----\n\n\n", file.Name()))
-				combinedLogsText.Write(content)
+				// Convert byte array to string to store as string array
+				buffer := bytes.NewBuffer(content)
+				strContent := buffer.String()
+				combinedLogsText = append(combinedLogsText, strContent)
 			}
 
 			// Move individual file to outputDir
@@ -264,6 +266,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				w.logger.Errorf("Could not move file %s: %v", file.Name(), err)
 				continue
 			}
+			fileNames = append(fileNames, file.Name())
 		}
 
 		// Write the combined YAML file
@@ -281,12 +284,18 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		}
 
 		// Write the combined log file
-		if combinedLogsText.Len() > 0 {
-			if err := os.WriteFile(combinedLogPath, []byte(combinedLogsText.String()), 0644); err != nil {
-				w.logger.Errorf("Could not write combined log file: %v", err)
-				return
+		if len(combinedLogsText) > 0 {
+			// Invoke Generate all with
+			combinedLogHtmlFile, err := os.Create(path.Join(outputDir, combinedLogHTMLPath))
+			if err != nil {
+				w.logger.Errorf("Could not create index.html: %v", err)
 			}
-			w.logger.Infof("Combined log file written to %s", combinedLogPath)
+			defer combinedLogHtmlFile.Close()
+
+			if err := generateAllHTML(combinedLogHtmlFile, combinedLogsText, fileNames); err != nil {
+				w.logger.Errorf("Could not generate index.html: %v", err)
+			}
+			w.logger.Infof("Combined log file written to %s", combinedLogHtmlFile)
 		}
 	}()
 

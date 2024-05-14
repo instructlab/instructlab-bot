@@ -14,6 +14,119 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func generateAllHTML(allFile *os.File, logEntries []string, fileNames []string) error {
+	const INDEX_HTML = `
+<!DOCTYPE html>
+<html>
+<head>
+	<style>
+    	:root {
+        	--primary-color: #007bff;
+        	--hover-color: #0056b3;
+        	--text-color: #333;
+        	--background-color: #f8f9fa;
+        	--link-color: #0066cc;
+        	--link-hover-color: #0044cc;
+       	}
+       	body {
+           	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+           	background-color: var(--background-color);
+           	margin: 0;
+           	padding: 20px;
+           	color: var(--text-color);
+       	}
+       	h1 {
+           	color: var(--primary-color);
+           	text-align: center;
+           	margin-bottom: 2rem;
+       	}
+       	a {
+           	color: var(--link-color);
+           	text-decoration: none;
+           	font-weight: 500;
+       	}	
+       	a:hover {
+           	color: var(--link-hover-color);
+           	text-decoration: underline;
+       	}
+		.item {
+			min-height: 300px
+		}
+		.item p {
+			max-width: fit-content;
+			margin-left: auto;
+			margin-right: auto;
+		}
+		.item h5 {
+			max-width: fit-content;
+			margin-left: auto;
+			margin-right: auto;
+		}
+   	</style>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+<body>
+	<div class="container">
+		<h2>All Log Files as Carousel</h2>
+		<div id="logfileCarousel" class="carousel slide" data-ride="carousel" data-interval="false">
+			<ol class="carousel-indicators">
+			{{ range $index, $value := .Files }}
+				{{ if eq $index 0 }}
+				<li data-target="#logfileCarousel" data-slide-to="{{$index}}" class="active"></li>
+				{{ else }}
+				<li data-target="#logfileCarousel" data-slide-to="{{$index}}"></li>
+				{{ end}}
+			{{ end }}
+			</ol>
+			<div class="carousel-inner">
+			{{ $FileNames := .FileNames }}
+			{{ range $index, $value := .Files }}
+				{{ if eq $index 0 }}
+				<div class="item active">
+					<h5> {{ index $FileNames $index }} </h5>
+					<pre> {{ $value }} </pre>
+				</div>
+				{{ else }}
+				<div class="item">
+					<h5> {{ index $FileNames $index }} </h5>
+					<pre> {{ $value }} </pre>
+				</div>
+				{{ end}}
+			{{ end }}
+			</div>
+			<a class="left carousel-control" href="#logfileCarousel" data-slide="prev">
+				<span class="glyphicon glyphicon-chevron-left"></span>
+				<span class="sr-only">Previous</span>
+			</a>
+			<a class="right carousel-control" href="#logfileCarousel" data-slide="next">
+				<span class="glyphicon glyphicon-chevron-right"></span>
+				<span class="sr-only">Next</span>
+			</a>
+		</div>
+	</div>
+</body>
+</html>`
+
+	tmpl, err := template.New("index").Parse(INDEX_HTML)
+	if err != nil {
+		return fmt.Errorf("template parsing error: %w", err)
+	}
+
+	data := struct {
+		Files     []string
+		FileNames []string
+	}{
+		Files:     logEntries,
+		FileNames: fileNames,
+	}
+
+	return tmpl.Execute(allFile, data)
+}
+
 func generateIndexHTML(indexFile *os.File, prNumber string, presignedFiles []map[string]string) error {
 	const INDEX_HTML = `
 <!DOCTYPE html>
