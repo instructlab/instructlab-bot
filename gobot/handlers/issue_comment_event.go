@@ -209,22 +209,18 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	detailsMsg := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. \n"+
 		"Related Job ID is %d.\n"+
 		"This may take several minutes...\n\n", jobType, jobNumber)
-	commentMsg := fmt.Sprintf("Beep, boop 🤖, Generating test data for your PR with the job type: *%s*. Your Job ID is %d. The "+
+	commentMsg := fmt.Sprintf("Beep, boop 🤖, Working on *%s* job for your PR. The "+
 		"results will be presented below in the pull request status box. This may take several minutes...\n\n",
-		jobType, jobNumber)
+		jobType)
 
 	var checkName string
-	var statusName string
 	switch jobType {
 	case "generate":
 		checkName = common.GenerateLocalCheck
-		statusName = common.GenerateLocalStatus
 	case "precheck":
 		checkName = common.PrecheckCheck
-		statusName = common.PrecheckStatus
 	case "sdg-svc":
 		checkName = common.GenerateSDGCheck
-		statusName = common.GenerateSDGStatus
 	default:
 		h.Logger.Errorf("Unknown job type: %s", jobType)
 	}
@@ -241,20 +237,6 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 		RepoName:     prComment.repoName,
 		PrNum:        prComment.prNum,
 		PrSha:        prComment.prSha,
-	}
-
-	statusExist, _ := util.StatusExist(ctx, client, params, statusName)
-	if statusExist {
-		commentMsg += fmt.Sprintf("\n > [!CAUTION] \n > **Migration Alert** There is an existing github Status (%s) present on your PR.\n"+
-			"Please ignore that Status because we recently moved from github Status to github Checks.\n"+
-			"Results (success or error) for this command will be present under the new github Check named %s.\n", statusName, checkName)
-		params.Comment = commentMsg
-	}
-
-	err = util.PostPullRequestComment(ctx, client, params)
-	if err != nil {
-		h.Logger.Errorf("Failed to post comment on PR %s/%s#%d: %v", params.RepoOwner, params.RepoName, params.PrNum, err)
-		return err
 	}
 
 	err = util.PostPullRequestCheck(ctx, client, params)
