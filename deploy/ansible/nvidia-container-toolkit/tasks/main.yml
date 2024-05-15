@@ -50,10 +50,10 @@
       - nvidia-container-runtime
     state: present
     update_cache: true
-  notify: restart docker
+  notify: Restart Docker
 
 - name: Set docker daemon configuration
   ansible.builtin.shell: |
     nvidia-ctk runtime configure --runtime=docker
   changed_when: true
-  notify: restart docker
+  notify: Restart Docker
