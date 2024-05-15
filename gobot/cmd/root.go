@@ -38,10 +38,13 @@ var (
 	HTTPAddress         string
 	HTTPPort            int
 	GithubIntegrationID int
+	TaxonomyRepo        string
 	GithubURL           string
 	GithubWebhookSecret string
 	GithubAppPrivateKey string
 	WebhookProxyURL     string
+	GithubUsername      string
+	GithubToken         string
 	RequiredLabels      []string
 	Maintainers         []string
 	BotUsername         string
@@ -51,12 +54,15 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&RedisHost, "redis", "", "redis:6379", "The Redis instance to connect to")
 	rootCmd.PersistentFlags().StringVarP(&HTTPAddress, "http-address", "", "127.0.0.1", "HTTP Address to bind to")
-	rootCmd.PersistentFlags().IntVarP(&HTTPPort, "http-port", "", 8080, "HTTP Port to bind to")
+	rootCmd.PersistentFlags().IntVarP(&HTTPPort, "http-port", "", 8081, "HTTP Port to bind to")
 	rootCmd.PersistentFlags().IntVarP(&GithubIntegrationID, "github-integration-id", "", 0, "The GitHub App Integration ID")
+	rootCmd.PersistentFlags().StringVarP(&TaxonomyRepo, "taxonomy-repo", "", "https://github.com/instructlab/taxonomy.git", "The GitHub repository to use for the taxonomy")
 	rootCmd.PersistentFlags().StringVarP(&GithubURL, "github-url", "", "https://api.github.com/", "The URL of the GitHub instance")
 	rootCmd.PersistentFlags().StringVarP(&GithubWebhookSecret, "github-webhook-secret", "", "", "The GitHub App Webhook Secret")
 	rootCmd.PersistentFlags().StringVarP(&GithubAppPrivateKey, "github-app-private-key", "", "", "The GitHub App Private Key")
 	rootCmd.PersistentFlags().StringVarP(&WebhookProxyURL, "webhook-proxy-url", "", "", "Get an ID from https://smee.io/new. If blank, the app will not use a webhook proxy")
+	rootCmd.PersistentFlags().StringVarP(&GithubUsername, "github-username", "u", "instructlab-bot", "The GitHub username to use for authentication")
+	rootCmd.PersistentFlags().StringVarP(&GithubToken, "github-token", "g", "", "The GitHub token to use for authentication")
 	rootCmd.PersistentFlags().StringSliceVarP(&RequiredLabels, "required-labels", "", []string{}, "Label(s) required before a PR can be tested")
 	rootCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
@@ -117,7 +123,7 @@ func run(logger *zap.SugaredLogger) error {
 		Maintainers:    Maintainers,
 	}
 
-	prHandler := &handlers.PullRequestHandler{
+	prHandler := &handlers.PullRequestEventHandler{
 		ClientCreator:  cc,
 		Logger:         logger,
 		RequiredLabels: RequiredLabels,
@@ -125,11 +131,20 @@ func run(logger *zap.SugaredLogger) error {
 		Maintainers:    Maintainers,
 	}
 
+	prCreateHandler := &handlers.PullRequestCreateHandler{
+		ClientCreator:  cc,
+		Logger:         logger,
+		TaxonomyRepo:   TaxonomyRepo,
+		GithubUsername: GithubUsername,
+		GithubToken:    GithubToken,
+	}
+
 	webhookHandler := githubapp.NewDefaultEventDispatcher(ghConfig, prCommentHandler, prHandler)
 
 	http.Handle(githubapp.DefaultWebhookRoute, webhookHandler)
 
-	addr := net.JoinHostPort(HTTPAddress, strconv.Itoa(HTTPPort))
+	//addr := net.JoinHostPort(HTTPAddress, strconv.Itoa(HTTPPort))
+	addr := net.JoinHostPort("", strconv.Itoa(HTTPPort))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 	defer cancel()
@@ -160,6 +175,9 @@ func run(logger *zap.SugaredLogger) error {
 	}
 	wg.Add(1)
 	httpServer := &http.Server{Addr: addr}
+	http.HandleFunc("/pr/skill", prCreateHandler.SkillPRHandler)
+	http.HandleFunc("/pr/knowledge", prCreateHandler.KnowledgePRHandler)
+
 	go func() {
 		logger.Infof("Starting server on %s...", addr)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

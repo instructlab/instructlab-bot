@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type PullRequestHandler struct {
+type PullRequestEventHandler struct {
 	githubapp.ClientCreator
 	Logger         *zap.SugaredLogger
 	RequiredLabels []string
@@ -20,11 +20,11 @@ type PullRequestHandler struct {
 	Maintainers    []string
 }
 
-func (h *PullRequestHandler) Handles() []string {
+func (h *PullRequestEventHandler) Handles() []string {
 	return []string{"pull_request"}
 }
 
-func (h *PullRequestHandler) Handle(ctx context.Context, eventType, deliveryID string, payload []byte) error {
+func (h *PullRequestEventHandler) Handle(ctx context.Context, eventType, deliveryID string, payload []byte) error {
 	var event github.PullRequestEvent
 	if err := json.Unmarshal(payload, &event); err != nil {
 		return errors.Wrap(err, "failed to parse issue comment event payload")
