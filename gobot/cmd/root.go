@@ -429,7 +429,7 @@ func receiveResults(ctx context.Context, redisHostPort string, logger *zap.Sugar
 			}
 
 			// Add the model name only if it's not empty
-			detailsMsg := fmt.Sprintf("Results for job ID: %s", result)
+			detailsMsg := fmt.Sprintf("Beep, boop 🤖, Here are the %s results for your PR", jobType)
 			if modelName != "" {
 				detailsMsg += " " + modelName
 			}
