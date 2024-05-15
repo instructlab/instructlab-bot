@@ -209,7 +209,7 @@ func (h *PRCommentHandler) queueGenerateJob(ctx context.Context, client *github.
 	detailsMsg := fmt.Sprintf("Generating test data for your PR with the job type: *%s*. \n"+
 		"Related Job ID is %d.\n"+
 		"This may take several minutes...\n\n", jobType, jobNumber)
-	commentMsg := fmt.Sprintf("Beep, boop 🤖, Generating test data for your PR with the job type: *%s*. Your Job ID is %d. The "+
+	commentMsg := fmt.Sprintf("Beep, boop 🤖, Working on *%s* job for your PR. The "+
 		"results will be presented below in the pull request status box. This may take several minutes...\n\n",
 		jobType, jobNumber)
 
