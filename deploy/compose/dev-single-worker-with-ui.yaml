@@ -37,6 +37,7 @@ services:
       API_PASS: "${API_PASS:-floofykittens}"
       DEBUG_MODE: "${DEBUG_MODE:-true}"
       TEST_MODE: "${TEST_MODE:-true}"
+      BOT_URL: "${BOT_URL:-http://bot:8081}"
     ports:
       - 3000:3000
 
