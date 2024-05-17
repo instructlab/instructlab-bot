@@ -117,6 +117,14 @@ This playbook installs all the components in the containers.
 ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-bot-stack.yml
 ```
 
+## Install the UI stack that works with the Bot stack
+
+This playbook installs all the required UI components in the containers.
+
+```console
+ansible-playbook -i inventory.txt  -e @secrets.enc --ask-vault-pass deploy-ui-stack.yml
+```
+
 ## Install the Worker stack (first time installation)
 
 This playbook installs all the required component on the host itself

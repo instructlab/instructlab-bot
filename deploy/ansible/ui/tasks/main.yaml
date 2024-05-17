@@ -1,0 +1,31 @@
+---
+- name: Log into GHCR
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: instructlab-bot
+    password: "{{ github_token }}"
+    reauthorize: true
+
+- name: Start the apiserver container
+  community.docker.docker_container:
+    name: apiserver
+    image: ghcr.io/instructlab/instructlab-bot/apiserver:main
+    state: started
+    pull: always
+    env:
+      LISTEN_ADDRESS: "${LISTEN_ADDRESS:-:3000}"
+      REDIS_SERVER: "${REDIS_SERVER:-redis:6379}"
+      DEBUG_MODE: "${DEBUG_MODE:-false}"
+      TEST_MODE: "${TEST_MODE:-false}"
+      BOT_URL: "${BOT_URL:-http://instructlab-bot:8081}"
+    ports:
+      - 3000:3000
+
+- name: Start the ui container
+  community.docker.docker_container:
+    name: ui
+    image: ghcr.io/instructlab/instructlab-bot/bot-ui:main
+    state: started
+    pull: always
+    ports:
+      - 8080:8080
