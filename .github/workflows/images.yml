@@ -48,6 +48,14 @@ jobs:
           cache-to: type=gha,mode=max
           file: gobot/Containerfile
 
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
+
   push_to_registries_ui:
     name: Push UI container image to GHCR
     runs-on: ubuntu-latest
@@ -90,6 +98,14 @@ jobs:
           cache-to: type=gha,mode=max
           file: ui/Containerfile
 
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
+
   push_to_registries_apiserver:
     name: Push apiserver container image to GHCR
     runs-on: ubuntu-latest
@@ -131,6 +147,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: ui/apiserver/Containerfile
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
 
   push_to_registries_serve:
     name: Push serve container image to GHCR
@@ -188,6 +212,14 @@ jobs:
           cache-to: type=gha,mode=max
           file: worker/Containerfile
 
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
+
   push_to_registries_serve_base:
     name: Push serve base container image to GHCR
     runs-on: ubuntu-latest
@@ -243,3 +275,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: worker/Containerfile.servebase
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true

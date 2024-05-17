@@ -29,6 +29,13 @@ jobs:
           go build -o "worker_$(go env GOOS)_${GOARCH}" main.go
           echo bin="worker_$(go env GOOS)_${GOARCH}" >> "$GITHUB_OUTPUT"
         working-directory: ./worker
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.bin }}

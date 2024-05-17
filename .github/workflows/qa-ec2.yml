@@ -62,6 +62,14 @@ jobs:
           --vault-password-file ansible_vault_password_file \
           deploy/ansible/qa/prod/deploy-worker-script.yml
 
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
+
       - name: Terminate EC2 Instances
         if: always()
         run: |
@@ -132,6 +140,14 @@ jobs:
       #          --vault-password-file ansible_vault_password_file \
       #          -e "github_token=${BOT_GITHUB_TOKEN}" deploy/ansible/deploy-bot.yml
       #          rm -f ansible_vault_password_file
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.18
+        timeout-minutes: 15
+        with:
+          detached: false
+          limit-access-to-actor: true
 
       - name: Terminate EC2 Instances
         if: always()
