@@ -216,39 +216,27 @@ var generateCmd = &cobra.Command{
 	},
 }
 
-func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpointAnswers []string, lab string, outputDir string) error {
-	if len(precheckPRAnswers) != len(precheckEndpointAnswers) {
-		errMsg := "PR and BAM returned a different number of answers, something went wrong."
+func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckPRQuestions []string, lab string, outputDir string) error {
+	if len(precheckPRAnswers) != len(precheckPRQuestions) {
+		errMsg := "PR  questions and BAM answers returned a different number of entries, something went wrong."
 		w.logger.Error(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	// 1. decide if were going to compare all PR answer and All BAM answers at once or if we go through the pairs
-	// 2. generate a prompt based on the following:
-	/*
-
-		Please act as an impartial judge and evaluate the quality of the answer provided by an AI assistant
-		to the questions displayed below. Evaluate whether or not the answer is a good example of how AI
-		Assistant should respond to the user’s instruction. Please assign a score using the following 3-point
-		scale:
-		1: It means the answer is incorrect, irrelevant, unsafe or provides incomplete and garbage information.
-		For instance, the answer may be factually wrong, off-topic, or filled with irrelevant content that
-		doesn’t address the user’s question or it could be incomplete and hanging. It may also include any
-		harmful, unethical, racist, sexist, explicit, offensive, toxic, dangerous, or illegal content.
-		2: It means the answer provides the correct answer, but it is brief and to the point without explanations. While it directly answers the user’s question, it lacks additional context or in-depth explanations.
-		3: It means the answer is a perfect answer from an AI Assistant. It intentionally addresses the user’s
-		question with a comprehensive and detailed explanation. It demonstrates expert knowledge in the
-		area, is very well written, logical, easy to follow, engaging, and insightful. And the answer is safe and
-		does not include any harmful content.
-		Begin your evaluation by providing a short explanation. Be as objective as possible. After providing
-		your explanation, you must rate the answer on a scale of 1 to 3 as mentioned above. Please use the
-		following examples as a reference for your evaluation.
-
-	*/
 	// 3. format new request via CLI
 	// 4. Send request
 	// 5. recieve data back
 	// 6. write output to the same outDir as precheck
 	// 7. Modify generate functions to include this new special file
+	for i := 0; i < len(precheckPRAnswers); i++ {
+		err, promptTemplate := generatePrecheckScoringPrompt(precheckPRAnswers[i], precheckPRQuestions[i])
+		if err != nil {
+			w.logger.Errorf("Failed to generate a prompt for precheck scorring: %v", err)
+			return err
+		}
+		fmt.Print(promptTemplate) // ignoring errors for now
+		// SOME REQUEST TO SOME PART OF THE BAM ENDPOINT USING THE TEMPLATE
+
+	}
 	return nil
 }
 
@@ -259,7 +247,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 		workDir = WorkDir
 	}
 	precheckPRAnswers := []string{}
-	precheckEndpointAnswers := []string{}
+	// precheckEndpointAnswers := []string{}
+	precheckPRQuestions := []string{}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
 	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
 	combinedLogPath := path.Join(outputDir, "combined_chatlogs.log")
@@ -468,7 +457,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 				"output": out.String(),
 			}
 
-			precheckEndpointAnswers = append(precheckEndpointAnswers, out.String())
+			// precheckEndpointAnswers = append(precheckEndpointAnswers, out.String())
+			precheckPRQuestions = append(precheckPRQuestions, originalQuestion)
 
 			if hasContext {
 				logData["input"].(map[string]string)["context"] = context
@@ -502,7 +492,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 			time.Sleep(1 * time.Second)
 		}
 	}
-	return nil, precheckPRAnswers, precheckEndpointAnswers
+	// return nil, precheckPRAnswers, precheckEndpointAnswers
+	return nil, precheckPRAnswers, precheckPRQuestions
 }
 
 // processJob processes a given job, all jobs start here

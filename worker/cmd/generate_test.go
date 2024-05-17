@@ -153,6 +153,7 @@ func TestFetchModelName(t *testing.T) {
 		zap.NewExample().Sugar(),
 		"job-id",
 		mockServer.URL,
+		mockServer.URL,
 		"http://sdg-example.com",
 		"dummy-client-cert-path.pem",
 		"dummy-client-key-path.pem",
@@ -214,6 +215,7 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 		zap.NewExample().Sugar(),
 		"job-id",
 		mockServer.URL,
+		mockServer.URL,
 		"http://sdg-example.com",
 		"dummy-client-cert-path.pem",
 		"dummy-client-key-path.pem",
@@ -231,4 +233,8 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 func normalizeHTML(input string) string {
 	compacted := regexp.MustCompile(`\s+`).ReplaceAllString(input, " ")
 	return regexp.MustCompile(`>\s+<`).ReplaceAllString(compacted, "><")
+}
+
+func TestGeneratePrecheckScoringPrompt(t *testing.T) {
+	// NEEDS TO BE IMPLEMENTED
 }
