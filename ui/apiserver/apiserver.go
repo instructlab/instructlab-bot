@@ -336,7 +336,7 @@ func (api *ApiServer) runIlabChatCommand(question, context string) (string, erro
 		cmd = exec.Command("echo", cmdArgs...)
 		api.logger.Infof("Running in test mode: %s", commandStr)
 	} else {
-		modelName, err := api.fetchModelName(true)
+		modelName, err := api.fetchModelName(true, api.preCheckEndpointURL)
 		if err != nil {
 			api.logger.Errorf("Failed to fetch model name: %v", err)
 			return "failed to retrieve the model name", err
@@ -382,9 +382,8 @@ func setupLogger(debugMode bool) *zap.SugaredLogger {
 
 // fetchModelName hits the defined precheck endpoint with "/models" appended to extract the model name.
 // If fullName is true, it returns the entire ID value; if false, it returns the parsed out name after the double hyphens.
-func (api *ApiServer) fetchModelName(fullName bool) (string, error) {
+func (api *ApiServer) fetchModelName(fullName bool, endpoint string) (string, error) {
 	// Ensure the endpoint URL ends with "/models"
-	endpoint := api.preCheckEndpointURL
 	if !strings.HasSuffix(endpoint, "/") {
 		endpoint += "/"
 	}

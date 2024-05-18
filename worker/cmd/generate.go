@@ -218,7 +218,7 @@ var generateCmd = &cobra.Command{
 
 func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpointAnswers []string, precheckPRQuestions []string, lab string, outputDir string, preCheckScoringModelName string) error {
 	if len(precheckPRAnswers) != len(precheckEndpointAnswers) {
-		errMsg := "PR  questions a Endpoint answers returned a different number of entries, something went wrong."
+		errMsg := "PR answers and Endpoint answers returned a different number of entries, something went wrong"
 		w.logger.Error(errMsg)
 		return fmt.Errorf(errMsg)
 	}
@@ -638,7 +638,7 @@ func (w *Worker) processJob() {
 	// sdg-svc does not have a models endpoint as yet
 	if jobType != jobSDG && PreCheckEndpointURL != localEndpoint {
 		var err error
-		modelName, err = w.fetchModelName(true)
+		modelName, err = w.fetchModelName(true, w.precheckEndpoint)
 		if err != nil {
 			w.logger.Errorf("Failed to fetch model name: %v", err)
 			modelName = "unknown"
@@ -683,7 +683,21 @@ func (w *Worker) processJob() {
 			w.reportJobError(err)
 			return
 		}
-		err = w.runPrecheckScoring(precheckPRAnswers, precheckEndpointAnswers, precheckPRQuestions, lab, outputDir, modelName)
+
+		var scoringModelName string
+		// sdg-svc does not have a models endpoint as yet
+		if jobType == jobPreCheck && w.precheckScoringEndpoint != localEndpoint {
+			var err error
+			scoringModelName, err = w.fetchModelName(true, w.precheckScoringEndpoint)
+			if err != nil {
+				w.logger.Errorf("Failed to fetch model name: %v", err)
+				scoringModelName = "unknown"
+			}
+		} else {
+			scoringModelName = w.getModelNameFromConfig() // will default to standard precheck model
+		}
+
+		err = w.runPrecheckScoring(precheckPRAnswers, precheckEndpointAnswers, precheckPRQuestions, lab, outputDir, scoringModelName)
 		if err != nil {
 			sugar.Errorf("Could not run scoring on result of precheck: %v", err)
 			w.reportJobError(err)
@@ -975,9 +989,8 @@ func (w *Worker) getModelNameFromConfig() string {
 
 // fetchModelName hits the defined precheckEndpoint with "/models" appended to extract the model name.
 // If fullName is true, it returns the entire ID value; if false, it returns the parsed out name after the double hyphens.
-func (w *Worker) fetchModelName(fullName bool) (string, error) {
+func (w *Worker) fetchModelName(fullName bool, endpoint string) (string, error) {
 	// Ensure the endpoint URL ends with "/models"
-	endpoint := w.precheckEndpoint
 	if !strings.HasSuffix(endpoint, "/") {
 		endpoint += "/"
 	}
@@ -1073,7 +1086,7 @@ func (w *Worker) determineModelName(jobType string) string {
 
 	// precheck is the only case we use a remote OpenAI endpoint right now
 	if PreCheckEndpointURL != localEndpoint && jobType == jobPreCheck {
-		modelName, err := w.fetchModelName(false)
+		modelName, err := w.fetchModelName(false, w.precheckEndpoint)
 		if err != nil {
 			w.logger.Errorf("Failed to fetch model name: %v", err)
 			return "unknown"
