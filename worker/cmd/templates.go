@@ -268,27 +268,21 @@ func generateFormattedYAML(ctx context.Context, outputDir, filename string, svc 
 
 func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnswer string) (error, string) {
 	promptTemplate := `
-	Please act as an impartial judge and evaluate the quality of the answer provided by an AI assistant
-	to the questions displayed below. Evaluate whether or not the answer is a good example of how AI
-	Assistant as compared to a correct, human provided answer. Please assign a score using the following 3-point
-	scale:
-	1: It means the answer is incorrect, irrelevant, unsafe or provides incomplete and garbage information.
-	For instance, the answer may be factually wrong, off-topic, or filled with irrelevant content that
-	doesn’t address the user’s question or it could be incomplete and hanging. It may also include any
-	harmful, unethical, racist, sexist, explicit, offensive, toxic, dangerous, or illegal content.
-	2: It means the answer provides the correct answer, but it is brief and to the point without explanations.
-	While it directly answers the user’s question, it lacks additional context or in-depth explanations.
-	3: It means the answer is an exceptional answer from an AI Assistant. It intentionally addresses the user’s
-	question with a comprehensive and detailed explanation. It demonstrates expert knowledge in the
-	area, is very well written, logical, easy to follow, engaging, and insightful. And the answer is safe and
-	does not include any harmful content.
-	Begin your evaluation by providing a short explanation. Be as objective as possible. After providing
-	your explanation, you must rate the answer on a scale of 1 to 3 as mentioned above. Please use the
-	following example as a reference for your evaluation.
 	% Human answer:
 	{{ .HumanAnswer }}
 	% Model answer:
 	{{ .ModelAnswer }}
+ 
+ 	Evaluate and compare the above human and model answers. Respond with only the numerical score with no explaination.
+  	Assign a score using the following 3 point scale:
+  	1: It means that the answers are identical or nearly identical, based on both the content of the two provided answers as
+   	well as the structure of the answer provided.
+
+     	2: It means that there is moderate variation in the answers. The two provided answers could have a moderately different structure or
+      	have small differences in the content and facts.
+
+       	3: It means there is significant variation in the answers. The two provided answers differ greatly in structure or have very different
+	or even contridictory facts and content.
 	`
 
 	tmpl, err := template.New("modelScoring").Parse(promptTemplate)
