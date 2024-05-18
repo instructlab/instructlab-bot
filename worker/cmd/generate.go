@@ -685,7 +685,7 @@ func (w *Worker) processJob() {
 		}
 
 		var scoringModelName string
-		// sdg-svc does not have a models endpoint as yet
+
 		if jobType == jobPreCheck && w.precheckScoringEndpoint != localEndpoint {
 			var err error
 			scoringModelName, err = w.fetchModelName(true, w.precheckScoringEndpoint)

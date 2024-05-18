@@ -234,7 +234,3 @@ func normalizeHTML(input string) string {
 	compacted := regexp.MustCompile(`\s+`).ReplaceAllString(input, " ")
 	return regexp.MustCompile(`>\s+<`).ReplaceAllString(compacted, "><")
 }
-
-func TestGeneratePrecheckScoringPrompt(t *testing.T) {
-	// NEEDS TO BE IMPLEMENTED
-}
