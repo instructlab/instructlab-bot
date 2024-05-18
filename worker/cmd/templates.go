@@ -273,7 +273,7 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnsw
 	% Model answer:
 	{{ .ModelAnswer }}
  
- 	Evaluate and compare the above human and model answers. Respond with only the numerical score with no explaination.
+ 	Evaluate and compare the above Human answer and Model answer. Respond with only the numerical score with no explaination.
   	Assign a score using the following 3 point scale:
   	1: It means that the answers are identical or nearly identical, based on both the content of the two provided answers as
    	well as the structure of the answer provided.
