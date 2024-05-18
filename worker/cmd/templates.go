@@ -266,11 +266,11 @@ func generateFormattedYAML(ctx context.Context, outputDir, filename string, svc 
 	return s3Key
 }
 
-func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckPRQuestion string) (error, string) {
+func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnswer string) (error, string) {
 	promptTemplate := `
 	Please act as an impartial judge and evaluate the quality of the answer provided by an AI assistant
 	to the questions displayed below. Evaluate whether or not the answer is a good example of how AI
-	Assistant should respond to the user’s instruction. Please assign a score using the following 3-point
+	Assistant as compared to a correct, human provided answer. Please assign a score using the following 3-point
 	scale:
 	1: It means the answer is incorrect, irrelevant, unsafe or provides incomplete and garbage information.
 	For instance, the answer may be factually wrong, off-topic, or filled with irrelevant content that
@@ -285,10 +285,10 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckPRQuestion s
 	Begin your evaluation by providing a short explanation. Be as objective as possible. After providing
 	your explanation, you must rate the answer on a scale of 1 to 3 as mentioned above. Please use the
 	following example as a reference for your evaluation.
-	% Input Question:
-	{{ .Question }}
-	% Model Output:
-	{{ .Answer }}
+	% Human answer:
+	{{ .HumanAnswer }}
+	% Model answer:
+	{{ .ModelAnswer }}
 	`
 
 	tmpl, err := template.New("modelScoring").Parse(promptTemplate)
@@ -297,11 +297,11 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckPRQuestion s
 	}
 
 	data := struct {
-		Question string
-		Answer   string
+		HumanAnswer string
+		ModelAnswer string
 	}{
-		Question: precheckPRQuestion,
-		Answer:   precheckPRAnswer,
+		HumanAnswer: precheckPRAnswer,
+		ModelAnswer: precheckEndpointAnswer,
 	}
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, data)

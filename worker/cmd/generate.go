@@ -216,38 +216,100 @@ var generateCmd = &cobra.Command{
 	},
 }
 
-func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckPRQuestions []string, lab string, outputDir string) error {
-	if len(precheckPRAnswers) != len(precheckPRQuestions) {
-		errMsg := "PR  questions and BAM answers returned a different number of entries, something went wrong."
+func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpointAnswers []string, precheckPRQuestions []string, lab string, outputDir string, preCheckScoringModelName string) error {
+	if len(precheckPRAnswers) != len(precheckEndpointAnswers) {
+		errMsg := "PR  questions a Endpoint answers returned a different number of entries, something went wrong."
 		w.logger.Error(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	// 3. format new request via CLI
-	// 4. Send request
-	// 5. recieve data back
-	// 6. write output to the same outDir as precheck
-	// 7. Modify generate functions to include this new special file
+
+	workDir := "."
+	if WorkDir != "" {
+		workDir = WorkDir
+	}
+	chatlogDir := path.Join(workDir, "data", "chatlogs")
+	combinedYAMLScoringPath := path.Join(outputDir, "combined_chatlog_scoring.yaml")
+
+	type QuestionScore struct {
+		Question       string
+		HumanAnswer    string
+		EndpointAnswer string
+		Score          string
+	}
+
+	type QuestionScoreReport struct {
+		RunTime        string
+		QuestionScores []QuestionScore
+	}
+
+	yamlData := QuestionScoreReport{}
 	for i := 0; i < len(precheckPRAnswers); i++ {
 		err, promptTemplate := generatePrecheckScoringPrompt(precheckPRAnswers[i], precheckPRQuestions[i])
 		if err != nil {
 			w.logger.Errorf("Failed to generate a prompt for precheck scorring: %v", err)
 			return err
 		}
-		fmt.Print(promptTemplate) // ignoring errors for now
-		// SOME REQUEST TO SOME PART OF THE BAM ENDPOINT USING THE TEMPLATE
+
+		commandStr := fmt.Sprintf("chat --quick-question %s", promptTemplate)
+		if TlsInsecure {
+			commandStr += " --tls-insecure"
+		}
+		if PreCheckScoringEndpointURL != localEndpoint && preCheckScoringModelName != "unknown" {
+			commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, preCheckScoringModelName)
+		}
+		cmdArgs := strings.Fields(commandStr)
+		cmd := exec.Command(lab, cmdArgs...)
+		// Register the command for reporting/logging
+		w.cmdRun = cmd.String()
+		w.logger.Infof("Running the precheck scoring command: %s", cmd.String())
+
+		cmd.Dir = workDir
+		cmd.Env = os.Environ()
+		var out bytes.Buffer
+		var errOut bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &errOut
+		err = cmd.Run()
+		if err != nil {
+			w.logger.Errorf("Precheck scoring command failed with error: %v; stderr: %s", err, errOut.String())
+			continue
+		}
+
+		questionScore := QuestionScore{
+			Question:       precheckPRQuestions[i],
+			HumanAnswer:    precheckPRAnswers[i],
+			EndpointAnswer: precheckEndpointAnswers[i],
+			Score:          out.String(),
+		}
+		yamlData.QuestionScores = append(yamlData.QuestionScores, questionScore)
 
 	}
+
+	yamlData.RunTime = time.Now().Format("2006-01-02T15_04_05")
+
+	scoringYaml, err := yaml.Marshal(yamlData)
+	if err != nil {
+		w.logger.Errorf("Could not marshal scoring data to YAML: %v", err)
+		return err
+	}
+
+	err = os.WriteFile(path.Join(chatlogDir, combinedYAMLScoringPath), scoringYaml, 0644)
+	if err != nil {
+		w.logger.Errorf("Could not write chatlog to file: %v", err)
+		return err
+	}
+
 	return nil
 }
 
 // runPrecheck runs lab chat against git diffed yaml files
-func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string, []string) {
+func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string, []string, []string) {
 	workDir := "."
 	if WorkDir != "" {
 		workDir = WorkDir
 	}
 	precheckPRAnswers := []string{}
-	// precheckEndpointAnswers := []string{}
+	precheckEndpointAnswers := []string{}
 	precheckPRQuestions := []string{}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
 	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
@@ -329,19 +391,19 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		w.logger.Errorf("Could not get stdout pipe: %v", err)
-		return err, []string{}, []string{}
+		return err, []string{}, []string{}, []string{}
 	}
 
 	w.logger.Debug("Running ilab diff")
 	if err := cmd.Start(); err != nil {
 		w.logger.Errorf("Could not start command(%s %s): %v", cmd.Path, strings.Join(cmd.Args, " "), err)
-		return err, []string{}, []string{}
+		return err, []string{}, []string{}, []string{}
 	}
 
 	output, err := io.ReadAll(stdout)
 	if err != nil {
 		w.logger.Errorf("Could not read stdout: %v", err)
-		return err, []string{}, []string{}
+		return err, []string{}, []string{}, []string{}
 	}
 	outputStr := string(output)
 	w.logger.Debugf("Output: %s", outputStr)
@@ -359,7 +421,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 	if yamlFileCount == 0 {
 		errMsg := "No modified YAML files detected in the PR for precheck"
 		w.logger.Error(errMsg)
-		return fmt.Errorf(errMsg), []string{}, []string{}
+		return fmt.Errorf(errMsg), []string{}, []string{}, []string{}
 	}
 
 	// Proceed with YAML files processing if they exist
@@ -372,14 +434,14 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 		f, err := os.Open(filePath)
 		if err != nil {
 			w.logger.Errorf("Could not open taxonomy file: %v", err)
-			return err, []string{}, []string{}
+			return err, []string{}, []string{}, []string{}
 		}
 		defer f.Close()
 
 		content, err := io.ReadAll(f)
 		if err != nil {
 			w.logger.Error(err)
-			return err, []string{}, []string{}
+			return err, []string{}, []string{}, []string{}
 		}
 
 		var data map[string]interface{}
@@ -388,7 +450,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 			// Odds are, the PR was not yaml-linted since it's invalid YAML failing unmarshalling
 			err = fmt.Errorf("the original taxonomy YAML likely did not pass yaml-linting, here is the unmarshalling error: %v", err)
 			w.logger.Error(err)
-			return err, []string{}, []string{}
+			return err, []string{}, []string{}, []string{}
 		}
 
 		// Check if "seed_examples" exists and is a list
@@ -397,7 +459,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 		if !ok {
 			err = fmt.Errorf("seed_examples not found or not a list")
 			w.logger.Error(err)
-			return err, []string{}, []string{}
+			return err, []string{}, []string{}, []string{}
 		}
 
 		for _, item := range seedExamples {
@@ -457,7 +519,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 				"output": out.String(),
 			}
 
-			// precheckEndpointAnswers = append(precheckEndpointAnswers, out.String())
+			precheckEndpointAnswers = append(precheckEndpointAnswers, out.String())
 			precheckPRQuestions = append(precheckPRQuestions, originalQuestion)
 
 			if hasContext {
@@ -492,8 +554,8 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) (error, []string,
 			time.Sleep(1 * time.Second)
 		}
 	}
-	// return nil, precheckPRAnswers, precheckEndpointAnswers
-	return nil, precheckPRAnswers, precheckPRQuestions
+	return nil, precheckPRAnswers, precheckEndpointAnswers, precheckPRQuestions
+	// return nil, precheckPRAnswers, precheckPRQuestions
 }
 
 // processJob processes a given job, all jobs start here
@@ -615,13 +677,13 @@ func (w *Worker) processJob() {
 	case jobPreCheck:
 		// @instructlab-bot precheck
 		// Runs precheck on a backend node
-		err, precheckPRAnswers, precheckEndpointAnswers := w.runPrecheck(lab, outputDir, modelName)
+		err, precheckPRAnswers, precheckEndpointAnswers, precheckPRQuestions := w.runPrecheck(lab, outputDir, modelName)
 		if err != nil {
 			sugar.Errorf("Could not run precheck: %v", err)
 			w.reportJobError(err)
 			return
 		}
-		err = w.runPrecheckScoring(precheckPRAnswers, precheckEndpointAnswers, lab, outputDir)
+		err = w.runPrecheckScoring(precheckPRAnswers, precheckEndpointAnswers, precheckPRQuestions, lab, outputDir, modelName)
 		if err != nil {
 			sugar.Errorf("Could not run scoring on result of precheck: %v", err)
 			w.reportJobError(err)
