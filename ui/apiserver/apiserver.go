@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,8 +26,17 @@ const (
 	redisQueueArchive  = "archived"
 )
 
-const PreCheckEndpointURL = "https://merlinite-7b-vllm-openai.apps.fmaas-backend.fmaas.res.ibm.com/v1"
-const InstructLabBotUrl = "http://bot:8081"
+const (
+	localEndpoint     = "http://localhost:8000/v1"
+	InstructLabBotUrl = "http://bot:8081"
+)
+
+type TLSConfig struct {
+	TlsClientCertPath   string
+	TlsClientKeyPath    string
+	TlsServerCaCertPath string
+	TlsInsecure         bool
+}
 
 type ApiServer struct {
 	router              *gin.Engine
@@ -36,6 +46,7 @@ type ApiServer struct {
 	testMode            bool
 	preCheckEndpointURL string
 	instructLabBotUrl   string
+	tlsConfig           TLSConfig
 }
 
 type JobData struct {
@@ -202,13 +213,60 @@ func (api *ApiServer) knowledgePRHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"msg": responseBody.String()})
 }
 
-// Sent http post request using custom client with zero timeout
-func (api *ApiServer) sendPostRequest(url string, body io.Reader) (*http.Response, error) {
-	client := &http.Client{
+func (api *ApiServer) buildHTTPServer() (http.Client, error) {
+	defaultHTTPClient := http.Client{
 		Timeout: 0 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
+	}
+	if !api.tlsConfig.TlsInsecure {
+		certs, err := tls.LoadX509KeyPair(api.tlsConfig.TlsClientCertPath, api.tlsConfig.TlsClientKeyPath)
+		if err != nil {
+			api.logger.Warnf("failed to load client certificate/key: %w", err)
+			return defaultHTTPClient, fmt.Errorf("Error load client certificate/key, defaulting to TLS Insecure session (http)")
+		}
+		// // NOT SURE WE NEED SERVER CA CERT FOR THIS, PLEASE ADVISE
+		caCert, err := os.ReadFile(api.tlsConfig.TlsServerCaCertPath)
+		if err != nil {
+			api.logger.Warnf("failed to read server CA certificate: %w", err)
+			return defaultHTTPClient, fmt.Errorf("Error load server CA certificate, defaulting to TLS Insecure session (http)")
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig := &tls.Config{
+			Certificates:       []tls.Certificate{certs},
+			RootCAs:            caCertPool,
+			InsecureSkipVerify: true,
+		}
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig:       tlsConfig,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		}
+		return *httpClient, nil
+	} else {
+		return defaultHTTPClient, nil
+	}
+}
+
+// Sent http post request using custom client with zero timeout
+func (api *ApiServer) sendPostRequest(url string, body io.Reader) (*http.Response, error) {
+	client, err := api.buildHTTPServer()
+	if err != nil {
+		// Either running http with tlsInsecure = true, or https runing with tlsInsecure = false
+		if err.Error() == "Error load client certificate/key, defaulting to TLS Insecure session (http)" ||
+			err.Error() == "Error load server CA certificate, defaulting to TLS Insecure session (http)" {
+			// Handle the specific error (e.g., log it)
+			api.logger.Warn("Warning: TLS certificate/key or server CA certificate not loaded, downgraded to http client.")
+		} else {
+			// Handle other errors
+			err = fmt.Errorf("Error creating http(s) server: %v", err)
+			fmt.Print(err)
+			return nil, err
+		}
 	}
 
 	request, err := http.NewRequest("POST", url, body)
@@ -459,9 +517,50 @@ func main() {
 	redisAddress := pflag.String("redis-server", "localhost:6379", "Redis server address")
 	apiUser := pflag.String("api-user", "", "API username")
 	apiPass := pflag.String("api-pass", "", "API password")
-	preCheckEndpointURL := pflag.String("precheck-endpoint", PreCheckEndpointURL, "Precheck endpoint URL")
+	preCheckEndpointURL := pflag.String("precheck-endpoint", "", "Precheck endpoint URL")
 	InstructLabBotUrl := pflag.String("bot-url", InstructLabBotUrl, "InstructLab Bot URL")
+	// TLS variables
+	tlsInsecure := pflag.Bool("tls-insecure", false, "Whether to skip TLS verification")
+	tlsClientCertPath := pflag.String("tls-client-cert", "$HOME/client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
+	tlsClientKeyPath := pflag.String("tls-client-key", "$HOME/client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
+	tlsServerCaCertPath := pflag.String("tls-server-ca-cert", "$HOME/server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
 	pflag.Parse()
+
+	/* Support env population with priority being:
+	1) flag
+	2) env
+	3) acceptable defaults
+	*/
+
+	// Precheck endpoint
+	HOME := os.Getenv("HOME")
+	if *preCheckEndpointURL == "" {
+		preCheckEndpointURLEnvValue := os.Getenv("PECHECK_ENDPOINT")
+		if preCheckEndpointURLEnvValue != "" {
+			*preCheckEndpointURL = preCheckEndpointURLEnvValue
+		} else {
+			*preCheckEndpointURL = localEndpoint
+		}
+	}
+	// TLS certPath
+	if *tlsClientCertPath == "" {
+		tlsClientCertPathEnvValue := os.Getenv("TLS_CLIENT_CERT_PATH")
+		if tlsClientCertPathEnvValue != "" {
+			*tlsClientCertPath = tlsClientCertPathEnvValue
+		} else {
+			*tlsClientCertPath = fmt.Sprintf("%s/client-tls-crt.pem2", HOME)
+		}
+	}
+	// TLS keyPath
+	if *tlsClientKeyPath == "" {
+		tlsClientKeyPathEnvValue := os.Getenv("TLS_CLIENT_KEY_PATH")
+		if tlsClientKeyPathEnvValue != "" {
+			*tlsClientKeyPath = tlsClientKeyPathEnvValue
+		} else {
+			*tlsClientKeyPath = fmt.Sprintf("%s/client-tls-key.pem2", HOME)
+		}
+	}
+	// NOTE: TLSInsecure not settable by env, just apiserver cli flag or defaults to false
 
 	logger := setupLogger(*debugFlag)
 	defer logger.Sync()
@@ -483,11 +582,28 @@ func main() {
 		testMode:            *testMode,
 		preCheckEndpointURL: *preCheckEndpointURL,
 		instructLabBotUrl:   *InstructLabBotUrl,
+		tlsConfig: TLSConfig{
+			TlsInsecure:         *tlsInsecure,
+			TlsClientCertPath:   *tlsClientCertPath,
+			TlsClientKeyPath:    *tlsClientKeyPath,
+			TlsServerCaCertPath: *tlsServerCaCertPath,
+		},
 	}
 	svr.setupRoutes(*apiUser, *apiPass)
 
-	svr.logger.Info("ApiServer starting", zap.String("listen-address", *listenAddress))
-	if err := svr.router.Run(*listenAddress); err != nil {
-		svr.logger.Error("ApiServer failed to start", zap.Error(err))
+	if *tlsInsecure == false {
+		// Check if we is valid key pair
+		_, err := tls.LoadX509KeyPair(*tlsClientCertPath, *tlsClientKeyPath)
+		if err != nil {
+			logger.Fatal(fmt.Errorf("TLS enforced but failed to load client certificate/key: %w", err))
+		}
+		svr.logger.Info("ApiServer starting with TLS", zap.String("listen-address", *listenAddress))
+		if err := svr.router.RunTLS(*listenAddress, *tlsClientCertPath, *tlsClientKeyPath); err != nil {
+			svr.logger.Error("ApiServer failed to start", zap.Error(err))
+		}
+	} else {
+		if err := svr.router.Run(*listenAddress); err != nil {
+			svr.logger.Error("ApiServer failed to start", zap.Error(err))
+		}
 	}
 }
