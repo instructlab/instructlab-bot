@@ -521,9 +521,9 @@ func main() {
 	InstructLabBotUrl := pflag.String("bot-url", InstructLabBotUrl, "InstructLab Bot URL")
 	// TLS variables
 	tlsInsecure := pflag.Bool("tls-insecure", false, "Whether to skip TLS verification")
-	tlsClientCertPath := pflag.String("tls-client-cert", "$HOME/client-tls-crt.pem2", "Path to the TLS client certificate. Defaults to 'client-tls-crt.pem2'")
-	tlsClientKeyPath := pflag.String("tls-client-key", "$HOME/client-tls-key.pem2", "Path to the TLS client key. Defaults to 'client-tls-key.pem2'")
-	tlsServerCaCertPath := pflag.String("tls-server-ca-cert", "$HOME/server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
+	tlsClientCertPath := pflag.String("tls-client-cert", "", "Path to the TLS client certificate. Evantually defaults to '$HOME/client-tls-crt.pem2'")
+	tlsClientKeyPath := pflag.String("tls-client-key", "", "Path to the TLS client key. Evantually defaults to '$HOME/client-tls-key.pem2'")
+	tlsServerCaCertPath := pflag.String("tls-server-ca-cert", "", "Path to the TLS server CA certificate. Evantually defaults to '$HOME/server-ca-crt.pem2'")
 	pflag.Parse()
 
 	/* ENV support, most variabls take 3 options, with the following priority:
@@ -536,7 +536,6 @@ func main() {
 	// With no comment, assume they support all 3.
 
 	// Precheck endpoint
-	HOME := os.Getenv("HOME")
 	if *preCheckEndpointURL == "" {
 		preCheckEndpointURLEnvValue := os.Getenv("PECHECK_ENDPOINT")
 		if preCheckEndpointURLEnvValue != "" {
@@ -547,6 +546,7 @@ func main() {
 	}
 
 	// TLS configurations
+	HOME := os.Getenv("HOME")
 	if *tlsClientCertPath == "" {
 		tlsClientCertPathEnvValue := os.Getenv("TLS_CLIENT_CERT_PATH")
 		if tlsClientCertPathEnvValue != "" {
@@ -562,6 +562,14 @@ func main() {
 			*tlsClientKeyPath = tlsClientKeyPathEnvValue
 		} else {
 			*tlsClientKeyPath = fmt.Sprintf("%s/client-tls-key.pem2", HOME)
+		}
+	}
+	if *tlsServerCaCertPath == "" {
+		tlsServerCaCertPathEnvValue := os.Getenv("TLS_SERVER_CA_CERT_PATH")
+		if tlsServerCaCertPathEnvValue != "" {
+			*tlsServerCaCertPath = tlsServerCaCertPathEnvValue
+		} else {
+			*tlsServerCaCertPath = fmt.Sprintf("%s/server-ca-crt.pem2", HOME)
 		}
 	}
 
