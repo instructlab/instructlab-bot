@@ -227,7 +227,6 @@ func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpoint
 	if WorkDir != "" {
 		workDir = WorkDir
 	}
-	chatlogDir := path.Join(workDir, "data", "chatlogs")
 	combinedYAMLScoringPath := path.Join(outputDir, "combined_chatlog_scoring.yaml")
 
 	type QuestionScore struct {
@@ -244,7 +243,7 @@ func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpoint
 
 	yamlData := QuestionScoreReport{}
 	for i := 0; i < len(precheckPRAnswers); i++ {
-		err, promptTemplate := generatePrecheckScoringPrompt(precheckPRAnswers[i], precheckPRQuestions[i])
+		err, promptTemplate := generatePrecheckScoringPrompt(precheckPRAnswers[i], precheckEndpointAnswers[i])
 		if err != nil {
 			w.logger.Errorf("Failed to generate a prompt for precheck scorring: %v", err)
 			return err
@@ -293,7 +292,7 @@ func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpoint
 		return err
 	}
 
-	err = os.WriteFile(path.Join(chatlogDir, combinedYAMLScoringPath), scoringYaml, 0644)
+	err = os.WriteFile(combinedYAMLScoringPath, scoringYaml, 0644)
 	if err != nil {
 		w.logger.Errorf("Could not write chatlog to file: %v", err)
 		return err
