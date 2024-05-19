@@ -224,9 +224,9 @@ run-on-kind:
 
 .PHONY: docker-clean
 docker-clean:
-	@container_ids=$$(docker ps -a --format "{{.ID}}" | awk '{print $$1}'); \
+	@container_ids=$$(podman ps -a --format "{{.ID}}" | awk '{print $$1}'); \
 	echo "removing all stopped containers (non-force)"; \
     for id in $$container_ids; do \
         echo "Removing container: $$id,"; \
-        docker rm $$id; \
+        podman rm $$id; \
     done
