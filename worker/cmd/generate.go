@@ -243,7 +243,7 @@ func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpoint
 
 	yamlData := QuestionScoreReport{}
 	for i := 0; i < len(precheckPRAnswers); i++ {
-		err, promptTemplate := generatePrecheckScoringPrompt(precheckPRAnswers[i], precheckEndpointAnswers[i])
+		err, promptTemplate := generatePrecheckScoringPrompt(precheckPRAnswers[i], precheckEndpointAnswers[i], precheckPRQuestions[i])
 		if err != nil {
 			w.logger.Errorf("Failed to generate a prompt for precheck scorring: %v", err)
 			return err
