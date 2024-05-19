@@ -526,11 +526,14 @@ func main() {
 	tlsServerCaCertPath := pflag.String("tls-server-ca-cert", "$HOME/server-ca-crt.pem2", "Path to the TLS server CA certificate. Defaults to 'server-ca-crt.pem2'")
 	pflag.Parse()
 
-	/* Support env population with priority being:
+	/* ENV support, most variabls take 3 options, with the following priority:
 	1) flag
 	2) env
 	3) acceptable defaults
 	*/
+
+	// NOTE: not all variables support all 3 methods, in which case they will be documented via comments.
+	// With no comment, assume they support all 3.
 
 	// Precheck endpoint
 	HOME := os.Getenv("HOME")
@@ -542,7 +545,8 @@ func main() {
 			*preCheckEndpointURL = localEndpoint
 		}
 	}
-	// TLS certPath
+
+	// TLS configurations
 	if *tlsClientCertPath == "" {
 		tlsClientCertPathEnvValue := os.Getenv("TLS_CLIENT_CERT_PATH")
 		if tlsClientCertPathEnvValue != "" {
@@ -560,7 +564,26 @@ func main() {
 			*tlsClientKeyPath = fmt.Sprintf("%s/client-tls-key.pem2", HOME)
 		}
 	}
+
 	// NOTE: TLSInsecure not settable by env, just apiserver cli flag or defaults to false
+
+	/* API credentials
+	API creds support only apiserver cli flag or env, no default values.
+	*/
+	// API user
+	if *apiUser == "" {
+		apiUserEnvValue := os.Getenv("API_USER")
+		if apiUserEnvValue != "" {
+			*apiUser = apiUserEnvValue
+		}
+	}
+	// API pass
+	if *apiPass == "" {
+		apiPassEnvValue := os.Getenv("API_PASS")
+		if apiPassEnvValue != "" {
+			*apiPass = apiPassEnvValue
+		}
+	}
 
 	logger := setupLogger(*debugFlag)
 	defer logger.Sync()
