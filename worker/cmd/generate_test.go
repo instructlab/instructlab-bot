@@ -153,6 +153,7 @@ func TestFetchModelName(t *testing.T) {
 		zap.NewExample().Sugar(),
 		"job-id",
 		mockServer.URL,
+		mockServer.URL,
 		"http://sdg-example.com",
 		"dummy-client-cert-path.pem",
 		"dummy-client-key-path.pem",
@@ -160,12 +161,12 @@ func TestFetchModelName(t *testing.T) {
 		20,
 	)
 
-	modelName, err := w.fetchModelName(false)
+	modelName, err := w.fetchModelName(false, w.precheckEndpoint)
 	assert.NoError(t, err, "fetchModelName should not return an error")
 	expectedModelName := "Mixtral-8x7B-Instruct-v0.1"
 	assert.Equal(t, expectedModelName, modelName, "The model name should be extracted correctly")
 
-	modelName, err = w.fetchModelName(true)
+	modelName, err = w.fetchModelName(true, w.precheckEndpoint)
 	assert.NoError(t, err, "fetchModelName should not return an error")
 	expectedModelName = "/shared_model_storage/transformers_cache/models--mistralai--Mixtral-8x7B-Instruct-v0.1/snapshots/5c79a376139be989ef1838f360bf4f1f256d7aec"
 	assert.Equal(t, expectedModelName, modelName, "The model name should be extracted correctly")
@@ -214,13 +215,14 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 		zap.NewExample().Sugar(),
 		"job-id",
 		mockServer.URL,
+		mockServer.URL,
 		"http://sdg-example.com",
 		"dummy-client-cert-path.pem",
 		"dummy-client-key-path.pem",
 		"dummy-ca-cert-path.pem",
 		20,
 	)
-	modelName, err := w.fetchModelName(false)
+	modelName, err := w.fetchModelName(false, w.precheckEndpoint)
 
 	// Verify that an error was returned due to the invalid "object" field
 	assert.Error(t, err, "fetchModelName should return an error for invalid object field")
