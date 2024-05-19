@@ -255,7 +255,7 @@ func (w *Worker) runPrecheckScoring(precheckPRAnswers []string, precheckEndpoint
 			commandStr += " --tls-insecure"
 		}
 		if PreCheckScoringEndpointURL != localEndpoint && preCheckScoringModelName != "unknown" {
-			commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, preCheckScoringModelName)
+			commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckScoringEndpointURL, preCheckScoringModelName)
 		}
 		cmdArgs := strings.Fields(commandStr)
 		cmd := exec.Command(lab, cmdArgs...)
