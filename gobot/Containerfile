@@ -1,5 +1,11 @@
 FROM registry.access.redhat.com/ubi8/ubi as build
 
+ARG GITHUB_USER
+ARG GITHUB_TOKEN
+
+ENV GITHUB_USER=$ILWORKER_GITHUB_USERNAME
+ENV GITHUB_TOKEN=$ILWORKER_GITHUB_TOKEN
+
 RUN dnf update -qy && \
     dnf install --setopt=install_weak_deps=False -qy \
     go \
