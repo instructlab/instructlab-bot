@@ -266,23 +266,25 @@ func generateFormattedYAML(ctx context.Context, outputDir, filename string, svc 
 	return s3Key
 }
 
-func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnswer string) (error, string) {
+func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnswer string, precheckQuestion string) (error, string) {
 	promptTemplate := `
- 	Evaluate and compare the below Human answer and Model answer. Respond with only the numerical score with no explaination.
+ 	Evaluate and compare the below Human answer and Model answer when given the same question. Respond with only the numerical score with no explaination.
   	Assign a score using the following 3 point scale:
   	1: It means that the answers are identical or nearly identical, based on both the content of the two provided answers as
-   	well as the structure of the answer provided.
+   	well as the wording and details of the answer provided.
 
-     	2: It means that there is moderate variation in the answers. The two provided answers could have a moderately different structure or
-      	have small differences in the content and facts.
+     	2: It means that there is moderate variation in the answers. The two provided answers could have a moderately different sentence structure
+	and wording, or have some differences in the content or perspective, but still share some key points.
 
-       	3: It means there is significant variation in the answers. The two provided answers differ greatly in structure or have very different
-	or even contridictory facts and content.
+       	3: It means the answers are significantly different. The two provided answers differ greatly in wording and perspective or have very different
+	or contridictory facts and content.
 
- 	% Human answer:
-	{{ .HumanAnswer }}
-	% Model answer:
-	{{ .ModelAnswer }}
+ 	Question:
+  	"{{ .Question }}"
+ 	Human answer:
+	"{{ .HumanAnswer }}"
+	Model answer:
+	"{{ .ModelAnswer }}"
  
 	`
 
@@ -294,9 +296,11 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnsw
 	data := struct {
 		HumanAnswer string
 		ModelAnswer string
+		Question string
 	}{
 		HumanAnswer: precheckPRAnswer,
 		ModelAnswer: precheckEndpointAnswer,
+		Question: precheckQuestion
 	}
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, data)
