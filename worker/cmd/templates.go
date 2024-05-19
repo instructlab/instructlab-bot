@@ -300,7 +300,7 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnsw
 	}{
 		HumanAnswer: precheckPRAnswer,
 		ModelAnswer: precheckEndpointAnswer,
-		Question: precheckQuestion
+		Question: precheckQuestion,
 	}
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, data)
