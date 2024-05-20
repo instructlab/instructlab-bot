@@ -268,7 +268,7 @@ func generateFormattedYAML(ctx context.Context, outputDir, filename string, svc 
 
 func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnswer string, precheckQuestion string) (error, string) {
 	promptTemplate := `
- 	Evaluate and compare the below Human answer and Model answer when given the same question. Respond with only the numerical score with no explaination.
+ 	Evaluate and compare the below ### Human answer and ### Model answer when given the same ### Question provided below. Respond with only the numerical score with no explanation.
   	Assign a score using the following 3 point scale:
   	1: It means that the answers are identical or nearly identical, based on both the content of the two provided answers as
    	well as the wording and details of the answer provided.
@@ -279,11 +279,11 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnsw
        	3: It means the answers are significantly different. The two provided answers differ greatly in wording and perspective or have very different
 	or contridictory facts and content.
 
- 	Question:
+ 	### Question:
   	"{{ .Question }}"
- 	Human answer:
+ 	### Human answer:
 	"{{ .HumanAnswer }}"
-	Model answer:
+	### Model answer:
 	"{{ .ModelAnswer }}"
  
 	`
