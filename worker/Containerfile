@@ -5,7 +5,7 @@ ENV WORK_DIR /app
 
 WORKDIR ${WORK_DIR}
 
-COPY . ${WORK_DIR}/instructlab-bot
+COPY worker ${WORK_DIR}/instructlab-bot/worker
 
 # Build the worker binary
 WORKDIR ${WORK_DIR}/instructlab-bot/worker

@@ -221,3 +221,12 @@ run-on-kind:
 	$(CMD_PREFIX) kubectl create namespace instructlab-bot
 	$(CMD_PREFIX) kubectl create -n instructlab-bot secret generic instructlab-bot --from-env-file=.env
 	$(CMD_PREFIX) kubectl apply -k deploy/instructlab-bot/overlays/dev
+
+.PHONY: docker-clean
+docker-clean:
+	@container_ids=$$(podman ps -a --format "{{.ID}}" | awk '{print $$1}'); \
+	echo "removing all stopped containers (non-force)"; \
+    for id in $$container_ids; do \
+        echo "Removing container: $$id,"; \
+        podman rm $$id; \
+    done

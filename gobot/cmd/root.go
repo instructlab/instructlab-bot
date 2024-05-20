@@ -67,6 +67,12 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVarP(&Maintainers, "maintainers", "", []string{}, "GitHub users or groups that are considered maintainers")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringVarP(&BotUsername, "bot-username", "", "@instructlab-bot", "The username of the bot")
+	if GithubToken == "" {
+		GithubToken = os.Getenv("ILWORKER_GITHUB_TOKEN")
+	}
+	if GithubUsername == "" {
+		GithubUsername = os.Getenv("ILWORKER_GITHUB_USERNAME")
+	}
 }
 
 var rootCmd = &cobra.Command{
