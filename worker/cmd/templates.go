@@ -268,7 +268,8 @@ func generateFormattedYAML(ctx context.Context, outputDir, filename string, svc 
 
 func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnswer string, precheckQuestion string) (error, string) {
 	promptTemplate := `
- 	Evaluate and compare the below ### Human answer and ### Model answer when given the same ### Question provided below. Respond with only the numerical score with no explanation.
+ 	Evaluate and compare the quality of the below ### Model answer compared to the ### Human answer when given the same ### Question provided below.
+  	The ### Human answer is to be treated as the ground truth answer.
   	Assign a score using the following 3 point scale:
   	1: It means that the answers are identical or nearly identical, based on both the content of the two provided answers as
    	well as the wording and details of the answer provided.
