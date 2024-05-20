@@ -279,7 +279,7 @@ func generatePrecheckScoringPrompt(precheckPRAnswer string, precheckEndpointAnsw
 
        	3: It means the answers are significantly different. The two provided answers differ greatly in wording and perspective or have very different
 	or contridictory facts and content.
-
+ 
  	### Question:
   	"{{ .Question }}"
  	### Human answer:
