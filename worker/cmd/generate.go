@@ -233,7 +233,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 	}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
 	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
-	combinedLogPath := path.Join(outputDir, "combined_chatlogs.log")
+	combinedYAMLHTMLPath := path.Join(outputDir, "combined_chatlogs.html")
 
 	defer func() {
 		// Move everything from chatlogDir to outputDir
@@ -244,7 +244,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		}
 
 		var combinedLogs []map[string]interface{}
-		var combinedLogsText strings.Builder
+		var fileNames []string
 
 		for _, file := range chatlogFiles {
 			if strings.HasSuffix(file.Name(), ".yaml") {
@@ -261,27 +261,19 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 					continue
 				}
 				combinedLogs = append(combinedLogs, logData)
-			} else if strings.HasSuffix(file.Name(), ".log") {
-				// Read individual log files
-				content, err := os.ReadFile(path.Join(chatlogDir, file.Name()))
-				if err != nil {
-					w.logger.Errorf("Could not read log file %s: %v", file.Name(), err)
-					continue
-				}
-				// Add delimiter before each log
-				combinedLogsText.WriteString(fmt.Sprintf("\n\n----- %s -----\n\n\n", file.Name()))
-				combinedLogsText.Write(content)
-			}
 
+			}
 			// Move individual file to outputDir
 			if err := os.Rename(path.Join(chatlogDir, file.Name()), path.Join(outputDir, file.Name())); err != nil {
 				w.logger.Errorf("Could not move file %s: %v", file.Name(), err)
 				continue
 			}
+			fileNames = append(fileNames, file.Name())
 		}
 
 		// Write the combined YAML file
 		if len(combinedLogs) > 0 {
+			// standard combined yaml file
 			combinedYAML, err := yaml.Marshal(combinedLogs)
 			if err != nil {
 				w.logger.Errorf("Could not marshal combined YAML data: %v", err)
@@ -292,15 +284,27 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				return
 			}
 			w.logger.Infof("Combined YAML file written to %s", combinedYAMLPath)
-		}
 
-		// Write the combined log file
-		if combinedLogsText.Len() > 0 {
-			if err := os.WriteFile(combinedLogPath, []byte(combinedLogsText.String()), 0644); err != nil {
-				w.logger.Errorf("Could not write combined log file: %v", err)
-				return
+			combinedLogHtmlFile, err := os.Create(combinedYAMLHTMLPath)
+			if err != nil {
+				w.logger.Errorf("Could not create combined_yaml.html: %v", err)
 			}
-			w.logger.Infof("Combined log file written to %s", combinedLogPath)
+			defer combinedLogHtmlFile.Close()
+
+			// build yamlEntries array from files
+			var yamlEntries []string
+			var yamlFileBytes []byte
+			for _, yamlFile := range combinedLogs {
+				yamlFileBytes, err = yaml.Marshal(yamlFile)
+				if err != nil {
+					w.logger.Errorf("Could not create unmarshal map to yaml: %v", err)
+				}
+				yamlEntries = append(yamlEntries, string(yamlFileBytes))
+			}
+			if err := generateAllHTML(combinedLogHtmlFile, yamlEntries, fileNames); err != nil {
+				w.logger.Errorf("Could not generate index.html: %v", err)
+			}
+			w.logger.Infof("Combined log file written to %s", combinedLogHtmlFile)
 		}
 	}()
 
