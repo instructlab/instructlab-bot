@@ -7,10 +7,8 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"time"
 
-	"github.com/Pallinder/go-randomdata"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -73,6 +71,7 @@ const (
 	KnowledgeStr        = "knowledge"
 	YamlFileName        = "qna.yaml"
 	AttributionFileName = "attribution.txt"
+	branchNamePrefix    = "bot-pr"
 )
 
 func (prc *PullRequestCreateHandler) SkillPRHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +89,7 @@ func (prc *PullRequestCreateHandler) SkillPRHandler(w http.ResponseWriter, r *ht
 		PullRequestCreateHandler: *prc,
 	}
 
-	prTask.branchName = prc.generateBranchName()
+	prTask.branchName = prc.generateBranchName(SkillStr)
 
 	// Clone the taxonomy repo
 	repo, err := prTask.cloneTaxonomyRepo()
@@ -160,7 +159,7 @@ func (prc *PullRequestCreateHandler) KnowledgePRHandler(w http.ResponseWriter, r
 		PullRequestCreateHandler: *prc,
 	}
 
-	prTask.branchName = prc.generateBranchName()
+	prTask.branchName = prc.generateBranchName(KnowledgeStr)
 
 	// Clone the taxonomy repo
 	repo, err := prTask.cloneTaxonomyRepo()
@@ -476,8 +475,7 @@ func (prt *PullRequestTask) createPullRequest(prType string, prTitle string, prD
 }
 
 // TODO: We need better way to generate branch name
-func (prc *PullRequestCreateHandler) generateBranchName() string {
-	str := randomdata.City()
-	str = strings.ReplaceAll(str, " ", "_")
-	return str
+func (prc *PullRequestCreateHandler) generateBranchName(prType string) string {
+	return fmt.Sprintf("%s-%s-%s", branchNamePrefix, prType, time.Now().Format("20060102150405"))
+
 }
