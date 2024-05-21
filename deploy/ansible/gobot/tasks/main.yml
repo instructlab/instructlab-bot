@@ -23,5 +23,5 @@
       ILBOT_HTTP_ADDRESS: "127.0.0.1"  # Bot's local http server ip address
       ILBOT_HTTP_PORT: "8081"  # Bot's local http server port
       # List of teams that are allowed to run bot commands on the PR
-      ILBOT_MAINTAINERS: "taxonomy-triagers,taxonomy-approvers,taxonomy-maintainers,labrador-org-maintainers,instruct-lab-bot-maintainers"
+      ILBOT_MAINTAINERS: "taxonomy-triagers,taxonomy-approvers,taxonomy-maintainers,instruct-lab-bot-triagers,instruct-lab-bot-maintainers,oversight-committee"
       ILBOT_REQUIRED_LABELS: "skill,knowledge"  # Labels required on each PR to run any bot command.
