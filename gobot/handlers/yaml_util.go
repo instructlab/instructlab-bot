@@ -8,6 +8,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	MaxLen = 110
+)
+
 type SkillYaml struct {
 	Task_description string `yaml:"task_description"`
 	Created_by       string `yaml:"created_by"`
@@ -35,7 +39,7 @@ type KnowledgeYaml struct {
 
 func (prc *PullRequestCreateHandler) generateKnowledgeYaml(requestData KnowledgePRRequest) (string, error) {
 	knowledgeYaml := KnowledgeYaml{
-		Task_description: strings.TrimSpace(requestData.Task_description),
+		Task_description: splitLongLines(strings.TrimSpace(requestData.Task_description), MaxLen),
 		Created_by:       strings.TrimSpace(requestData.Name),
 		Domain:           strings.TrimSpace(requestData.Domain),
 		Seed_examples: []struct {
@@ -61,12 +65,12 @@ func (prc *PullRequestCreateHandler) generateKnowledgeYaml(requestData Knowledge
 			yaml.Node{
 				Kind:  yaml.ScalarNode,
 				Style: yaml.FoldedStyle,
-				Value: strings.TrimSpace(question),
+				Value: splitLongLines(strings.TrimSpace(question), MaxLen),
 			},
 			yaml.Node{
 				Kind:  yaml.ScalarNode,
 				Style: yaml.FoldedStyle,
-				Value: strings.TrimSpace(requestData.Answers[i]),
+				Value: splitLongLines(strings.TrimSpace(requestData.Answers[i]), MaxLen),
 			},
 		})
 	}
@@ -89,7 +93,7 @@ func (prc *PullRequestCreateHandler) generateKnowledgeAttributionData(requestDat
 
 func (prc *PullRequestCreateHandler) generateSkillYaml(requestData SkillPRRequest) (string, error) {
 	skillYaml := SkillYaml{
-		Task_description: strings.TrimSpace(requestData.Task_description),
+		Task_description: splitLongLines(strings.TrimSpace(requestData.Task_description), MaxLen),
 		Created_by:       strings.TrimSpace(requestData.Name),
 		Seed_examples: []struct {
 			Question yaml.Node
@@ -107,21 +111,20 @@ func (prc *PullRequestCreateHandler) generateSkillYaml(requestData SkillPRReques
 			yaml.Node{
 				Kind:  yaml.ScalarNode,
 				Style: yaml.FoldedStyle,
-				Value: strings.TrimSpace(question),
+				Value: splitLongLines(strings.TrimSpace(question), MaxLen),
 			},
 			yaml.Node{
 				Kind:  yaml.ScalarNode,
 				Style: yaml.FoldedStyle,
-				Value: strings.TrimSpace(requestData.Contexts[i]),
+				Value: splitLongLines(strings.TrimSpace(requestData.Contexts[i]), MaxLen),
 			},
 			yaml.Node{
 				Kind:  yaml.ScalarNode,
 				Style: yaml.FoldedStyle,
-				Value: strings.TrimSpace(requestData.Answers[i]),
+				Value: splitLongLines(strings.TrimSpace(requestData.Answers[i]), MaxLen),
 			},
 		})
 	}
-
 	// Generate the yaml file using new yaml encoder
 	var buf bytes.Buffer
 	yamlEncoder := yaml.NewEncoder(&buf)
@@ -136,4 +139,26 @@ func (prc *PullRequestCreateHandler) generateSkillAttributionData(requestData Sk
 	return fmt.Sprintf("Title of work: %s \nLink to work: %s \nLicense of the work: %s \nCreator names: %s",
 		strings.TrimSpace(requestData.Title_work), strings.TrimSpace(requestData.Link_work),
 		strings.TrimSpace(requestData.License_work), strings.TrimSpace(requestData.Creators))
+}
+
+func splitLongLines(input string, maxLen int) string {
+	var result strings.Builder
+	lines := strings.Split(input, "\n")
+
+	if len(lines) > 1 || len(lines[0]) > maxLen {
+		for _, line := range lines {
+			for len(line) > maxLen {
+				splitIndex := strings.LastIndexAny(line[:maxLen], " \t")
+				if splitIndex == -1 {
+					splitIndex = maxLen
+				}
+				result.WriteString(line[:splitIndex] + "\n")
+				line = line[splitIndex:]
+				line = strings.TrimLeft(line, " \t")
+			}
+			result.WriteString(line + "\n")
+		}
+		return result.String()
+	}
+	return input
 }
