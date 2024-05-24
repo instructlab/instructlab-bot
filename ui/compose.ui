@@ -81,3 +81,26 @@ services:
           devices:
             - driver: nvidia
               capabilities: [gpu]
+  
+  milvus:
+    container_name: milvus-standalone
+    image: quay.io/ai-lab/vector_dbs/milvus@sha256:7d0be442cbcafeebdb056c56b16f7f7fe96b235d7a82cfdd57edc302042d00eb
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_CONFIG_PATH: "/milvus/configs/embedEtcd.yaml"
+      COMMON_STORAGETYPE: "local"
+    volumes:
+      - /home/fedora/milvus-volume:/var/lib/milvus
+    ports:
+      - 19530:19530
+      - 9091:9091
+      - 2379:2379
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9091/healthz || exit 1"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 90s
+    command: milvus run standalone
