@@ -24,10 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/go-git/go-git/v5"
-	gitconfig "github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/gomodule/redigo/redis"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -283,7 +279,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				w.logger.Errorf("Could not write combined YAML file: %v", err)
 				return
 			}
-			w.logger.Infof("Combined YAML file written to %s", combinedYAMLPath)
+			w.logger.Debugf("Combined YAML file written to %s", combinedYAMLPath)
 
 			combinedLogHtmlFile, err := os.Create(combinedYAMLHTMLPath)
 			if err != nil {
@@ -304,7 +300,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			if err := generateAllHTML(combinedLogHtmlFile, yamlEntries, fileNames); err != nil {
 				w.logger.Errorf("Could not generate index.html: %v", err)
 			}
-			w.logger.Infof("Combined log file written to %s", combinedLogHtmlFile)
+			w.logger.Debugf("Combined log file written to %v", combinedLogHtmlFile)
 		}
 	}()
 
@@ -706,125 +702,15 @@ func (w *Worker) processJob() {
 
 	// Notify the "results" queue that the job is done with the public URL
 	w.postJobResults(indexPublicURL, jobType)
+
+	// Clean up the taxonomy directory if it exists
+	if _, err := os.Stat(taxonomyDir); !os.IsNotExist(err) {
+		sugar.Warnf("Taxonomy directory exists, deleting %s", taxonomyDir)
+		if err := deleteTaxonomyDir(taxonomyDir); err != nil {
+			sugar.Errorf("could not delete existing taxonomy directory: %v", err)
+		}
+	}
 	sugar.Infof("Job done")
-}
-
-// gitOperations handles the Git-related operations for a job and returns the head hash
-func (w *Worker) gitOperations(sugar *zap.SugaredLogger, taxonomyDir string, prNumber string) (string, error) {
-	sugar.Debug("Opening taxonomy git repo")
-
-	var r *git.Repository
-	if _, err := os.Stat(taxonomyDir); os.IsNotExist(err) {
-		sugar.Warnf("Taxonomy directory does not exist, cloning from %s", GitRemote)
-		r, err = git.PlainClone(taxonomyDir, false, &git.CloneOptions{
-			URL: GitRemote,
-			Auth: &githttp.BasicAuth{
-				Username: GithubUsername,
-				Password: GithubToken,
-			},
-		})
-		if err != nil {
-			return "", fmt.Errorf("could not clone taxonomy git repo: %v", err)
-		}
-	} else {
-		r, err = git.PlainOpen(taxonomyDir)
-		if err != nil {
-			return "", fmt.Errorf("could not open taxonomy git repo: %v", err)
-		}
-	}
-
-	retryFetch := func() error {
-		var lastErr error
-		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
-			sugar.Debug("Fetching from origin")
-			err := r.Fetch(&git.FetchOptions{
-				RemoteName: Origin,
-				Auth: &githttp.BasicAuth{
-					Username: GithubUsername,
-					Password: GithubToken,
-				},
-			})
-			if err == nil {
-				return nil
-			}
-			lastErr = err
-			if attempt < gitMaxRetries {
-				sugar.Infof("Retrying fetching updates, attempt %d/%d", attempt+1, gitMaxRetries)
-				time.Sleep(gitRetryDelay)
-			}
-		}
-		return lastErr
-	}
-	if err := retryFetch(); err != nil && err != git.NoErrAlreadyUpToDate {
-		return "", fmt.Errorf("could not fetch from origin: %v", err)
-	}
-
-	wt, err := r.Worktree()
-	if err != nil {
-		return "", fmt.Errorf("could not get worktree: %v", err)
-	}
-
-	sugar.Debug("Checking out main")
-	// Retry mechanism for checking out main branch
-	retryCheckout := func() error {
-		var lastErr error
-		for attempt := 1; attempt <= gitMaxRetries; attempt++ {
-			err := wt.Checkout(&git.CheckoutOptions{
-				Branch: plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/main", Origin)),
-			})
-			if err == nil {
-				return nil
-			}
-			lastErr = err
-			if attempt < gitMaxRetries {
-				sugar.Infof("Retrying checkout of main, attempt %d/%d", attempt+1, gitMaxRetries)
-				time.Sleep(gitRetryDelay)
-			}
-		}
-		return lastErr
-	}
-
-	if err := retryCheckout(); err != nil {
-		return "", fmt.Errorf("could not checkout main after retries: %v", err)
-	}
-
-	prBranchName := fmt.Sprintf("pr-%s", prNumber)
-	if _, err := r.Branch(prBranchName); err == nil {
-		err = r.DeleteBranch(prBranchName)
-		if err != nil {
-			return "", fmt.Errorf("could not delete branch %s: %v", prBranchName, err)
-		}
-	}
-
-	sugar = sugar.With("pr_branch_name", prBranchName)
-	sugar.Debug("Fetching PR branch")
-	refspec := gitconfig.RefSpec(fmt.Sprintf("refs/pull/%s/head:refs/heads/%s", prNumber, prBranchName))
-	err = r.Fetch(&git.FetchOptions{
-		RemoteName: Origin,
-		RefSpecs:   []gitconfig.RefSpec{refspec},
-		Auth: &githttp.BasicAuth{
-			Username: "instructlab-bot",
-			Password: GithubToken,
-		},
-	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return "", fmt.Errorf("could not fetch PR branch: %v", err)
-	}
-
-	sugar.Debug("Checking out PR branch")
-	err = wt.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(prBranchName),
-	})
-	if err != nil {
-		return "", fmt.Errorf("could not checkout PR branch: %v", err)
-	}
-
-	head, err := r.Head()
-	if err != nil {
-		return "", fmt.Errorf("could not get HEAD: %v", err)
-	}
-
-	return head.Hash().String(), nil
 }
 
 // postJobResults posts the results of a job to a Redis queue
