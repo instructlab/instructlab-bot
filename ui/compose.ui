@@ -93,6 +93,7 @@ services:
       COMMON_STORAGETYPE: "local"
     volumes:
       - /home/fedora/milvus-volume:/var/lib/milvus
+      - /home/fedora/instruct-lab-bot/milvus/seed:data/milvus/seed
     ports:
       - 19530:19530
       - 9091:9091

@@ -1,0 +1,9 @@
+pymilvus==2.4.3
+langchain==0.2.1
+langchain-community==0.2.1
+langchain-core==0.2.1
+langchain-openai==0.1.7
+langchain-experimental==0.0.59
+tika==2.6.0
+sentence-transformers==2.7.0
+beautifulsoup4==4.12.3

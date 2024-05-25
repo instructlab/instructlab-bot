@@ -12,6 +12,9 @@ models
 generated
 .idea
 .DS_Store
+milvus/seed/data/*
+*.venv
+*venv
 
 # UI assets
 **/node_modules
