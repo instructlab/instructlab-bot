@@ -7,8 +7,8 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 export const authOptions: NextAuthOptions = {
   providers: [
     GitHubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
+      clientId: process.env.OAUTH_GITHUB_ID!,
+      clientSecret: process.env.OAUTH_GITHUB_SECRET!,
     }),
     CredentialsProvider({
       name: 'Credentials',
@@ -44,6 +44,9 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+  },
+  pages: {
+    signIn: '/login',
   },
 };
 
