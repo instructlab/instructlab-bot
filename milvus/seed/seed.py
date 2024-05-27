@@ -4,7 +4,7 @@ from langchain_community.vectorstores import Milvus
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings, HuggingFaceInstructEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
 from langchain import hub
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -24,18 +24,25 @@ def milvus_init() -> MilvusClient:
 
 def fill_dnd_collection(text_splitter: any, embeddings: any) -> None:
     # local
-    raw = parser.from_file("data/DnD-5e-Handbook.pdf")
-    print(len(raw['content']))
-    docs = text_splitter.create_documents([raw['content']])
+    # raw = parser.from_file("data/DnD-5e-Handbook.pdf")
+    # print(len(raw['content']))
+    # docs = text_splitter.create_documents([raw['content']])
+    # vector_store = Milvus.from_documents(
+    #     docs,
+    #     embedding=embeddings,
+    #     connection_args={"host": "localhost", "port": 19530},
+    #     collection_name="dnd"
+    # )
+    # remote
+    loader = PyPDFLoader('https://orkerhulen.dk/onewebmedia/DnD%205e%20Players%20Handbook%20%28BnW%20OCR%29.pdf')
+    data = loader.load()
+    split_data = text_splitter.split_documents(data)
     vector_store = Milvus.from_documents(
-        docs,
+        documents=split_data,
         embedding=embeddings,
         connection_args={"host": "localhost", "port": 19530},
         collection_name="dnd"
     )
-    # remote
-    # loader = PyPDFLoader('https://orkerhulen.dk/onewebmedia/DnD%205e%20Players%20Handbook%20%28BnW%20OCR%29.pdf')
-    # data = loader.load()
 
 def generate_embeddings() -> any:
     # model_name = "ibm/merlinite-7b"
