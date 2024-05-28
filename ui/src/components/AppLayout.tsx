@@ -74,11 +74,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     },
     {
       path: '/playground',
-      label: 'Playground',
+      label: 'Laboratory',
       children: [
         { path: '/playground/chat', label: 'Chat' },
-        { path: '/playground/devchat', label: 'Developer Chat' },
-        { path: '/playground/endpoints', label: 'Custom Model Endpoints' },
+        { path: '/playground/ragchat', label: 'RAG Chat' },
+        { path: '/playground/devchat', label: 'Developer Playground' },
+        { path: '/playground/endpoints', label: 'Custom Model Settings' },
       ],
     },
   ];
