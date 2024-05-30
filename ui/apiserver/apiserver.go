@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -29,14 +30,10 @@ const (
 const (
 	localEndpoint     = "http://localhost:8000/v1"
 	InstructLabBotUrl = "http://bot:8081"
+	TLSCertChainPath  = "/home/fedora/chain.pem"
+	TLSClientCRTPath  = "/home/fedora/client-tls-crt.pem2"
+	TLSClientKEYPath  = "/home/fedora/client-tls-key.pem2"
 )
-
-type TLSConfig struct {
-	TlsClientCertPath   string
-	TlsClientKeyPath    string
-	TlsServerCaCertPath string
-	TlsInsecure         bool
-}
 
 type ApiServer struct {
 	router              *gin.Engine
@@ -46,7 +43,7 @@ type ApiServer struct {
 	testMode            bool
 	preCheckEndpointURL string
 	instructLabBotUrl   string
-	tlsConfig           TLSConfig
+	devMode             bool
 }
 
 type JobData struct {
@@ -214,30 +211,23 @@ func (api *ApiServer) knowledgePRHandler(c *gin.Context) {
 }
 
 func (api *ApiServer) buildHTTPServer() (http.Client, error) {
-	defaultHTTPClient := http.Client{
-		Timeout: 0 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	if !api.tlsConfig.TlsInsecure {
-		certs, err := tls.LoadX509KeyPair(api.tlsConfig.TlsClientCertPath, api.tlsConfig.TlsClientKeyPath)
+	tlsInseucre := !api.devMode
+	if !api.devMode {
+		certPool := x509.NewCertPool()
+		pemData, err := os.ReadFile(TLSCertChainPath) // Replace with your certificate file path
 		if err != nil {
-			api.logger.Warnf("failed to load client certificate/key: %w", err)
-			return defaultHTTPClient, fmt.Errorf("Error load client certificate/key, defaulting to TLS Insecure session (http)")
+			err = fmt.Errorf("Failed to read cert chain file: %s", err)
+			api.logger.Error(err)
+			return http.Client{}, err
 		}
-		// // NOT SURE WE NEED SERVER CA CERT FOR THIS, PLEASE ADVISE
-		caCert, err := os.ReadFile(api.tlsConfig.TlsServerCaCertPath)
-		if err != nil {
-			api.logger.Warnf("failed to read server CA certificate: %w", err)
-			return defaultHTTPClient, fmt.Errorf("Error load server CA certificate, defaulting to TLS Insecure session (http)")
+		if !certPool.AppendCertsFromPEM(pemData) {
+			err = fmt.Errorf("Failed to append pemData to certPool: %s", err)
+			api.logger.Error(err)
+			return http.Client{}, err
 		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
 		tlsConfig := &tls.Config{
-			Certificates:       []tls.Certificate{certs},
-			RootCAs:            caCertPool,
-			InsecureSkipVerify: true,
+			RootCAs:            certPool,
+			InsecureSkipVerify: tlsInseucre,
 		}
 		httpClient := &http.Client{
 			Transport: &http.Transport{
@@ -248,7 +238,11 @@ func (api *ApiServer) buildHTTPServer() (http.Client, error) {
 		}
 		return *httpClient, nil
 	} else {
-		return defaultHTTPClient, nil
+		return http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: tlsInseucre},
+			},
+		}, nil
 	}
 }
 
@@ -256,29 +250,14 @@ func (api *ApiServer) buildHTTPServer() (http.Client, error) {
 func (api *ApiServer) sendPostRequest(url string, body io.Reader) (*http.Response, error) {
 	client, err := api.buildHTTPServer()
 	if err != nil {
-		// Either running http with tlsInsecure = true, or https runing with tlsInsecure = false
-		if err.Error() == "Error load client certificate/key, defaulting to TLS Insecure session (http)" ||
-			err.Error() == "Error load server CA certificate, defaulting to TLS Insecure session (http)" {
-			// Handle the specific error (e.g., log it)
-			api.logger.Warn("Warning: TLS certificate/key or server CA certificate not loaded, downgraded to http client.")
-		} else {
-			// Handle other errors
-			err = fmt.Errorf("Error creating http(s) server: %v", err)
-			fmt.Print(err)
-			return nil, err
-		}
-	}
-
-	request, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		api.logger.Errorf("Error creating http request: %v", err)
+		err = fmt.Errorf("Error creating http(s) server: %v", err)
+		api.logger.Error(err)
 		return nil, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	response, err := client.Do(request)
+	response, err := client.Post(url, "application/json", body)
 	if err != nil {
-		api.logger.Errorf("Error sending http request: %v", err)
-		return nil, err
+		api.logger.Errorf("Error creating and or sending http request: %v", err)
+		return response, err
 	}
 	return response, nil
 }
@@ -448,26 +427,19 @@ func (api *ApiServer) fetchModelName(fullName bool) (string, error) {
 	}
 	endpoint += "models"
 
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout = 10 * time.Second
-	http.DefaultTransport.(*http.Transport).ExpectContinueTimeout = 1 * time.Second
+	client, err := api.buildHTTPServer()
 
-	req, err := http.NewRequestWithContext(api.ctx, "GET", endpoint, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	response, err := client.Get(endpoint)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch model details: %w", err)
 	}
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d", response.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -520,10 +492,7 @@ func main() {
 	preCheckEndpointURL := pflag.String("precheck-endpoint", "", "Precheck endpoint URL")
 	InstructLabBotUrl := pflag.String("bot-url", InstructLabBotUrl, "InstructLab Bot URL")
 	// TLS variables
-	tlsInsecure := pflag.Bool("tls-insecure", false, "Whether to skip TLS verification")
-	tlsClientCertPath := pflag.String("tls-client-cert", "", "Path to the TLS client certificate. Evantually defaults to '$HOME/client-tls-crt.pem2'")
-	tlsClientKeyPath := pflag.String("tls-client-key", "", "Path to the TLS client key. Evantually defaults to '$HOME/client-tls-key.pem2'")
-	tlsServerCaCertPath := pflag.String("tls-server-ca-cert", "", "Path to the TLS server CA certificate. Evantually defaults to '$HOME/server-ca-crt.pem2'")
+	devMode := pflag.Bool("dev-mode", false, "Whether to skip TLS verification")
 	pflag.Parse()
 
 	/* ENV support, most variabls take 3 options, with the following priority:
@@ -542,34 +511,6 @@ func main() {
 			*preCheckEndpointURL = preCheckEndpointURLEnvValue
 		} else {
 			*preCheckEndpointURL = localEndpoint
-		}
-	}
-
-	// TLS configurations
-	HOME := os.Getenv("HOME")
-	if *tlsClientCertPath == "" {
-		tlsClientCertPathEnvValue := os.Getenv("TLS_CLIENT_CERT_PATH")
-		if tlsClientCertPathEnvValue != "" {
-			*tlsClientCertPath = tlsClientCertPathEnvValue
-		} else {
-			*tlsClientCertPath = fmt.Sprintf("%s/client-tls-crt.pem2", HOME)
-		}
-	}
-	// TLS keyPath
-	if *tlsClientKeyPath == "" {
-		tlsClientKeyPathEnvValue := os.Getenv("TLS_CLIENT_KEY_PATH")
-		if tlsClientKeyPathEnvValue != "" {
-			*tlsClientKeyPath = tlsClientKeyPathEnvValue
-		} else {
-			*tlsClientKeyPath = fmt.Sprintf("%s/client-tls-key.pem2", HOME)
-		}
-	}
-	if *tlsServerCaCertPath == "" {
-		tlsServerCaCertPathEnvValue := os.Getenv("TLS_SERVER_CA_CERT_PATH")
-		if tlsServerCaCertPathEnvValue != "" {
-			*tlsServerCaCertPath = tlsServerCaCertPathEnvValue
-		} else {
-			*tlsServerCaCertPath = fmt.Sprintf("%s/server-ca-crt.pem2", HOME)
 		}
 	}
 
@@ -604,6 +545,7 @@ func main() {
 		Addr: *redisAddress,
 	})
 
+	tlsInsecure := !*devMode
 	router := gin.Default()
 	svr := ApiServer{
 		router:              router,
@@ -613,23 +555,29 @@ func main() {
 		testMode:            *testMode,
 		preCheckEndpointURL: *preCheckEndpointURL,
 		instructLabBotUrl:   *InstructLabBotUrl,
-		tlsConfig: TLSConfig{
-			TlsInsecure:         *tlsInsecure,
-			TlsClientCertPath:   *tlsClientCertPath,
-			TlsClientKeyPath:    *tlsClientKeyPath,
-			TlsServerCaCertPath: *tlsServerCaCertPath,
-		},
+		devMode:             *devMode,
 	}
 	svr.setupRoutes(*apiUser, *apiPass)
 
-	if *tlsInsecure == false {
+	if tlsInsecure == false {
 		// Check if we is valid key pair
-		_, err := tls.LoadX509KeyPair(*tlsClientCertPath, *tlsClientKeyPath)
+
+		certPool := x509.NewCertPool()
+		pemData, err := os.ReadFile(TLSCertChainPath) // Replace with your certificate file path
 		if err != nil {
-			logger.Fatal(fmt.Errorf("TLS enforced but failed to load client certificate/key: %w", err))
+			log.Fatalf("Failed to read cert chain file: %s", err)
 		}
+		if !certPool.AppendCertsFromPEM(pemData) {
+			log.Fatalf("Failed to append pemData to certPool: %s", err)
+		}
+		// tlsConfig := &tls.Config{
+		// 	RootCAs:            certPool,
+		// 	InsecureSkipVerify: *tlsInsecure,
+		// }
+		// if err := svr.router.
 		svr.logger.Info("ApiServer starting with TLS", zap.String("listen-address", *listenAddress))
-		if err := svr.router.RunTLS(*listenAddress, *tlsClientCertPath, *tlsClientKeyPath); err != nil {
+		if err := svr.router.RunTLS(*listenAddress, *TLSCertChainPath, nil); != nil {
+		// if err := svr.router.RunTLS(*listenAddress, *tlsClientCertPath, *tlsClientKeyPath); err != nil {
 			svr.logger.Error("ApiServer failed to start", zap.Error(err))
 		}
 	} else {
