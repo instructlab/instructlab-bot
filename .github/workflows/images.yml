@@ -82,7 +82,6 @@ jobs:
           build-args: |
             GITHUB_USER=instructlab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
-          target: ui
           push: true
           tags: ${{ steps.ui_meta.outputs.tags }}
           labels: ${{ steps.ui_meta.outputs.labels }}
@@ -124,7 +123,6 @@ jobs:
           build-args: |
             GITHUB_USER=instructlab-bot
             GITHUB_TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
-          target: ui
           push: true
           tags: ${{ steps.apiserver_meta.outputs.tags }}
           labels: ${{ steps.apiserver_meta.outputs.labels }}
