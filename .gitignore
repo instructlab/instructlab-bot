@@ -21,3 +21,4 @@ yarn.lock
 stats.json
 .next/
 auth.log
+tsconfig.tsbuildinfo

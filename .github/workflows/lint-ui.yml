@@ -34,3 +34,6 @@ jobs:
       - name: Run UI linting
         run: npm run lint
         working-directory: ui
+      - name: Run UI type check
+        run: npm run type-check
+        working-directory: ui
