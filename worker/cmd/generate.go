@@ -229,6 +229,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 	}
 	chatlogDir := path.Join(workDir, "data", "chatlogs")
 	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
+	combinedLogPath := path.Join(outputDir, "combined_chatlogs.log")
 	combinedYAMLHTMLPath := path.Join(outputDir, "combined_chatlogs.html")
 
 	defer func() {
@@ -240,6 +241,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		}
 
 		var combinedLogs []map[string]interface{}
+		var combinedLogsText strings.Builder
 		var fileNames []string
 
 		for _, file := range chatlogFiles {
@@ -258,6 +260,16 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				}
 				combinedLogs = append(combinedLogs, logData)
 
+			} else if strings.HasSuffix(file.Name(), ".log") {
+				// Read individual log files
+				content, err := os.ReadFile(path.Join(chatlogDir, file.Name()))
+				if err != nil {
+					w.logger.Errorf("Could not read log file %s: %v", file.Name(), err)
+					continue
+				}
+				// Add delimiter before each log
+				combinedLogsText.WriteString(fmt.Sprintf("\n\n----- %s -----\n\n\n", file.Name()))
+				combinedLogsText.Write(content)
 			}
 			// Move individual file to outputDir
 			if err := os.Rename(path.Join(chatlogDir, file.Name()), path.Join(outputDir, file.Name())); err != nil {
@@ -265,6 +277,14 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				continue
 			}
 			fileNames = append(fileNames, file.Name())
+		}
+
+		if combinedLogsText.Len() > 0 {
+			if err := os.WriteFile(combinedLogPath, []byte(combinedLogsText.String()), 0644); err != nil {
+				w.logger.Errorf("Could not write combined log file: %v", err)
+				return
+			}
+			w.logger.Infof("Combined log file written to %s", combinedLogPath)
 		}
 
 		// Write the combined YAML file
@@ -1121,6 +1141,8 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 			var contentType string
 			if strings.HasSuffix(filename, ".json") || strings.Contains(filename, "json-viewer.html") {
 				contentType = "application/json-lines+json"
+			} else if strings.HasSuffix(filename, ".html") {
+				contentType = "text/html"
 			} else {
 				contentType = "text/plain"
 			}

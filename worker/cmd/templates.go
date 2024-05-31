@@ -111,7 +111,7 @@ func generateAllHTML(allFile *os.File, logEntries []string, fileNames []string) 
 </body>
 </html>`
 
-	tmpl, err := template.New("index").Parse(INDEX_HTML)
+	tmpl, err := template.New("combined_chatlogs.html").Parse(INDEX_HTML)
 	if err != nil {
 		return fmt.Errorf("template parsing error: %w", err)
 	}
