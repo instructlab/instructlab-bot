@@ -12,6 +12,7 @@ import { TextInput } from '@patternfly/react-core/dist/dynamic/components/TextIn
 import { Form } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { FormGroup } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { TextArea } from '@patternfly/react-core/dist/dynamic/components/TextArea';
+import yaml from 'js-yaml';
 
 export const SkillForm: React.FunctionComponent = () => {
   const [email, setEmail] = useState('');
@@ -187,6 +188,39 @@ export const SkillForm: React.FunctionComponent = () => {
     console.log('Skill submitted successfully ' + res);
   };
 
+  const handleDownloadYaml = () => {
+    interface SeedExample {
+      question: string;
+      answer: string;
+      context?: string;
+    }
+
+    const yamlData = {
+      created_by: email,
+      task_description: task_description,
+      seed_examples: questions.map((question, index) => {
+        const example: SeedExample = {
+          question,
+          answer: answers[index],
+        };
+        if (contexts[index].trim() !== '') {
+          example.context = contexts[index];
+        }
+        return example;
+      }),
+    };
+
+    const yamlString = yaml.dump(yamlData);
+    const blob = new Blob([yamlString], { type: 'application/x-yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'skill.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <Form className="form">
       <FormFieldGroupExpandable
@@ -344,6 +378,9 @@ export const SkillForm: React.FunctionComponent = () => {
       <ActionGroup>
         <Button variant="primary" type="submit" className="submit" onClick={handleSubmit}>
           Submit
+        </Button>
+        <Button variant="primary" type="button" className="download" onClick={handleDownloadYaml}>
+          Download YAML
         </Button>
       </ActionGroup>
     </Form>

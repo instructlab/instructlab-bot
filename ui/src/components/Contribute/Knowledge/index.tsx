@@ -12,6 +12,7 @@ import { TextInput } from '@patternfly/react-core/dist/dynamic/components/TextIn
 import { Form } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { FormGroup } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { TextArea } from '@patternfly/react-core/dist/dynamic/components/TextArea';
+import yaml from 'js-yaml';
 
 export const KnowledgeForm: React.FunctionComponent = () => {
   const [email, setEmail] = useState('');
@@ -191,6 +192,46 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       resetForm();
     }
     console.log('Knowledge submitted successfully : ' + res);
+  };
+
+  const handleDownloadYaml = () => {
+    interface SeedExample {
+      question: string;
+      answer: string;
+    }
+
+    interface Document {
+      repo: string;
+      commit: string;
+      patterns: string[];
+    }
+
+    const yamlData = {
+      created_by: email,
+      domain: domain,
+      task_description: task_description,
+      seed_examples: questions.map(
+        (question, index): SeedExample => ({
+          question,
+          answer: answers[index],
+        })
+      ),
+      document: {
+        repo: repo,
+        commit: commit,
+        patterns: patterns.split(',').map((pattern) => pattern.trim()),
+      } as Document,
+    };
+
+    const yamlString = yaml.dump(yamlData);
+    const blob = new Blob([yamlString], { type: 'application/x-yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'knowledge.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -392,6 +433,9 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       <ActionGroup>
         <Button variant="primary" type="submit" className="submit-k" onClick={handleSubmit}>
           Submit
+        </Button>
+        <Button variant="primary" type="button" className="download-k" onClick={handleDownloadYaml}>
+          Download YAML
         </Button>
       </ActionGroup>
     </Form>
