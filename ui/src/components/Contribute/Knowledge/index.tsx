@@ -12,7 +12,9 @@ import { TextInput } from '@patternfly/react-core/dist/dynamic/components/TextIn
 import { Form } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { FormGroup } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { TextArea } from '@patternfly/react-core/dist/dynamic/components/TextArea';
+import { PlusIcon, MinusCircleIcon } from '@patternfly/react-icons/dist/dynamic/icons/';
 import yaml from 'js-yaml';
+import { validateFields, validateEmail, validateUniqueItems } from '../../../utils/validation';
 
 export const KnowledgeForm: React.FunctionComponent = () => {
   const [email, setEmail] = useState('');
@@ -65,6 +67,16 @@ export const KnowledgeForm: React.FunctionComponent = () => {
     }
   };
 
+  const addQuestionAnswerPair = () => {
+    setQuestions([...questions, '']);
+    setAnswers([...answers, '']);
+  };
+
+  const deleteQuestionAnswerPair = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+    setAnswers(answers.filter((_, i) => i !== index));
+  };
+
   const resetForm = () => {
     setEmail('');
     setName('');
@@ -101,61 +113,45 @@ export const KnowledgeForm: React.FunctionComponent = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLButtonElement>) => {
     event.preventDefault();
 
-    // Make sure all questions and answers are filled
-    if (questions.some((question) => question === '') || answers.some((answer) => answer === '')) {
+    const infoFields = { email, name, task_description, task_details, domain, repo, commit, patterns };
+    const attributionFields = { title_work, link_work, revision, license_work, creators };
+
+    let validation = validateFields(infoFields);
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the questions and answers are filled!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    // Make sure all the info fields are filled
-    if (
-      email === '' ||
-      name === '' ||
-      task_description === '' ||
-      task_details === '' ||
-      domain === '' ||
-      repo === '' ||
-      commit === '' ||
-      patterns === ''
-    ) {
+    validation = validateFields(attributionFields);
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the Info fields are filled!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    // Make sure email has a valid format
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailRegex.test(email)) {
+    validation = validateEmail(email);
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please enter a valid email address!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    // Make sure all the attribution fields are filled
-    if (title_work === '' || link_work === '' || revision === '' || license_work === '' || creators === '') {
+    validation = validateUniqueItems(questions, 'questions');
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the Attribution fields are filled!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    // Make sure all the questions are unique
-    const uniqueQuestions = new Set(questions);
-    if (uniqueQuestions.size !== questions.length) {
+    validation = validateUniqueItems(answers, 'answers');
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the questions are unique!');
-      setIsFailureAlertVisible(true);
-      return;
-    }
-
-    const uniqueAnswer = new Set(answers);
-    if (uniqueAnswer.size !== answers.length) {
-      setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the answers are unique!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
@@ -195,6 +191,49 @@ export const KnowledgeForm: React.FunctionComponent = () => {
   };
 
   const handleDownloadYaml = () => {
+    const infoFields = { email, name, task_description, task_details, domain, repo, commit, patterns };
+    const attributionFields = { title_work, link_work, revision, license_work, creators };
+
+    let validation = validateFields(infoFields);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateFields(attributionFields);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateEmail(email);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateUniqueItems(questions, 'questions');
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateUniqueItems(answers, 'answers');
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
     interface SeedExample {
       question: string;
       answer: string;
@@ -312,9 +351,9 @@ export const KnowledgeForm: React.FunctionComponent = () => {
           />
         }
       >
-        {[...Array(5)].map((_, index) => (
+        {questions.map((question, index) => (
           <FormGroup key={index}>
-            <Text className="heading-k"> Example : {index + 1}</Text>
+            <Text className="heading-k"> Question and Answer: {index + 1}</Text>
             <TextArea
               isRequired
               type="text"
@@ -331,8 +370,14 @@ export const KnowledgeForm: React.FunctionComponent = () => {
               value={answers[index]}
               onChange={(_event, value) => handleInputChange(index, 'answer', value)}
             />
+            <Button variant="danger" onClick={() => deleteQuestionAnswerPair(index)}>
+              <MinusCircleIcon /> Delete
+            </Button>
           </FormGroup>
         ))}
+        <Button variant="primary" onClick={addQuestionAnswerPair}>
+          <PlusIcon /> Add Question and Answer
+        </Button>
       </FormFieldGroupExpandable>
 
       <FormFieldGroupExpandable

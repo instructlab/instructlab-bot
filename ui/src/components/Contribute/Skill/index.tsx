@@ -12,7 +12,9 @@ import { TextInput } from '@patternfly/react-core/dist/dynamic/components/TextIn
 import { Form } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { FormGroup } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { TextArea } from '@patternfly/react-core/dist/dynamic/components/TextArea';
+import { PlusIcon, MinusCircleIcon } from '@patternfly/react-icons/dist/dynamic/icons/';
 import yaml from 'js-yaml';
+import { validateFields, validateEmail, validateUniqueItems } from '../../../utils/validation';
 
 export const SkillForm: React.FunctionComponent = () => {
   const [email, setEmail] = useState('');
@@ -38,6 +40,16 @@ export const SkillForm: React.FunctionComponent = () => {
   const [success_alert_message, setSuccessAlertMessage] = useState('');
 
   const { postSkillPR } = usePostSkillPR();
+
+  const addQuestionAnswerPair = () => {
+    setQuestions([...questions, '']);
+    setAnswers([...answers, '']);
+  };
+
+  const deleteQuestionAnswerPair = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+    setAnswers(answers.filter((_, i) => i !== index));
+  };
 
   const handleInputChange = (index: number, type: string, value: string) => {
     switch (type) {
@@ -100,60 +112,45 @@ export const SkillForm: React.FunctionComponent = () => {
     setIsSuccessAlertVisible(false);
     setIsFailureAlertVisible(false);
 
-    // Make sure all the questions, contexts and answers are not empty
-    if (questions.some((question) => question.trim() === '') || answers.some((answer) => answer.trim() === '')) {
+    const infoFields = { email, name, task_description, task_details };
+    const attributionFields = { title_work, link_work, license_work, creators };
+
+    let validation = validateFields(infoFields);
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the questions and answers are not empty!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    // Make sure all the questions are unique
-    const uniqueQuestions = new Set(questions);
-    if (uniqueQuestions.size !== questions.length) {
+    validation = validateFields(attributionFields);
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the questions are unique!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    const uniqueContext = new Set(contexts);
-    if (uniqueContext.size !== contexts.length) {
+    validation = validateEmail(email);
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the contexts are unique!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    const uniqueAnswer = new Set(answers);
-    if (uniqueAnswer.size !== answers.length) {
+    validation = validateUniqueItems(questions, 'questions');
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the answers are unique!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
 
-    // Make sure email, name, task_description, task_details, title_work, link_work, license_work, creators are not empty
-    if (email.trim() === '' || name.trim() === '' || task_description.trim() === '' || task_details.trim() === '') {
+    validation = validateUniqueItems(answers, 'answers');
+    if (!validation.valid) {
       setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the Info fields are not empty!');
-      setIsFailureAlertVisible(true);
-      return;
-    }
-
-    // Make sure email has a valid format
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailRegex.test(email)) {
-      setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please enter a valid email address!');
-      setIsFailureAlertVisible(true);
-      return;
-    }
-
-    // Make sure all the Attribution fields are not empty
-    if (title_work.trim() === '' || link_work.trim() === '' || license_work.trim() === '' || creators.trim() === '') {
-      setFailureAlertTitle('Something went wrong!');
-      setFailureAlertMessage('Please make sure all the Attribution fields are not empty!');
+      setFailureAlertMessage(validation.message);
       setIsFailureAlertVisible(true);
       return;
     }
@@ -189,6 +186,49 @@ export const SkillForm: React.FunctionComponent = () => {
   };
 
   const handleDownloadYaml = () => {
+    const infoFields = { email, name, task_description, task_details };
+    const attributionFields = { title_work, link_work, license_work, creators };
+
+    let validation = validateFields(infoFields);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateFields(attributionFields);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateEmail(email);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateUniqueItems(questions, 'questions');
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    validation = validateUniqueItems(answers, 'answers');
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
     interface SeedExample {
       question: string;
       answer: string;
@@ -291,9 +331,9 @@ export const SkillForm: React.FunctionComponent = () => {
           />
         }
       >
-        {[...Array(5)].map((_, index) => (
+        {questions.map((question, index) => (
           <FormGroup key={index}>
-            <Text className="heading"> Example : {index + 1}</Text>
+            <Text className="heading"> Question and Answer: {index + 1}</Text>
             <TextArea
               isRequired
               type="text"
@@ -317,8 +357,14 @@ export const SkillForm: React.FunctionComponent = () => {
               value={answers[index]}
               onChange={(_event, value) => handleInputChange(index, 'answer', value)}
             />
+            <Button variant="danger" onClick={() => deleteQuestionAnswerPair(index)}>
+              <MinusCircleIcon /> Delete
+            </Button>
           </FormGroup>
         ))}
+        <Button variant="primary" onClick={addQuestionAnswerPair}>
+          <PlusIcon /> Add Question and Answer
+        </Button>
       </FormFieldGroupExpandable>
 
       <FormFieldGroupExpandable
