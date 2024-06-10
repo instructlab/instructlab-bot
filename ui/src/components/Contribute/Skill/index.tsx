@@ -2,9 +2,7 @@
 'use client';
 import React, { useState } from 'react';
 import './skill.css';
-import { usePostSkillPR } from '../../../common/HooksPostSkillPR';
-import { Alert } from '@patternfly/react-core/dist/dynamic/components/Alert';
-import { AlertActionCloseButton } from '@patternfly/react-core/dist/dynamic/components/Alert';
+import { Alert, AlertActionLink, AlertActionCloseButton } from '@patternfly/react-core/dist/dynamic/components/Alert';
 import { ActionGroup, FormFieldGroupExpandable, FormFieldGroupHeader } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { Button } from '@patternfly/react-core/dist/dynamic/components/Button';
 import { Text } from '@patternfly/react-core/dist/dynamic/components/Text';
@@ -13,8 +11,8 @@ import { Form } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { FormGroup } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { TextArea } from '@patternfly/react-core/dist/dynamic/components/TextArea';
 import { PlusIcon, MinusCircleIcon } from '@patternfly/react-icons/dist/dynamic/icons/';
-import yaml from 'js-yaml';
 import { validateFields, validateEmail, validateUniqueItems } from '../../../utils/validation';
+import yaml from 'js-yaml';
 
 export const SkillForm: React.FunctionComponent = () => {
   const [email, setEmail] = useState('');
@@ -23,7 +21,7 @@ export const SkillForm: React.FunctionComponent = () => {
   const [task_details, setTaskDetails] = useState('');
 
   const [title_work, setTitleWork] = useState('');
-  const [link_work, setLinkWork] = useState('');
+  const [link_work, setLinkWork] = useState('-');
   const [license_work, setLicenseWork] = useState('');
   const [creators, setCreators] = useState('');
 
@@ -38,18 +36,6 @@ export const SkillForm: React.FunctionComponent = () => {
 
   const [success_alert_title, setSuccessAlertTitle] = useState('');
   const [success_alert_message, setSuccessAlertMessage] = useState('');
-
-  const { postSkillPR } = usePostSkillPR();
-
-  const addQuestionAnswerPair = () => {
-    setQuestions([...questions, '']);
-    setAnswers([...answers, '']);
-  };
-
-  const deleteQuestionAnswerPair = (index: number) => {
-    setQuestions(questions.filter((_, i) => i !== index));
-    setAnswers(answers.filter((_, i) => i !== index));
-  };
 
   const handleInputChange = (index: number, type: string, value: string) => {
     switch (type) {
@@ -79,6 +65,16 @@ export const SkillForm: React.FunctionComponent = () => {
     }
   };
 
+  const addQuestionAnswerPair = () => {
+    setQuestions([...questions, '']);
+    setAnswers([...answers, '']);
+  };
+
+  const deleteQuestionAnswerPair = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+    setAnswers(answers.filter((_, i) => i !== index));
+  };
+
   const resetForm = () => {
     setQuestions(new Array(5).fill(''));
     setContexts(new Array(5).fill(''));
@@ -88,29 +84,21 @@ export const SkillForm: React.FunctionComponent = () => {
     setTaskDescription('');
     setTaskDetails('');
     setTitleWork('');
-    setLinkWork('');
+    setLinkWork('-');
     setLicenseWork('');
     setCreators('');
   };
 
   const onCloseSuccessAlert = () => {
-    setSuccessAlertTitle('Skill contribution submitted successfully!');
-    setSuccessAlertMessage('Thank you for your contribution!!');
     setIsSuccessAlertVisible(false);
   };
 
   const onCloseFailureAlert = () => {
-    setFailureAlertTitle('Failed to submit your Skill contribution!');
-    setFailureAlertMessage('Please try again later.');
     setIsFailureAlertVisible(false);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLButtonElement>) => {
     event.preventDefault();
-
-    // Hide the existing alerts if any
-    setIsSuccessAlertVisible(false);
-    setIsFailureAlertVisible(false);
 
     const infoFields = { email, name, task_description, task_details };
     const attributionFields = { title_work, link_work, license_work, creators };
@@ -155,7 +143,7 @@ export const SkillForm: React.FunctionComponent = () => {
       return;
     }
 
-    const [res, err] = await postSkillPR({
+    const skillData = {
       name: name,
       email: email,
       task_description: task_description,
@@ -167,22 +155,33 @@ export const SkillForm: React.FunctionComponent = () => {
       questions,
       contexts,
       answers,
-    });
+    };
 
-    if (err !== null) {
-      setFailureAlertTitle('Failed to submit your Skill contribution!');
-      setFailureAlertMessage(err);
-      setIsFailureAlertVisible(true);
-      return;
-    }
+    try {
+      const response = await fetch('/api/pr/skill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(skillData),
+      });
 
-    if (res !== null) {
+      if (!response.ok) {
+        throw new Error('Failed to submit skill data');
+      }
+
+      const result = await response.json();
       setSuccessAlertTitle('Skill contribution submitted successfully!');
-      setSuccessAlertMessage(res);
+      setSuccessAlertMessage(result.html_url);
       setIsSuccessAlertVisible(true);
       resetForm();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setFailureAlertTitle('Failed to submit your Skill contribution!');
+        setFailureAlertMessage(error.message);
+        setIsFailureAlertVisible(true);
+      }
     }
-    console.log('Skill submitted successfully ' + res);
   };
 
   const handleDownloadYaml = () => {
@@ -250,12 +249,40 @@ export const SkillForm: React.FunctionComponent = () => {
       }),
     };
 
-    const yamlString = yaml.dump(yamlData);
+    const yamlString = yaml.dump(yamlData, { lineWidth: -1 });
     const blob = new Blob([yamlString], { type: 'application/x-yaml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'skill.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDownloadAttribution = () => {
+    const attributionFields = { title_work, link_work: '-', revision: task_details, license_work, creators };
+
+    const validation = validateFields(attributionFields);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    const attributionContent = `Title of work: ${title_work}
+Link to work: -
+Revision: ${task_details}
+License of the work: ${license_work}
+Creator names: ${creators}
+`;
+
+    const blob = new Blob([attributionContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attribution.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -333,7 +360,7 @@ export const SkillForm: React.FunctionComponent = () => {
       >
         {questions.map((question, index) => (
           <FormGroup key={index}>
-            <Text className="heading"> Question and Answer: {index + 1}</Text>
+            <Text className="heading"> Example : {index + 1}</Text>
             <TextArea
               isRequired
               type="text"
@@ -345,7 +372,7 @@ export const SkillForm: React.FunctionComponent = () => {
             <TextArea
               type="text"
               aria-label={`Context ${index + 1}`}
-              placeholder="Enter the context"
+              placeholder="Enter the context (Optional)"
               value={contexts[index]}
               onChange={(_event, value) => handleInputChange(index, 'context', value)}
             />
@@ -387,14 +414,6 @@ export const SkillForm: React.FunctionComponent = () => {
           />
           <TextInput
             isRequired
-            type="url"
-            aria-label="link_work"
-            placeholder="Enter link to work"
-            value={link_work}
-            onChange={(_event, value) => setLinkWork(value)}
-          />
-          <TextInput
-            isRequired
             type="text"
             aria-label="license_work"
             placeholder="Enter license of the work"
@@ -412,8 +431,17 @@ export const SkillForm: React.FunctionComponent = () => {
         </FormGroup>
       </FormFieldGroupExpandable>
       {isSuccessAlertVisible && (
-        <Alert variant="success" title={success_alert_title} actionClose={<AlertActionCloseButton onClose={onCloseSuccessAlert} />}>
-          {success_alert_message}
+        <Alert
+          variant="success"
+          title={success_alert_title}
+          actionClose={<AlertActionCloseButton onClose={onCloseSuccessAlert} />}
+          actionLinks={
+            <AlertActionLink component="a" href={success_alert_message} target="_blank" rel="noopener noreferrer">
+              View your pull request
+            </AlertActionLink>
+          }
+        >
+          Thank you for your contribution!
         </Alert>
       )}
       {isFailureAlertVisible && (
@@ -423,10 +451,13 @@ export const SkillForm: React.FunctionComponent = () => {
       )}
       <ActionGroup>
         <Button variant="primary" type="submit" className="submit" onClick={handleSubmit}>
-          Submit
+          Submit Skill
         </Button>
-        <Button variant="primary" type="button" className="download" onClick={handleDownloadYaml}>
+        <Button variant="primary" type="button" className="download-yaml" onClick={handleDownloadYaml}>
           Download YAML
+        </Button>
+        <Button variant="primary" type="button" className="download-attribution" onClick={handleDownloadAttribution}>
+          Download Attribution
         </Button>
       </ActionGroup>
     </Form>

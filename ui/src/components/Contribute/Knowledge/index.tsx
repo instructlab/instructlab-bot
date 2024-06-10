@@ -2,9 +2,7 @@
 'use client';
 import React, { useState } from 'react';
 import './knowledge.css';
-import { usePostKnowledgePR } from '../../../common/HooksPostKnowledgePR';
-import { Alert } from '@patternfly/react-core/dist/dynamic/components/Alert';
-import { AlertActionCloseButton } from '@patternfly/react-core/dist/dynamic/components/Alert';
+import { Alert, AlertActionLink, AlertActionCloseButton } from '@patternfly/react-core/dist/dynamic/components/Alert';
 import { ActionGroup, FormFieldGroupExpandable, FormFieldGroupHeader } from '@patternfly/react-core/dist/dynamic/components/Form';
 import { Button } from '@patternfly/react-core/dist/dynamic/components/Button';
 import { Text } from '@patternfly/react-core/dist/dynamic/components/Text';
@@ -44,8 +42,6 @@ export const KnowledgeForm: React.FunctionComponent = () => {
   const [success_alert_title, setSuccessAlertTitle] = useState('');
   const [success_alert_message, setSuccessAlertMessage] = useState('');
 
-  const { postKnowledgePR } = usePostKnowledgePR();
-
   const handleInputChange = (index: number, type: string, value: string) => {
     switch (type) {
       case 'question':
@@ -80,17 +76,14 @@ export const KnowledgeForm: React.FunctionComponent = () => {
   const resetForm = () => {
     setEmail('');
     setName('');
-
     setTaskDescription('');
     setTaskDetails('');
     setDomain('');
     setQuestions(new Array(5).fill(''));
     setAnswers(new Array(5).fill(''));
-
     setRepo('');
     setCommit('');
     setPatterns('');
-
     setTitleWork('');
     setLinkWork('');
     setLicenseWork('');
@@ -99,14 +92,10 @@ export const KnowledgeForm: React.FunctionComponent = () => {
   };
 
   const onCloseSuccessAlert = () => {
-    setSuccessAlertTitle('Knowledge contribution submitted successfully!');
-    setSuccessAlertMessage('Thank you for your contribution!!');
     setIsSuccessAlertVisible(false);
   };
 
   const onCloseFailureAlert = () => {
-    setFailureAlertTitle('Failed to submit your Knowledge contribution!');
-    setFailureAlertMessage('Please try again later.');
     setIsFailureAlertVisible(false);
   };
 
@@ -156,11 +145,12 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       return;
     }
 
-    const [res, err] = await postKnowledgePR({
+    const knowledgeData = {
       name: name,
       email: email,
       task_description: task_description,
       task_details: task_details,
+      domain: domain,
       repo: repo,
       commit: commit,
       patterns: patterns,
@@ -169,25 +159,35 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       revision: revision,
       license_work: license_work,
       creators: creators,
-      domain: domain,
       questions,
       answers,
-    });
+    };
 
-    if (err !== null) {
-      setFailureAlertTitle('Failed to submit your Knowledge contribution!');
-      setFailureAlertMessage(err);
-      setIsFailureAlertVisible(true);
-      return;
-    }
+    try {
+      const response = await fetch('/api/pr/knowledge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(knowledgeData),
+      });
 
-    if (res !== null) {
+      if (!response.ok) {
+        throw new Error('Failed to submit knowledge data');
+      }
+
+      const result = await response.json();
       setSuccessAlertTitle('Knowledge contribution submitted successfully!');
-      setSuccessAlertMessage(res);
+      setSuccessAlertMessage(result.html_url);
       setIsSuccessAlertVisible(true);
       resetForm();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setFailureAlertTitle('Failed to submit your Knowledge contribution!');
+        setFailureAlertMessage(error.message);
+        setIsFailureAlertVisible(true);
+      }
     }
-    console.log('Knowledge submitted successfully : ' + res);
   };
 
   const handleDownloadYaml = () => {
@@ -239,18 +239,12 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       answer: string;
     }
 
-    interface Document {
-      repo: string;
-      commit: string;
-      patterns: string[];
-    }
-
     const yamlData = {
       created_by: email,
       domain: domain,
       task_description: task_description,
       seed_examples: questions.map(
-        (question, index): SeedExample => ({
+        (question: string, index: number): SeedExample => ({
           question,
           answer: answers[index],
         })
@@ -258,16 +252,44 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       document: {
         repo: repo,
         commit: commit,
-        patterns: patterns.split(',').map((pattern) => pattern.trim()),
-      } as Document,
+        patterns: patterns.split(',').map((pattern: string) => pattern.trim()),
+      },
     };
 
-    const yamlString = yaml.dump(yamlData);
+    const yamlString = yaml.dump(yamlData, { lineWidth: -1 });
     const blob = new Blob([yamlString], { type: 'application/x-yaml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'knowledge.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDownloadAttribution = () => {
+    const attributionFields = { title_work, link_work, revision: task_details, license_work, creators };
+
+    const validation = validateFields(attributionFields);
+    if (!validation.valid) {
+      setFailureAlertTitle('Something went wrong!');
+      setFailureAlertMessage(validation.message);
+      setIsFailureAlertVisible(true);
+      return;
+    }
+
+    const attributionContent = `Title of work: ${title_work}
+Link to work: ${link_work}
+Revision: ${task_details}
+License of the work: ${license_work}
+Creator names: ${creators}
+`;
+
+    const blob = new Blob([attributionContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attribution.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -466,8 +488,17 @@ export const KnowledgeForm: React.FunctionComponent = () => {
         </FormGroup>
       </FormFieldGroupExpandable>
       {isSuccessAlertVisible && (
-        <Alert variant="success" title={success_alert_title} actionClose={<AlertActionCloseButton onClose={onCloseSuccessAlert} />}>
-          {success_alert_message}
+        <Alert
+          variant="success"
+          title={success_alert_title}
+          actionClose={<AlertActionCloseButton onClose={onCloseSuccessAlert} />}
+          actionLinks={
+            <AlertActionLink component="a" href={success_alert_message} target="_blank" rel="noopener noreferrer">
+              View your pull request
+            </AlertActionLink>
+          }
+        >
+          Thank you for your contribution!
         </Alert>
       )}
       {isFailureAlertVisible && (
@@ -477,10 +508,13 @@ export const KnowledgeForm: React.FunctionComponent = () => {
       )}
       <ActionGroup>
         <Button variant="primary" type="submit" className="submit-k" onClick={handleSubmit}>
-          Submit
+          Submit Knowledge
         </Button>
-        <Button variant="primary" type="button" className="download-k" onClick={handleDownloadYaml}>
+        <Button variant="primary" type="button" className="download-k-yaml" onClick={handleDownloadYaml}>
           Download YAML
+        </Button>
+        <Button variant="primary" type="button" className="download-k-attribution" onClick={handleDownloadAttribution}>
+          Download Attribution
         </Button>
       </ActionGroup>
     </Form>

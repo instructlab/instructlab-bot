@@ -6,6 +6,25 @@ import axios from 'axios';
 import winston from 'winston';
 import path from 'path';
 
+// Extend the Session and JWT types
+declare module 'next-auth' {
+  interface Session {
+    accessToken?: string;
+    id?: string;
+  }
+
+  interface User {
+    id?: string;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    accessToken?: string;
+    id?: string;
+  }
+}
+
 // Logger setup
 const logger = winston.createLogger({
   level: 'info',
@@ -25,7 +44,7 @@ const authOptions: NextAuthOptions = {
     GitHubProvider({
       clientId: process.env.OAUTH_GITHUB_ID!,
       clientSecret: process.env.OAUTH_GITHUB_SECRET!,
-      authorization: { params: { scope: 'read:user' } },
+      authorization: { params: { scope: 'public_repo' } },
     }),
     CredentialsProvider({
       name: 'Credentials',
@@ -51,16 +70,22 @@ const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      if (account) {
+        token.accessToken = account.access_token!;
+      }
       if (user) {
         token.id = user.id;
       }
+      console.log('JWT Callback:', token);
       return token;
     },
     async session({ session, token }) {
       if (token) {
-        (session as { id?: string }).id = token.id as string;
+        session.accessToken = token.accessToken;
+        session.id = token.id;
       }
+      console.log('Session Callback:', session);
       return session;
     },
     async signIn({ account, profile }) {

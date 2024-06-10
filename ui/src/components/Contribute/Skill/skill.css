@@ -14,7 +14,8 @@
 }
 
 .submit:hover,
-.download:hover {
+.download-yaml:hover,
+.download-attribution:hover {
   background-color: #45a049;
 }
 

@@ -14,7 +14,8 @@
 }
 
 .submit-k:hover,
-.download-k:hover {
+.download-k-yaml:hover,
+.download-k-attribution:hover {
   background-color: #45a049;
 }
 
