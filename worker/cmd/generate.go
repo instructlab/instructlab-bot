@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -415,6 +416,10 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 
 			context, hasContext := example["context"].(string)
 			originalQuestion := question
+
+			// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
+			question = escapeHyphens(question)
+
 			// Slicing args breaks ilab chat for context, use Sprintf to control spacing
 			if hasContext {
 				// Append the context to the question with a specific format
@@ -1220,6 +1225,14 @@ func (w *Worker) handleOutputFiles(outputDir, prNumber, outDirName string) strin
 	}
 
 	return indexUpKey
+}
+
+// escapeHyphens escapes sequences of two or more hyphens in the input string.
+func escapeHyphens(input string) string {
+	re := regexp.MustCompile(`-{2,}`)
+	return re.ReplaceAllStringFunc(input, func(match string) string {
+		return strings.Repeat(`\-`, len(match))
+	})
 }
 
 /* Uncomment to bypass ilab diff (temporary until upstream files are validated prior to merge)
