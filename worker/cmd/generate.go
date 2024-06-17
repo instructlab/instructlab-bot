@@ -544,6 +544,14 @@ func (w *Worker) processJob() {
 	taxonomyDir := path.Join(workDir, "taxonomy")
 	sugar = sugar.With("work_dir", workDir, "origin", Origin)
 
+	// Clean up the taxonomy directory if it exists from a previous jobs
+	if _, err := os.Stat(taxonomyDir); !os.IsNotExist(err) {
+		sugar.Warnf("Taxonomy directory exists, deleting %s", taxonomyDir)
+		if err := deleteTaxonomyDir(taxonomyDir); err != nil {
+			sugar.Errorf("could not delete existing taxonomy directory: %v", err)
+		}
+	}
+
 	headHash, err := w.gitOperations(sugar, taxonomyDir, prNumber)
 	if err != nil {
 		w.logger.Errorf("git operations error: %v", err)
