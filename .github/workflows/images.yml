@@ -33,7 +33,7 @@ jobs:
             ghcr.io/${{ github.repository }}/instructlab-gobot
 
       - name: Build and push gobot image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -75,7 +75,7 @@ jobs:
             ghcr.io/${{ github.repository }}/bot-ui
 
       - name: Build and push ui image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -116,7 +116,7 @@ jobs:
             ghcr.io/${{ github.repository }}/apiserver
 
       - name: Build and push apiserver image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -172,7 +172,7 @@ jobs:
             ghcr.io/${{ github.repository }}/instructlab-serve
 
       - name: Build and push serve image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -228,7 +228,7 @@ jobs:
             ghcr.io/${{ github.repository }}/instructlab-serve-base
 
       - name: Build and push serve image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
