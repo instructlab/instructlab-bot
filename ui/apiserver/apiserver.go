@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,8 +27,13 @@ const (
 	redisQueueArchive  = "archived"
 )
 
-const PreCheckEndpointURL = "https://merlinite-7b-vllm-openai.apps.fmaas-backend.fmaas.res.ibm.com/v1"
-const InstructLabBotUrl = "http://bot:8081"
+const (
+	localEndpoint     = "http://localhost:8000/v1"
+	InstructLabBotUrl = "http://bot:8081"
+	TLSCertChainPath  = "/home/fedora/chain.pem"
+	TLSClientCRTPath  = "/home/fedora/client-tls-crt.pem2"
+	TLSClientKEYPath  = "/home/fedora/client-tls-key.pem2"
+)
 
 type ApiServer struct {
 	router              *gin.Engine
@@ -36,6 +43,7 @@ type ApiServer struct {
 	testMode            bool
 	preCheckEndpointURL string
 	instructLabBotUrl   string
+	devMode             bool
 }
 
 type JobData struct {
@@ -202,25 +210,54 @@ func (api *ApiServer) knowledgePRHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"msg": responseBody.String()})
 }
 
+func (api *ApiServer) buildHTTPServer() (http.Client, error) {
+	tlsInseucre := !api.devMode
+	if !api.devMode {
+		certPool := x509.NewCertPool()
+		pemData, err := os.ReadFile(TLSCertChainPath) // Replace with your certificate file path
+		if err != nil {
+			err = fmt.Errorf("Failed to read cert chain file: %s", err)
+			api.logger.Error(err)
+			return http.Client{}, err
+		}
+		if !certPool.AppendCertsFromPEM(pemData) {
+			err = fmt.Errorf("Failed to append pemData to certPool: %s", err)
+			api.logger.Error(err)
+			return http.Client{}, err
+		}
+		tlsConfig := &tls.Config{
+			RootCAs:            certPool,
+			InsecureSkipVerify: tlsInseucre,
+		}
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig:       tlsConfig,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		}
+		return *httpClient, nil
+	} else {
+		return http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: tlsInseucre},
+			},
+		}, nil
+	}
+}
+
 // Sent http post request using custom client with zero timeout
 func (api *ApiServer) sendPostRequest(url string, body io.Reader) (*http.Response, error) {
-	client := &http.Client{
-		Timeout: 0 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-
-	request, err := http.NewRequest("POST", url, body)
+	client, err := api.buildHTTPServer()
 	if err != nil {
-		api.logger.Errorf("Error creating http request: %v", err)
+		err = fmt.Errorf("Error creating http(s) server: %v", err)
+		api.logger.Error(err)
 		return nil, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	response, err := client.Do(request)
+	response, err := client.Post(url, "application/json", body)
 	if err != nil {
-		api.logger.Errorf("Error sending http request: %v", err)
-		return nil, err
+		api.logger.Errorf("Error creating and or sending http request: %v", err)
+		return response, err
 	}
 	return response, nil
 }
@@ -390,26 +427,19 @@ func (api *ApiServer) fetchModelName(fullName bool) (string, error) {
 	}
 	endpoint += "models"
 
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout = 10 * time.Second
-	http.DefaultTransport.(*http.Transport).ExpectContinueTimeout = 1 * time.Second
+	client, err := api.buildHTTPServer()
 
-	req, err := http.NewRequestWithContext(api.ctx, "GET", endpoint, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	response, err := client.Get(endpoint)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch model details: %w", err)
 	}
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d", response.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -459,9 +489,50 @@ func main() {
 	redisAddress := pflag.String("redis-server", "localhost:6379", "Redis server address")
 	apiUser := pflag.String("api-user", "", "API username")
 	apiPass := pflag.String("api-pass", "", "API password")
-	preCheckEndpointURL := pflag.String("precheck-endpoint", PreCheckEndpointURL, "Precheck endpoint URL")
+	preCheckEndpointURL := pflag.String("precheck-endpoint", "", "Precheck endpoint URL")
 	InstructLabBotUrl := pflag.String("bot-url", InstructLabBotUrl, "InstructLab Bot URL")
+	// TLS variables
+	devMode := pflag.Bool("dev-mode", false, "Whether to skip TLS verification")
 	pflag.Parse()
+
+	/* ENV support, most variabls take 3 options, with the following priority:
+	1) flag
+	2) env
+	3) acceptable defaults
+	*/
+
+	// NOTE: not all variables support all 3 methods, in which case they will be documented via comments.
+	// With no comment, assume they support all 3.
+
+	// Precheck endpoint
+	if *preCheckEndpointURL == "" {
+		preCheckEndpointURLEnvValue := os.Getenv("PECHECK_ENDPOINT")
+		if preCheckEndpointURLEnvValue != "" {
+			*preCheckEndpointURL = preCheckEndpointURLEnvValue
+		} else {
+			*preCheckEndpointURL = localEndpoint
+		}
+	}
+
+	// NOTE: TLSInsecure not settable by env, just apiserver cli flag or defaults to false
+
+	/* API credentials
+	API creds support only apiserver cli flag or env, no default values.
+	*/
+	// API user
+	if *apiUser == "" {
+		apiUserEnvValue := os.Getenv("API_USER")
+		if apiUserEnvValue != "" {
+			*apiUser = apiUserEnvValue
+		}
+	}
+	// API pass
+	if *apiPass == "" {
+		apiPassEnvValue := os.Getenv("API_PASS")
+		if apiPassEnvValue != "" {
+			*apiPass = apiPassEnvValue
+		}
+	}
 
 	logger := setupLogger(*debugFlag)
 	defer logger.Sync()
@@ -474,6 +545,7 @@ func main() {
 		Addr: *redisAddress,
 	})
 
+	tlsInsecure := !*devMode
 	router := gin.Default()
 	svr := ApiServer{
 		router:              router,
@@ -483,11 +555,34 @@ func main() {
 		testMode:            *testMode,
 		preCheckEndpointURL: *preCheckEndpointURL,
 		instructLabBotUrl:   *InstructLabBotUrl,
+		devMode:             *devMode,
 	}
 	svr.setupRoutes(*apiUser, *apiPass)
 
-	svr.logger.Info("ApiServer starting", zap.String("listen-address", *listenAddress))
-	if err := svr.router.Run(*listenAddress); err != nil {
-		svr.logger.Error("ApiServer failed to start", zap.Error(err))
+	if tlsInsecure == false {
+		// Check if we is valid key pair
+
+		certPool := x509.NewCertPool()
+		pemData, err := os.ReadFile(TLSCertChainPath) // Replace with your certificate file path
+		if err != nil {
+			log.Fatalf("Failed to read cert chain file: %s", err)
+		}
+		if !certPool.AppendCertsFromPEM(pemData) {
+			log.Fatalf("Failed to append pemData to certPool: %s", err)
+		}
+		// tlsConfig := &tls.Config{
+		// 	RootCAs:            certPool,
+		// 	InsecureSkipVerify: *tlsInsecure,
+		// }
+		// if err := svr.router.
+		svr.logger.Info("ApiServer starting with TLS", zap.String("listen-address", *listenAddress))
+		if err := svr.router.RunTLS(*listenAddress, *TLSCertChainPath, nil); != nil {
+		// if err := svr.router.RunTLS(*listenAddress, *tlsClientCertPath, *tlsClientKeyPath); err != nil {
+			svr.logger.Error("ApiServer failed to start", zap.Error(err))
+		}
+	} else {
+		if err := svr.router.Run(*listenAddress); err != nil {
+			svr.logger.Error("ApiServer failed to start", zap.Error(err))
+		}
 	}
 }
