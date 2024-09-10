@@ -52,6 +52,13 @@
         precheck_endpoint_url != None and
         precheck_endpoint_url | trim != ''
 
+- name: Append api key arg for given precheck_endpoint
+  ansible.builtin.set_fact:
+    worker_args: "{{ worker_args }} --precheck-api-key {{ precheck_api_key }}"
+  when: precheck_api_key is defined and
+        precheck_api_key != None and
+        precheck_api_key | trim != ''
+
 - name: Set tls-insecure if enabled
   ansible.builtin.set_fact:
     worker_args: "{{ worker_args }} --tls-insecure \"true\""
