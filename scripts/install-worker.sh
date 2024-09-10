@@ -14,7 +14,9 @@ OS=""
 REDIS_IP=${REDIS_IP:-"127.0.0.1"}
 WORK_DIR=${WORK_DIR:-"${HOME}/instructlab-bot"}
 
+ILAB_CONFIG_FILE=${ILAB_CONFIG_FILE:-"./config.yaml"}
 PRECHECK_ENDPOINT_URL=${PRECHECK_ENDPOINT_URL:-"http://localhost:8000/v1"}
+PRECHECK_API_KEY=${PRECHECK_API_KEY:-""}
 SDG_ENDPOINT_URL=${SDG_ENDPOINT_URL:-""}
 TLS_INSECURE=${TLS_INSECURE:-"false"}
 
@@ -56,7 +58,9 @@ usage() {
     echo "  --nexodus-reg-key REG_KEY: Optionally a registration key for Nexodus. Ex: https://try.nexodus.io#..."
     echo "  --redis-ip IP: Optionally the IP address of the Redis server. Default: ${REDIS_IP}"
     echo "  --work-dir DIR: Optionally the directory to use for the worker. Default: ${WORK_DIR}"
+    echo "  --ilab-config-file FILE: File path of the InstructLab config file. Default: ./config.yaml"
     echo "  --precheck-endpoint-url URL: The endpoint URL for the ilab precheck. Default: http://localhost:8000/v1"
+    echo "  --precheck-api-key KEY: The API key for the ilab precheck endpoint"
     echo "  --sdg-endpoint-url URL: The endpoint URL for the ilab sdg-svc. Default: "
     echo "  --tls-insecure BOOL: Use insecure TLS connection. Default: ${TLS_INSECURE}"
     echo "  --tls-client-key KEY: The TLS client key for ilab sdg-svc"
@@ -112,9 +116,9 @@ install_prereqs_fedora() {
         go \
         make \
         nvtop \
-        python3 \
+        python3.11 \
+        python3.11-devel \
         python3-pip \
-        python3-virtualenv \
         redis \
         unzip \
         vim
@@ -238,13 +242,13 @@ EOF
 install_lab() {
     cd "${WORK_DIR}" || (echo "Failed to change to work directory: ${WORK_DIR}" && exit 1)
     # Always attempt to install instructlab to make sure bot is running the latest version of stable branch.
-
-    sudo pip install --upgrade --force-reinstall "git+https://github.com/instructlab/instructlab.git@stable"
+    # I think we don't need support for the local training for the instructlab bot, because it's pointing to the endpoints.
     if [ "${GPU_TYPE}" = "cuda" ]; then
-        CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip install --force-reinstall --no-cache-dir llama-cpp-python
+        pip3.11 cache remove llama_cpp_python
+        pip3.11 install 'instructlab[cuda]' -C cmake.args="-DLLAMA_CUDA=on" -C cmake.args="-DLLAMA_NATIVE=off"
+        pip3.11 install vllm@git+https://github.com/opendatahub-io/vllm@2024.08.01
     elif [ -n "${GPU_TYPE}" ]; then
-        echo "Unsupported GPU_TYPE: ${GPU_TYPE}"
-        exit 1
+        pip3.11 install instructlab
     fi
     if [ ! -f config.yaml ]; then
         ilab init --non-interactive
@@ -274,9 +278,19 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
     sudo install -m 0600 labbotworker.sysconfig /etc/sysconfig/labbotworker
 
+    # Check if ILAB_CONFIG_FILE is set
+    if [ -n "${ILAB_CONFIG_FILE}" ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --ilab-config-file ${ILAB_CONFIG_FILE}"
+    fi
+
     # Check if PRECHECK_ENDPOINT_URL is set
     if [ -n "${PRECHECK_ENDPOINT_URL}" ]; then
         EXTRA_ARGS="${EXTRA_ARGS} --precheck-endpoint-url ${PRECHECK_ENDPOINT_URL}"
+    fi
+
+    # Check if PRECHECK_API_KEY is set
+    if [ -n "${PRECHECK_API_KEY}" ]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --precheck-api-key ${PRECHECK_API_KEY}"
     fi
 
     # Check if SDG_ENDPOINT_URL is set
@@ -391,8 +405,16 @@ while [ $# -gt 0 ]; do
             WORK_DIR="$2"
             shift
             ;;
+        --ilab-config-file)
+            ILAB_CONFIG_FILE="$2"
+            shift
+            ;;
         --precheck-endpoint-url)
             PRECHECK_ENDPOINT_URL="$2"
+            shift
+            ;;
+        --precheck-api-key)
+            PRECHECK_API_KEY="$2"
             shift
             ;;
         --sdg-endpoint-url)

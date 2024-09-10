@@ -150,6 +150,7 @@ func TestFetchModelName(t *testing.T) {
 		context.Background(),
 		nil,
 		nil,
+		nil,
 		zap.NewExample().Sugar(),
 		"job-id",
 		mockServer.URL,
@@ -210,6 +211,7 @@ func TestFetchModelNameWithInvalidObject(t *testing.T) {
 
 	w := NewJobProcessor(
 		context.Background(),
+		nil,
 		nil,
 		nil,
 		zap.NewExample().Sugar(),
