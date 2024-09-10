@@ -46,6 +46,7 @@ var (
 	TlsClientCertPath   string
 	TlsClientKeyPath    string
 	TlsServerCaCertPath string
+	PrecheckAPIKey      string
 	TlsInsecure         bool
 	MaxSeed             int
 	TaxonomyFolders     = []string{"compositional_skills", "knowledge"}
@@ -79,6 +80,7 @@ type Worker struct {
 	logger              *zap.SugaredLogger
 	job                 string
 	precheckEndpoint    string
+	precheckAPIKey      string
 	sdgEndpoint         string
 	jobStart            time.Time
 	tlsClientCertPath   string
@@ -88,7 +90,7 @@ type Worker struct {
 	cmdRun              string
 }
 
-func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
+func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, precheckAPIKey, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
 	return &Worker{
 		ctx:                 ctx,
 		pool:                pool,
@@ -96,6 +98,7 @@ func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logg
 		logger:              logger,
 		job:                 job,
 		precheckEndpoint:    precheckEndpoint,
+		precheckAPIKey:      precheckAPIKey,
 		sdgEndpoint:         sdgEndpoint,
 		jobStart:            time.Now(),
 		tlsClientCertPath:   tlsClientCertPath,
@@ -115,6 +118,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
 	generateCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
+	generateCmd.Flags().StringVarP(&PrecheckAPIKey, "precheck-api-key", "", "", "The APIKey for the precheck-endpoint-url.")
 	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instructlab/taxonomy", "The git remote for the taxonomy repo")
@@ -201,6 +205,7 @@ var generateCmd = &cobra.Command{
 					}
 					NewJobProcessor(ctx, pool, svc, sugar, job,
 						PreCheckEndpointURL,
+						PrecheckAPIKey,
 						SdgEndpointURL,
 						TlsClientCertPath,
 						TlsClientKeyPath,
@@ -432,6 +437,10 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			if PreCheckEndpointURL != localEndpoint && modelName != "unknown" {
 				commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, modelName)
 			}
+			if PrecheckAPIKey != "" {
+				commandStr += fmt.Sprintf(" --precheck-api-key %s", PrecheckAPIKey)
+			}
+
 			cmdArgs := strings.Fields(commandStr)
 			cmd := exec.Command(lab, cmdArgs...)
 			// Register the command for reporting/logging
