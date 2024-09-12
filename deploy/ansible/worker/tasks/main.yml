@@ -25,7 +25,7 @@
 
 - name: Set default args for install-worker
   ansible.builtin.set_fact:
-    worker_args: "--gpu-type cuda --github-token {{ github_token }} \
+    worker_args: "--github-token {{ github_token }} \
     --redis-ip {{ redis_ip }} \
     --nexodus-reg-key {{ nexodus_reg_key }} \
     --aws-access-key-id {{ aws_access_key_id }} \
@@ -45,12 +45,26 @@
         bot_repo != None and
         bot_repo | trim != ''
 
+- name: Append ilab config file path
+  ansible.builtin.set_fact:
+    worker_args: "{{ worker_args }} --ilab-config-file {{ ilab_config_file }}"
+  when: ilab_config_file is defined and
+        ilab_config_file != None and
+        ilab_config_file | trim != ''
+
 - name: Append args for precheck_endpoint_url
   ansible.builtin.set_fact:
     worker_args: "{{ worker_args }} --precheck-endpoint-url {{ precheck_endpoint_url }}"
   when: precheck_endpoint_url is defined and
         precheck_endpoint_url != None and
         precheck_endpoint_url | trim != ''
+
+- name: Append api key arg for given precheck_endpoint
+  ansible.builtin.set_fact:
+    worker_args: "{{ worker_args }} --precheck-api-key {{ precheck_api_key }}"
+  when: precheck_api_key is defined and
+        precheck_api_key != None and
+        precheck_api_key | trim != ''
 
 - name: Set tls-insecure if enabled
   ansible.builtin.set_fact:
