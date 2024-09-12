@@ -23,7 +23,9 @@ private_key: |
 
 # taxonomy_repo: https://instructlab-bot:{{ github_token }}@github.com/instructlab/taxonomy.git
 # bot_repo: https://instructlab-bot:{{ github_token }}@github.com/instructlab/instructlab-bot.git
+ilab_config_file: /home/fedora/.config/instructlab/config.yml
 endpoint_url:
+endpoint_api_key:
 sdg_endpoint_url:
 
 tls_client_cert: |
