@@ -23,6 +23,7 @@ const (
 	AccessCheckFailed = "Access check failed."
 	LabelsNotFound    = "Required labels not found."
 	BotEnabled        = "Bot is successfully enabled."
+	NotAllowed        = "Command not allowed"
 )
 
 type PRCommentHandler struct {
@@ -440,6 +441,27 @@ func (h *PRCommentHandler) sdgSvcCommand(ctx context.Context, client *github.Cli
 		}
 
 		params.CheckSummary = LabelsNotFound
+		params.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, params)
+	}
+
+	present, err = util.CheckKnowledgeLabel(prComment.labels)
+	if err != nil {
+		h.Logger.Errorf("Failed to check knowledge label: %v", err)
+	}
+	if present {
+		detailsMsg := "Beep, boop 🤖: Bot does not allow to run generate on the knowledge contribution."
+
+		botComment := github.IssueComment{
+			Body: &detailsMsg,
+		}
+
+		if _, _, err := client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment); err != nil {
+			h.Logger.Error("Failed to comment on pull request: %w", err)
+		}
+
+		params.CheckSummary = NotAllowed
 		params.CheckDetails = detailsMsg
 
 		return util.PostPullRequestCheck(ctx, client, params)
