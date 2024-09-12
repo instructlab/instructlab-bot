@@ -34,6 +34,7 @@ import (
 var (
 	WorkDir             string
 	VenvDir             string
+	IlabConfigFile      string
 	PreCheckEndpointURL string
 	SdgEndpointURL      string
 	NumInstructions     int
@@ -46,6 +47,7 @@ var (
 	TlsClientCertPath   string
 	TlsClientKeyPath    string
 	TlsServerCaCertPath string
+	PrecheckAPIKey      string
 	TlsInsecure         bool
 	MaxSeed             int
 	TaxonomyFolders     = []string{"compositional_skills", "knowledge"}
@@ -54,7 +56,6 @@ var (
 const (
 	gitMaxRetries            = 5
 	gitRetryDelay            = 2 * time.Second
-	ilabConfigPath           = "config.yaml"
 	localEndpoint            = "http://localhost:8000/v1"
 	jobSDG                   = "sdg-svc"
 	jobGenerateLocal         = "generate"
@@ -74,11 +75,13 @@ const (
 // Worker encapsulates dependencies and methods to process jobs
 type Worker struct {
 	ctx                 context.Context
+	ilabConfig          *IlabConfig
 	pool                *redis.Pool
 	svc                 *s3.Client
 	logger              *zap.SugaredLogger
 	job                 string
 	precheckEndpoint    string
+	precheckAPIKey      string
 	sdgEndpoint         string
 	jobStart            time.Time
 	tlsClientCertPath   string
@@ -88,14 +91,16 @@ type Worker struct {
 	cmdRun              string
 }
 
-func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
+func NewJobProcessor(ctx context.Context, ilabConfig *IlabConfig, pool *redis.Pool, svc *s3.Client, logger *zap.SugaredLogger, job, precheckEndpoint, precheckAPIKey, sdgEndpoint, tlsClientCertPath, tlsClientKeyPath, tlsServerCaCertPath string, maxSeed int) *Worker {
 	return &Worker{
 		ctx:                 ctx,
+		ilabConfig:          ilabConfig,
 		pool:                pool,
 		svc:                 svc,
 		logger:              logger,
 		job:                 job,
 		precheckEndpoint:    precheckEndpoint,
+		precheckAPIKey:      precheckAPIKey,
 		sdgEndpoint:         sdgEndpoint,
 		jobStart:            time.Now(),
 		tlsClientCertPath:   tlsClientCertPath,
@@ -106,15 +111,62 @@ func NewJobProcessor(ctx context.Context, pool *redis.Pool, svc *s3.Client, logg
 }
 
 type IlabConfig struct {
+	Chat struct {
+		Context    string  `yaml:"context"`
+		GreedyMode bool    `yaml:"greedy_mode"`
+		LogsDir    string  `yaml:"logs_dir"`
+		MaxTokens  *int    `yaml:"max_tokens"`
+		Model      string  `yaml:"model"`
+		Session    *string `yaml:"session"`
+	} `yaml:"chat"`
+
+	Evaluate struct {
+		BaseBranch *string `yaml:"base_branch"`
+		BaseModel  string  `yaml:"base_model"`
+		Branch     *string `yaml:"branch"`
+		Gpus       *string `yaml:"gpus"`
+		Model      string  `yaml:"model"`
+	} `yaml:"evaluate"`
+
 	Generate struct {
-		Model string `yaml:"model"`
+		ChunkWordCount int    `yaml:"chunk_word_count"`
+		Model          string `yaml:"model"`
+		NumCPUs        int    `yaml:"num_cpus"`
+		OutputDir      string `yaml:"output_dir"`
+		Pipeline       string `yaml:"pipeline"`
+		PromptFile     string `yaml:"prompt_file"`
+		SdgScaleFactor int    `yaml:"sdg_scale_factor"`
+		SeedFile       string `yaml:"seed_file"`
+		TaxonomyBase   string `yaml:"taxonomy_base"`
+		TaxonomyPath   string `yaml:"taxonomy_path"`
 	} `yaml:"generate"`
+
+	Serve struct {
+		Backend      *string `yaml:"backend"`
+		ChatTemplate *string `yaml:"chat_template"`
+		HostPort     string  `yaml:"host_port"`
+		ModelPath    string  `yaml:"model_path"`
+	} `yaml:"serve"`
+
+	Train struct {
+		AdditionalArgs    map[string]interface{} `yaml:"additional_args"`
+		CheckpointAtEpoch bool                   `yaml:"checkpoint_at_epoch"`
+		CkptOutputDir     string                 `yaml:"ckpt_output_dir"`
+		DataOutputDir     string                 `yaml:"data_output_dir"`
+		DataPath          string                 `yaml:"data_path"`
+		ModelPath         string                 `yaml:"model_path"`
+		SaveSamples       int                    `yaml:"save_samples"`
+	} `yaml:"train"`
+
+	Version string `yaml:"version"`
 }
 
 func init() {
 	generateCmd.Flags().StringVarP(&WorkDir, "work-dir", "w", "", "Directory to work in")
 	generateCmd.Flags().StringVarP(&VenvDir, "venv-dir", "v", "", "The virtual environment directory")
+	generateCmd.Flags().StringVarP(&IlabConfigFile, "ilab-config-file", "", "config.yaml", "InstructLab config file absolute path - <path>/config.yaml")
 	generateCmd.Flags().StringVarP(&PreCheckEndpointURL, "precheck-endpoint-url", "e", "", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
+	generateCmd.Flags().StringVarP(&PrecheckAPIKey, "precheck-api-key", "", "", "The APIKey for the precheck-endpoint-url.")
 	generateCmd.Flags().StringVarP(&SdgEndpointURL, "sdg-endpoint-url", "", "http://localhost:8000/v1", "Endpoint hosting the model API. Default, it assumes the model is served locally.")
 	generateCmd.Flags().IntVarP(&NumInstructions, "num-instructions", "n", 10, "The number of instructions to generate")
 	generateCmd.Flags().StringVarP(&GitRemote, "git-remote", "", "https://github.com/instructlab/taxonomy", "The git remote for the taxonomy repo")
@@ -174,6 +226,14 @@ var generateCmd = &cobra.Command{
 
 		svc := s3.NewFromConfig(cfg)
 
+		// Read ilab config file
+		config, err := readIlabConfig(IlabConfigFile)
+		if err != nil {
+			sugar.Fatalf("Could not read ilab config file: %v", err)
+		}
+
+		sugar.Info("ilab config read from config file: %+v", config)
+
 		sigChan := make(chan os.Signal, 1)
 		stopChan := make(chan struct{})
 
@@ -199,8 +259,9 @@ var generateCmd = &cobra.Command{
 						sugar.Errorf("Could not pop from redis queue: %v", err)
 						continue
 					}
-					NewJobProcessor(ctx, pool, svc, sugar, job,
+					NewJobProcessor(ctx, config, pool, svc, sugar, job,
 						PreCheckEndpointURL,
+						PrecheckAPIKey,
 						SdgEndpointURL,
 						TlsClientCertPath,
 						TlsClientKeyPath,
@@ -228,7 +289,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 	if WorkDir != "" {
 		workDir = WorkDir
 	}
-	chatlogDir := path.Join(workDir, "data", "chatlogs")
+	chatlogDir := w.ilabConfig.Chat.LogsDir
 	combinedYAMLPath := path.Join(outputDir, "combined_chatlogs.yaml")
 	combinedLogPath := path.Join(outputDir, "combined_chatlogs.log")
 	combinedYAMLHTMLPath := path.Join(outputDir, "combined_chatlogs.html")
@@ -237,7 +298,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		// Move everything from chatlogDir to outputDir
 		chatlogFiles, err := os.ReadDir(chatlogDir)
 		if err != nil {
-			w.logger.Errorf("Could not read chatlog directory: %v", err)
+			w.logger.Errorf("Could not read chatlog directory (%v) : %v", chatlogDir, err)
 			return
 		}
 
@@ -351,11 +412,15 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 
 	yamlFileCount := 0
 	labDiffOutput := strings.Split(outputStr, "\n")
+	isKnowledge := false
 
 	// Early check for YAML file presence before further processing
 	for _, file := range labDiffOutput {
 		if strings.HasSuffix(file, ".yaml") {
 			yamlFileCount++
+			if strings.HasPrefix(file, "knowledge/") {
+				isKnowledge = true
+			}
 		}
 	}
 
@@ -365,16 +430,26 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		return fmt.Errorf(errMsg)
 	}
 
+	if isKnowledge {
+		w.logger.Info("PR contains knowledge contribution")
+		return w.runKnowledgePrecheck(lab, labDiffOutput, modelName, chatlogDir, workDir)
+	}
+
+	w.logger.Info("PR contain skill contribution")
+	return w.runSkillPrecheck(lab, labDiffOutput, modelName, chatlogDir, workDir)
+}
+
+func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelName string, chatlogDir string, workDir string) error {
 	// Proceed with YAML files processing if they exist
 	for _, file := range labDiffOutput {
 		if !strings.HasSuffix(file, ".yaml") {
 			continue
 		}
-		filePath := path.Join(workDir, "taxonomy", file)
-
+		filePath := path.Join(w.ilabConfig.Generate.TaxonomyPath, file)
+		w.logger.Infof("ANIL: opening knowledge yaml : %s", filePath)
 		f, err := os.Open(filePath)
 		if err != nil {
-			w.logger.Errorf("Could not open taxonomy file: %v", err)
+			w.logger.Errorf("Could not open taxonomy knowledge yaml file: %v", err)
 			return err
 		}
 		defer f.Close()
@@ -397,7 +472,154 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		// Check if "seed_examples" exists and is a list
 		seedExamples, ok := data["seed_examples"].([]interface{})
 		if !ok {
-			err = fmt.Errorf("seed_examples not found or not a list")
+			err = fmt.Errorf("seed_examples not found or not a list in the knowledge")
+			w.logger.Error(err)
+			return err
+		}
+
+		for seIndex, item := range seedExamples {
+			example, ok := item.(map[interface{}]interface{})
+			if !ok {
+				w.logger.Error("Invalid seed example format in knowledge YAML file")
+				continue
+			}
+			context, ok := example["context"].(string)
+			if !ok {
+				w.logger.Error("Context not found or not a string in seed example of knowledge")
+				continue
+			}
+
+			originalContext := context
+
+			// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
+			context = escapeHyphens(context)
+
+			qnaPairs, hasQnAPairs := example["questions_and_answers"].([]interface{})
+
+			if !hasQnAPairs {
+				w.logger.Errorf("Questions and answers not found or not a list in knowledge seed example %d", seIndex)
+
+				// If there are no questions and answers, skip to the next seed example
+				continue
+			}
+
+			for _, qnaPair := range qnaPairs {
+				qna, ok := qnaPair.(map[interface{}]interface{})
+				if !ok {
+					w.logger.Errorf("Invalid question and answer format in knowledge seed example %d", seIndex)
+					continue
+				}
+				question, ok := qna["question"].(string)
+				if !ok {
+					w.logger.Errorf("Question not found or not a string in knowledge seed example %d", seIndex)
+					continue
+				}
+
+				// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
+				originalQuestion := question
+				question = escapeHyphens(question)
+				// Append the context to the question with a specific format
+				question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
+
+				commandStr := fmt.Sprintf("model chat --quick-question %s", question)
+				if TlsInsecure {
+					commandStr += " --tls-insecure"
+				}
+				if PreCheckEndpointURL != localEndpoint && modelName != "unknown" {
+					commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, modelName)
+				}
+				if PrecheckAPIKey != "" {
+					commandStr += fmt.Sprintf(" --api-key %s", PrecheckAPIKey)
+				}
+				cmdArgs := strings.Fields(commandStr)
+				cmd := exec.Command(lab, cmdArgs...)
+				// Register the command for reporting/logging
+				w.cmdRun = cmd.String()
+				w.logger.Infof("Running the precheck command for knowledge contribution: %s", cmd.String())
+				cmd.Dir = workDir
+				cmd.Env = os.Environ()
+				var out bytes.Buffer
+				var errOut bytes.Buffer
+				cmd.Stdout = &out
+				cmd.Stderr = &errOut
+				err = cmd.Run()
+				if err != nil {
+					w.logger.Errorf("Precheck command failed for knowledge contribution with error: %v; stderr: %s", err, errOut.String())
+					continue
+				}
+
+				logData := map[string]interface{}{
+					"context": originalContext,
+					"input": map[string]string{
+						"question": originalQuestion,
+					},
+					"output": out.String(),
+				}
+				logYAML, err := yaml.Marshal(logData)
+				if err != nil {
+					w.logger.Errorf("Could not marshal log data to YAML: %v", err)
+					continue
+				}
+				// Generate uniquely timestamped filenames for the combined input/output YAML files
+				timestamp := time.Now().Format("2006-01-02T15_04_05")
+				logFileName := fmt.Sprintf("chat_%s.yaml", timestamp)
+				err = os.WriteFile(path.Join(chatlogDir, logFileName), logYAML, 0644)
+				if err != nil {
+					w.logger.Errorf("Could not write chatlog for knowledge question to file: %v", err)
+					continue
+				}
+
+				// Create a combined .log file
+				logText := fmt.Sprintf("Context:\n%s\nInput:\n%s\nOutput:\n%s\n", originalContext, originalQuestion, out.String())
+				logFileName = fmt.Sprintf("chat_%s.log", timestamp)
+				err = os.WriteFile(path.Join(chatlogDir, logFileName), []byte(logText), 0644)
+				if err != nil {
+					w.logger.Errorf("Could not write chat log for knowledge question to file: %v", err)
+					continue
+				}
+				// Sleep to ensure unique timestamps for filenames
+				time.Sleep(1 * time.Second)
+			}
+
+		}
+	}
+	return nil
+}
+
+func (w *Worker) runSkillPrecheck(lab string, labDiffOutput []string, modelName string, chatlogDir string, workDir string) error {
+
+	// Proceed with YAML files processing if they exist
+	for _, file := range labDiffOutput {
+		if !strings.HasSuffix(file, ".yaml") {
+			continue
+		}
+		filePath := path.Join(w.ilabConfig.Generate.TaxonomyPath, file)
+		f, err := os.Open(filePath)
+		if err != nil {
+			w.logger.Errorf("Could not open taxonomy skill yaml file: %v", err)
+			return err
+		}
+		defer f.Close()
+
+		content, err := io.ReadAll(f)
+		if err != nil {
+			w.logger.Error(err)
+			return err
+		}
+
+		var data map[string]interface{}
+		err = yaml.Unmarshal(content, &data)
+		if err != nil {
+			// Odds are, the PR was not yaml-linted since it's invalid YAML failing unmarshalling
+			err = fmt.Errorf("the original taxonomy YAML likely did not pass yaml-linting, here is the unmarshalling error: %v", err)
+			w.logger.Error(err)
+			return err
+		}
+
+		// Check if "seed_examples" exists and is a list
+		seedExamples, ok := data["seed_examples"].([]interface{})
+		if !ok {
+			err = fmt.Errorf("seed_examples not found or not a list in skill yaml file: %s", filePath)
 			w.logger.Error(err)
 			return err
 		}
@@ -405,12 +627,12 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 		for _, item := range seedExamples {
 			example, ok := item.(map[interface{}]interface{})
 			if !ok {
-				w.logger.Error("Invalid seed example format")
+				w.logger.Error("Invalid seed example format in the skill")
 				continue
 			}
 			question, ok := example["question"].(string)
 			if !ok {
-				w.logger.Error("Question not found or not a string")
+				w.logger.Error("Question not found or not a string in the skill")
 				continue
 			}
 
@@ -425,18 +647,22 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 				// Append the context to the question with a specific format
 				question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
 			}
-			commandStr := fmt.Sprintf("chat --quick-question %s", question)
+			commandStr := fmt.Sprintf("model chat --quick-question %s", question)
 			if TlsInsecure {
 				commandStr += " --tls-insecure"
 			}
 			if PreCheckEndpointURL != localEndpoint && modelName != "unknown" {
 				commandStr += fmt.Sprintf(" --endpoint-url %s --model %s", PreCheckEndpointURL, modelName)
 			}
+			if PrecheckAPIKey != "" {
+				commandStr += fmt.Sprintf(" --api-key %s", PrecheckAPIKey)
+			}
+
 			cmdArgs := strings.Fields(commandStr)
 			cmd := exec.Command(lab, cmdArgs...)
 			// Register the command for reporting/logging
 			w.cmdRun = cmd.String()
-			w.logger.Infof("Running the precheck command: %s", cmd.String())
+			w.logger.Infof("Running the precheck command for skill contribution: %s", cmd.String())
 
 			cmd.Dir = workDir
 			cmd.Env = os.Environ()
@@ -446,7 +672,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			cmd.Stderr = &errOut
 			err = cmd.Run()
 			if err != nil {
-				w.logger.Errorf("Precheck command failed with error: %v; stderr: %s", err, errOut.String())
+				w.logger.Errorf("Precheck command for skill failed with error: %v; stderr: %s", err, errOut.String())
 				continue
 			}
 
@@ -472,7 +698,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			logFileName := fmt.Sprintf("chat_%s.yaml", timestamp)
 			err = os.WriteFile(path.Join(chatlogDir, logFileName), logYAML, 0644)
 			if err != nil {
-				w.logger.Errorf("Could not write chatlog to file: %v", err)
+				w.logger.Errorf("Could not write skill question chatlog to file: %v", err)
 				continue
 			}
 
@@ -481,7 +707,7 @@ func (w *Worker) runPrecheck(lab, outputDir, modelName string) error {
 			logFileName = fmt.Sprintf("chat_%s.log", timestamp)
 			err = os.WriteFile(path.Join(chatlogDir, logFileName), []byte(logText), 0644)
 			if err != nil {
-				w.logger.Errorf("Could not write chat log to file: %v", err)
+				w.logger.Errorf("Could not write skill question chat log to file: %v", err)
 				continue
 			}
 
@@ -546,7 +772,8 @@ func (w *Worker) processJob() {
 	if WorkDir != "" {
 		workDir = WorkDir
 	}
-	taxonomyDir := path.Join(workDir, "taxonomy")
+	taxonomyDir := w.ilabConfig.Generate.TaxonomyPath
+
 	sugar = sugar.With("work_dir", workDir, "origin", Origin)
 
 	// Clean up the taxonomy directory if it exists from a previous jobs
@@ -582,8 +809,9 @@ func (w *Worker) processJob() {
 		var err error
 		modelName, err = w.fetchModelName(true)
 		if err != nil {
-			w.logger.Errorf("Failed to fetch model name: %v", err)
-			modelName = "unknown"
+			w.logger.Warnf("Failed to fetch model name: %v", err)
+			w.logger.Warnf("Using default model name: granite-7b-lab")
+			modelName = "granite-7b-lab"
 		}
 	} else {
 		modelName = w.getModelNameFromConfig()
@@ -594,7 +822,7 @@ func (w *Worker) processJob() {
 	case jobGenerateLocal:
 		// @instructlab-bot generate-local
 		// Runs generate on the local worker node
-		generateArgs := []string{"generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
+		generateArgs := []string{"data", "generate", "--num-instructions", fmt.Sprintf("%d", NumInstructions), "--output-dir", outputDir}
 
 		cmd = exec.CommandContext(w.ctx, lab, generateArgs...)
 		if WorkDir != "" {
@@ -629,7 +857,7 @@ func (w *Worker) processJob() {
 		// @instructlab-bot generate
 		// Runs generate on the SDG backend
 		// ilab diff is run since the sdg generation is not part of upstream cli
-		cmdDiff := exec.Command("ilab", "diff")
+		cmdDiff := exec.Command("ilab", "taxonomy", "diff")
 		var stderr bytes.Buffer
 		cmdDiff.Stderr = &stderr
 
@@ -644,9 +872,9 @@ func (w *Worker) processJob() {
 		diffOutputLines := strings.Split(string(diffOutput), "\n")
 		// Filter taxonomy files ending in .yaml and prepare them relative to workDir
 		var taxonomyFiles []string
-		for _, line := range diffOutputLines {
-			if strings.HasSuffix(line, ".yaml") {
-				relativePath := filepath.Join("taxonomy", line)
+		for _, file := range diffOutputLines {
+			if strings.HasSuffix(file, ".yaml") {
+				relativePath := filepath.Join(w.ilabConfig.Generate.TaxonomyPath, file)
 				taxonomyFiles = append(taxonomyFiles, relativePath)
 			}
 		}
@@ -783,9 +1011,25 @@ func (w *Worker) postJobResults(URL, jobType string) {
 	}
 }
 
-// getModelNameFromConfig retrieves the model name from the config file or precheckEndpoint
+func readIlabConfig(filePath string) (*IlabConfig, error) {
+	fmt.Printf("Reading InstructLab config file from: %s", filePath)
+	cfgData, err := os.ReadFile(filePath)
+	if err != nil {
+		return &IlabConfig{}, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	var cfg IlabConfig
+	err = yaml.Unmarshal(cfgData, &cfg)
+	if err != nil {
+		return &IlabConfig{}, fmt.Errorf("failed to unmarshal config file: %v", err)
+	}
+
+	return &cfg, nil
+}
+
+// getModelNameFromConfig retrieves the model name from the config file
 func (w *Worker) getModelNameFromConfig() string {
-	cfgData, err := os.ReadFile(ilabConfigPath)
+	cfgData, err := os.ReadFile(IlabConfigFile)
 	if err != nil {
 		return "unknown"
 	}
@@ -795,8 +1039,9 @@ func (w *Worker) getModelNameFromConfig() string {
 	if err != nil || cfg.Generate.Model == "" {
 		return "unknown"
 	}
-
-	return cfg.Generate.Model
+	modelName := filepath.Base(cfg.Generate.Model)
+	w.logger.Infof("Model name from the config file: %s", modelName)
+	return modelName
 }
 
 // fetchModelName hits the defined precheckEndpoint with "/models" appended to extract the model name.
@@ -818,6 +1063,10 @@ func (w *Worker) fetchModelName(fullName bool) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
+	if w.precheckAPIKey != "" {
+		w.logger.Info("Set Authorization header with precheck API key")
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", w.precheckAPIKey))
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch model details: %w", err)
@@ -844,7 +1093,7 @@ func (w *Worker) fetchModelName(fullName bool) (string, error) {
 	if err := json.Unmarshal(body, &responseData); err != nil {
 		return "", fmt.Errorf("failed to parse JSON response: %w", err)
 	}
-
+	w.logger.Debugf("Received response for model request: %v", responseData)
 	if responseData.Object != "list" {
 		return "", fmt.Errorf("expected object type 'list', got '%s'", responseData.Object)
 	}
@@ -902,7 +1151,8 @@ func (w *Worker) determineModelName(jobType string) string {
 		modelName, err := w.fetchModelName(false)
 		if err != nil {
 			w.logger.Errorf("Failed to fetch model name: %v", err)
-			return "unknown"
+			w.logger.Info("Using default model name: granite-7b-lab")
+			return "granite-7b-lab"
 		}
 		return modelName
 	}
