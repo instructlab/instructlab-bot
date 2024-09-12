@@ -446,7 +446,6 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 			continue
 		}
 		filePath := path.Join(w.ilabConfig.Generate.TaxonomyPath, file)
-		w.logger.Infof("ANIL: opening knowledge yaml : %s", filePath)
 		f, err := os.Open(filePath)
 		if err != nil {
 			w.logger.Errorf("Could not open taxonomy knowledge yaml file: %v", err)
@@ -492,7 +491,7 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 			originalContext := context
 
 			// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
-			context = escapeHyphens(context)
+			// context = escapeHyphens(context)
 
 			qnaPairs, hasQnAPairs := example["questions_and_answers"].([]interface{})
 
@@ -515,11 +514,19 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 					continue
 				}
 
+				originalAnswer, ok := qna["answer"].(string)
+				if !ok {
+					w.logger.Errorf("Answer not found or not a string in knowledge seed example %d", seIndex)
+					continue
+				}
+
 				// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
 				originalQuestion := question
 				question = escapeHyphens(question)
 				// Append the context to the question with a specific format
-				question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
+				// In case of knowledge, it doesn't make sense to provide the context with the question
+				// Commenting out the context appending in case we need to revert back
+				// question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
 
 				commandStr := fmt.Sprintf("model chat --quick-question %s", question)
 				if TlsInsecure {
@@ -549,11 +556,10 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 				}
 
 				logData := map[string]interface{}{
-					"context": originalContext,
-					"input": map[string]string{
-						"question": originalQuestion,
-					},
-					"output": out.String(),
+					"context":         originalContext,
+					"question":        originalQuestion,
+					"original-answer": originalAnswer,
+					"model-answer":    out.String(),
 				}
 				logYAML, err := yaml.Marshal(logData)
 				if err != nil {
@@ -570,7 +576,7 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 				}
 
 				// Create a combined .log file
-				logText := fmt.Sprintf("Context:\n%s\nInput:\n%s\nOutput:\n%s\n", originalContext, originalQuestion, out.String())
+				logText := fmt.Sprintf("Context:\n%s\nQuestion:\n%s\nOriginalAnswer:\n%s\nModelAnswer:\n%s\n", originalContext, originalQuestion, originalAnswer, out.String())
 				logFileName = fmt.Sprintf("chat_%s.log", timestamp)
 				err = os.WriteFile(path.Join(chatlogDir, logFileName), []byte(logText), 0644)
 				if err != nil {
@@ -635,6 +641,11 @@ func (w *Worker) runSkillPrecheck(lab string, labDiffOutput []string, modelName 
 				w.logger.Error("Question not found or not a string in the skill")
 				continue
 			}
+			originalAnswer, ok := example["answer"].(string)
+			if !ok {
+				w.logger.Error("Answer not found or not a string in the skill")
+				continue
+			}
 
 			context, hasContext := example["context"].(string)
 			originalQuestion := question
@@ -677,14 +688,13 @@ func (w *Worker) runSkillPrecheck(lab string, labDiffOutput []string, modelName 
 			}
 
 			logData := map[string]interface{}{
-				"input": map[string]string{
-					"question": originalQuestion,
-				},
-				"output": out.String(),
+				"question":        originalQuestion,
+				"original-answer": originalAnswer,
+				"model-answer":    out.String(),
 			}
 
 			if hasContext {
-				logData["input"].(map[string]string)["context"] = context
+				logData["context"] = context
 			}
 
 			logYAML, err := yaml.Marshal(logData)
