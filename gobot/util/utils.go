@@ -8,6 +8,8 @@ import (
 	"github.com/instructlab/instructlab-bot/gobot/common"
 )
 
+const KnowledgeLabel string = "knowledge"
+
 func CheckBotEnableStatus(ctx context.Context, client *github.Client, params PullRequestStatusParams) (bool, error) {
 	checkStatus, response, err := client.Checks.ListCheckRunsForRef(ctx, params.RepoOwner, params.RepoName, params.PrSha, nil)
 	if err != nil {
@@ -24,6 +26,18 @@ func CheckBotEnableStatus(ctx context.Context, client *github.Client, params Pul
 		}
 	}
 	return false, nil
+}
+
+func CheckKnowledgeLabel(labels []*github.Label) (bool, error) {
+
+	labelFound := false
+	for _, label := range labels {
+		if label.GetName() == KnowledgeLabel {
+			labelFound = true
+			break
+		}
+	}
+	return labelFound, nil
 }
 
 func CheckRequiredLabel(labels []*github.Label, requiredLabels []string) (bool, error) {
