@@ -100,15 +100,7 @@ ilabserve-base-image: worker/Containerfile.servebase ## Build container image fo
 	$(ECHO_PREFIX) printf "  %-12s worker/Containerfile.servebase\n" "[PODMAN]"
 	$(CMD_PREFIX) podman build -f worker/Containerfile.servebase -t ghcr.io/instructlab/instructlab-bot/instructlab-serve-base:main .
 
-apiserver-image: ui/apiserver/Containerfile ## Build continaer image for the Apiserver
-	$(ECHO_PREFIX) printf "  %-12s ui/apiserver/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f ui/apiserver/Containerfile -t ghcr.io/instructlab/instructlab-bot/apiserver:main .
-
-ui-image: ui/Containerfile ## Build continaer image for the bot ui
-	$(ECHO_PREFIX) printf "  %-12s ui/Containerfile\n" "[PODMAN]"
-	$(CMD_PREFIX) podman build -f ui/Containerfile -t ghcr.io/instructlab/instructlab-bot/bot-ui:main .
-
-all-images: gobot-image worker-test-image apiserver-image ui-image ## Build all container images
+all-images: gobot-image worker-test-image ## Build all container images
 	$(ECHO_PREFIX) printf "  %-12s BUILD ALL CONTAINER IMAGES\n"
 
 .PHONY: gobot
@@ -154,27 +146,11 @@ run-dev: ## Deploy the bot development stack.
 	$(ECHO_PREFIX) printf "Deploy the development stack\n"
 	$(CMD_PREFIX) podman compose -f ./deploy/compose/dev-single-worker-compose.yaml up -d
 
-.PHONY: run-dev-ui
-run-dev-ui: ## Deploy the bot development stack with the UI components.
-	$(ECHO_PREFIX) printf "  %-12s \n" "[RUN DEV UI STACK]"
-	$(CMD_PREFIX) if [ ! -f .env ]; then \
-		echo ".env not found. Copy .env.example to .env and configure it." ; \
-		exit 1 ; \
-	fi
-	$(ECHO_PREFIX) printf "Deploy the development stack with UI components\n"
-	$(CMD_PREFIX) podman compose -f ./deploy/compose/dev-single-worker-with-ui.yaml up -d
-
 .PHONY: stop-dev
 stop-dev: ## Stop the bot development stack.
 	$(ECHO_PREFIX) printf "  %-12s \n" "[STOP DEV STACK]"
 	$(ECHO_PREFIX) printf "Stop the development stack\n"
 	$(CMD_PREFIX) podman compose -f ./deploy/compose/dev-single-worker-compose.yaml down
-
-.PHONY: stop-dev-ui
-stop-dev-ui: ## Stop the bot development stack with the UI components.
-	$(ECHO_PREFIX) printf "  %-12s \n" "[STOP DEV UI STACK]"
-	$(ECHO_PREFIX) printf "Stop the development stack with UI components\n"
-	$(CMD_PREFIX) podman compose -f ./deploy/compose/dev-single-worker-with-ui.yaml down
 
 .PHONY: redis-stack
 redis-stack: ## Run a redis-stack container

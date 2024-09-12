@@ -9,5 +9,3 @@ globs:
   - "**/*.md"
 ignores:
   - "pkg"
-  - "**/node_modules/*"
-  - "**/node_modules/**"
