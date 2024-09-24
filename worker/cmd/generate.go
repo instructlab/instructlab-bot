@@ -482,16 +482,11 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 				w.logger.Error("Invalid seed example format in knowledge YAML file")
 				continue
 			}
-			context, ok := example["context"].(string)
+			originalContext, ok := example["context"].(string)
 			if !ok {
 				w.logger.Error("Context not found or not a string in seed example of knowledge")
 				continue
 			}
-
-			originalContext := context
-
-			// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
-			// context = escapeHyphens(context)
 
 			qnaPairs, hasQnAPairs := example["questions_and_answers"].([]interface{})
 
@@ -508,7 +503,7 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 					w.logger.Errorf("Invalid question and answer format in knowledge seed example %d", seIndex)
 					continue
 				}
-				question, ok := qna["question"].(string)
+				originalQuestion, ok := qna["question"].(string)
 				if !ok {
 					w.logger.Errorf("Question not found or not a string in knowledge seed example %d", seIndex)
 					continue
@@ -521,9 +516,8 @@ func (w *Worker) runKnowledgePrecheck(lab string, labDiffOutput []string, modelN
 				}
 
 				// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
-				originalQuestion := question
-				question = escapeHyphens(question)
-				// Append the context to the question with a specific format
+				question := escapeHyphens(originalQuestion)
+
 				// In case of knowledge, it doesn't make sense to provide the context with the question
 				// Commenting out the context appending in case we need to revert back
 				// question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
@@ -636,7 +630,7 @@ func (w *Worker) runSkillPrecheck(lab string, labDiffOutput []string, modelName 
 				w.logger.Error("Invalid seed example format in the skill")
 				continue
 			}
-			question, ok := example["question"].(string)
+			originalQuestion, ok := example["question"].(string)
 			if !ok {
 				w.logger.Error("Question not found or not a string in the skill")
 				continue
@@ -647,14 +641,14 @@ func (w *Worker) runSkillPrecheck(lab string, labDiffOutput []string, modelName 
 				continue
 			}
 
-			context, hasContext := example["context"].(string)
-			originalQuestion := question
+			originalContext, hasContext := example["context"].(string)
 
 			// Escape sequences of two or more hyphens in the question to avoid ilab seeing a flag request
-			question = escapeHyphens(question)
+			question := escapeHyphens(originalQuestion)
 
 			// Slicing args breaks ilab chat for context, use Sprintf to control spacing
 			if hasContext {
+				context := escapeHyphens(originalContext)
 				// Append the context to the question with a specific format
 				question = fmt.Sprintf("%s %s %s.", question, ctxPrompt, context)
 			}
@@ -694,7 +688,7 @@ func (w *Worker) runSkillPrecheck(lab string, labDiffOutput []string, modelName 
 			}
 
 			if hasContext {
-				logData["context"] = context
+				logData["context"] = originalContext
 			}
 
 			logYAML, err := yaml.Marshal(logData)
