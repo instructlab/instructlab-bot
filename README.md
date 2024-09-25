@@ -1,5 +1,9 @@
 # instructlab-bot
 
+![Lint](https://github.com/instructlab/instructlab-bot/actions/workflows/lint-jobs.yml/badge.svg?branch=main)
+![Build](https://github.com/instructlab/instructlab-bot/actions/workflows/build.yml/badge.svg?branch=main)
+![Image](https://github.com/instructlab/instructlab-bot/actions/workflows/images.yml/badge.svg?branch=main)
+
 A GitHub bot to increase contributor test and review velocity for
 [instructlab/taxonomy](https://github.com/instructlab/taxonomy).
 
