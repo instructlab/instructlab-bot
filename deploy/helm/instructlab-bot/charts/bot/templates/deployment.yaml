@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+        - image: {{ .Values.image }} # ghcr.io/instructlab/instructlab-bot/instructlab-gobot:main
+          env:
+            - name: ILBOT_GITHUB_INTEGRATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: instructlab-bot
+                  key: ILBOT_GITHUB_INTEGRATION_ID
+            - name: ILBOT_GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: instructlab-bot
+                  key: ILBOT_GITHUB_WEBHOOK_SECRET
+            - name: ILBOT_GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: instructlab-bot
+                  key: ILBOT_GITHUB_APP_PRIVATE_KEY
+          name: bot
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      restartPolicy: Always
