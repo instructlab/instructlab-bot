@@ -129,6 +129,8 @@ func (h *PRCommentHandler) Handle(ctx context.Context, eventType, deliveryID str
 		return h.precheckCommand(ctx, client, &prComment)
 	case "generate":
 		return h.sdgSvcCommand(ctx, client, &prComment)
+	case "approve":
+		return h.trainingDataApproveCommand(ctx, client, &prComment)
 	default:
 		return h.unknownCommand(ctx, client, &prComment)
 	}
@@ -481,6 +483,75 @@ func (h *PRCommentHandler) unknownCommand(ctx context.Context, client *github.Cl
 
 	if _, _, err := client.Issues.CreateComment(ctx, prComment.repoOwner, prComment.repoName, prComment.prNum, &botComment); err != nil {
 		h.Logger.Error("Failed to comment on pull request: %w", err)
+		return err
+	}
+
+	return nil
+}
+
+func (h *PRCommentHandler) trainingDataApproveCommand(ctx context.Context, client *github.Client, prComment *PRComment) error {
+	h.Logger.Infof("Approve command received on %s/%s#%d by %s",
+		prComment.repoOwner, prComment.repoName, prComment.prNum, prComment.author)
+
+	statusParams := util.PullRequestStatusParams{
+		Status:     common.CheckComplete,
+		Conclusion: common.CheckStatusFailure,
+		CheckName:  common.TrainingDataApproveCheck,
+		RepoOwner:  prComment.repoOwner,
+		RepoName:   prComment.repoName,
+		PrNum:      prComment.prNum,
+		PrSha:      prComment.prSha,
+	}
+
+	labelParams := util.PullRequestLabelParams{
+		Name:      common.TrainingDataApproveLabelName,
+		RepoOwner: prComment.repoOwner,
+		RepoName:  prComment.repoName,
+		PrNum:     prComment.prNum,
+		PrSha:     prComment.prSha,
+	}
+
+	// Check if user is part of the teams that are allowed to enable the bot
+	isAllowed := h.checkAuthorPermission(ctx, client, prComment)
+	if !isAllowed {
+		statusParams.Comment = fmt.Sprintf("User %s is not allowed to run the InstructLab bot. Only %v teams are allowed to access the bot functions.", prComment.author, h.Maintainers)
+
+		err := util.PostPullRequestComment(ctx, client, statusParams)
+		if err != nil {
+			h.Logger.Errorf("Failed to post comment on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
+			return err
+		}
+		return nil
+	}
+
+	present, err := util.CheckRequiredLabel(prComment.labels, h.RequiredLabels)
+	if err != nil {
+		h.Logger.Errorf("Failed to check required labels: %v", err)
+	}
+	if !present {
+		detailsMsg := fmt.Sprintf("Beep, boop 🤖: To proceed, the pull request must have one of the '%v' labels.", h.RequiredLabels)
+		if err != nil {
+			detailsMsg = fmt.Sprintf("%s\nError: %v", detailsMsg, err)
+		}
+
+		statusParams.CheckSummary = LabelsNotFound
+		statusParams.CheckDetails = detailsMsg
+
+		return util.PostPullRequestCheck(ctx, client, statusParams)
+	}
+
+	// 1. Applies the label training-data-approved
+	err = util.PostPullRequestLabel(ctx, client, labelParams)
+	if err != nil {
+		h.Logger.Errorf("Failed to check required labels: %v", err)
+	}
+
+	// 2. Prompt user to run the training
+	statusParams.Comment = fmt.Sprintf("the '%s' label has been applied to the PR. You may now run '@instruct-lab-bot train", common.TrainingDataApproveLabelName)
+
+	err = util.PostPullRequestComment(ctx, client, statusParams)
+	if err != nil {
+		h.Logger.Errorf("Failed to post comment on PR %s/%s#%d: %v", prComment.repoOwner, prComment.repoName, prComment.prNum, err)
 		return err
 	}
 
