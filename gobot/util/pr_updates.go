@@ -4,12 +4,29 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v61/github"
 	"github.com/instructlab/instructlab-bot/gobot/common"
 )
+
+type PullRequestLabelParams struct {
+	// ID          int64
+	// URL         string
+	Name    string
+	Comment string
+	// Color       string
+	// Description string
+	// Default     bool
+	// NodeID      string
+
+	RepoOwner string
+	RepoName  string
+	PrNum     int
+	PrSha     string
+}
 
 type PullRequestStatusParams struct {
 	Status       string
@@ -64,7 +81,6 @@ func PostPullRequestComment(ctx context.Context, client *github.Client, params P
 }
 
 func PostPullRequestCheck(ctx context.Context, client *github.Client, params PullRequestStatusParams) error {
-
 	checkRequest := github.CreateCheckRunOptions{
 		Name:      params.CheckName,
 		HeadSHA:   params.PrSha,
@@ -86,6 +102,26 @@ func PostPullRequestCheck(ctx context.Context, client *github.Client, params Pul
 	_, _, err := client.Checks.CreateCheckRun(ctx, params.RepoOwner, params.RepoName, checkRequest)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func PostPullRequestLabel(ctx context.Context, client *github.Client, params PullRequestLabelParams) error {
+	// Not sure we need all this, keeping for now until tested with just name
+	label := &github.Label{
+		// ID:          &params.ID,
+		// URL:         &params.URL,
+		Name: &params.Name,
+		// Color:       &params.Color,
+		// Description: &params.Description,
+		// Default:     &params.Default,
+		// NodeID:      &params.NodeID,
+	}
+
+	_, _, err := client.Issues.AddLabelsToIssue(ctx, params.RepoOwner, params.RepoName, *&params.PrNum, []string{*label.Name})
+	if err != nil {
+		fmt.Printf("Error adding label to pull request: %v\n", err)
+		os.Exit(1)
 	}
 	return nil
 }
